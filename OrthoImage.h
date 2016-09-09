@@ -9,12 +9,14 @@ using namespace std;
 
 //coredll
 #include "defs.h"
+#include "geotiff.h"
 
 //cvlib
 #include "bundlerio.hpp"
 
 //gdal
 #include "gdal_priv.h"
+
 
 
 //same as ReadBundlerOutFile(...)

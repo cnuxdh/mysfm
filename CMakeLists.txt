@@ -4,6 +4,10 @@ INCLUDE_DIRECTORIES(/usr/local/include
 										../
 										../CoreDll
 										../Corelib
+										../sfm-driver
+										../matrix
+										../5point
+										../imagelib
 										)
 
 
@@ -12,4 +16,7 @@ ADD_LIBRARY(cvlib
 	absOri.hpp
 	panorama.cpp
 	panorama.hpp
+	relativepose.hpp
+	relativepose.cpp
+	register.cpp
 	)

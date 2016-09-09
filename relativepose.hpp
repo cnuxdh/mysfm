@@ -151,7 +151,7 @@ DLL_EXPORT int RelativePoseEstimation(char* filename1, char* filename2, double f
 
 
 //calculate the fundamental matrix using: F=[T]x.R
-//DLL_EXPORT int CalculateEssentialMatrix(double* R, double* T, double* F);
+DLL_EXPORT int CalculateEssentialMatrix(double* R, double* T, double* F);
 
 
 #endif

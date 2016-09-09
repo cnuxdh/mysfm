@@ -2,6 +2,22 @@
 #include "assert.h"
 #include "math.h"
 
+
+
+#ifdef OPENCV_1X 
+	#include "cv.h"
+	#include "highgui.h"
+	#include "cxcore.h"
+#else
+	#include "opencv2/core/core.hpp"
+	#include "opencv2/highgui/highgui.hpp"
+	#include "opencv2/calib3d/calib3d.hpp"
+	using namespace cv;
+#endif
+
+
+
+
 #include "sift.hpp"
 #include "relativepose.hpp"
 #include "cali.hpp"
@@ -28,18 +44,6 @@
 #include "triangulate.h"
 #include "fmatrix.h"
 
-
-
-#ifdef OPENCV_1X 
-	#include "cv.h"
-	#include "highgui.h"
-	#include "cxcore.h"
-#else
-	//opencv
-	#include "opencv2/core/core.hpp"
-	#include "opencv2/highgui/highgui.hpp"
-	#include "opencv2/calib3d/calib3d.hpp"
-#endif
 
 
 
@@ -1165,7 +1169,7 @@ int RelativePoseEstimation(char* filename1, char* filename2, double focalLen1, d
 	return 0;
 }
 
-/*
+
 int CalculateEssentialMatrix(double* R, double* T, double* F)
 {
 	//generate the asymmetric matrix
@@ -1178,4 +1182,4 @@ int CalculateEssentialMatrix(double* R, double* T, double* F)
     
 	return 0;
 }
-*/
+
