@@ -43,19 +43,7 @@
 #include "triangulate.h"
 
 
-static char ply_header[] = 
-"ply\n"
-"format ascii 1.0\n"
-"element face 0\n"
-"property list uchar int vertex_indices\n"
-"element vertex %d\n"
-"property float x\n"
-"property float y\n"
-"property float z\n"
-"property uchar diffuse_red\n"
-"property uchar diffuse_green\n"
-"property uchar diffuse_blue\n"
-"end_header\n";
+
 
 /* Write point files to a ply file */
 void DumpPointsToPly(char *output_directory, char *filename, 
@@ -373,6 +361,9 @@ double ComputeRayAngle(v2_t p, v2_t q,
 }
 
 
+
+
+
 v3_t GeneratePointAtInfinity(vector<CImageDataBase*> imageData,
 							 const ImageKeyVector &views, 
 							 int *added_order, 
@@ -391,13 +382,7 @@ v3_t GeneratePointAtInfinity(vector<CImageDataBase*> imageData,
 
 	double p3[3] = { key.cx, key.cy, 1.0 };
 	
-	/*
-	if (m_optimize_for_fisheye) 
-	{
-		// Undistort the point
-		double x = p3[0], y = p3[1];
-		m_image_data[image_idx].UndistortPoint(x, y, p3[0], p3[1]);
-	}*/
+
 
 	double K[9], Kinv[9];
 	GetIntrinsics(cameras[camera_idx], K);
@@ -406,7 +391,7 @@ v3_t GeneratePointAtInfinity(vector<CImageDataBase*> imageData,
 	double ray[3];
 	matrix_product(3, 3, 3, 1, Kinv, p3, ray);
 
-	/* We now have a ray, put it at infinity */
+	//We now have a ray, put it at infinity
 	double ray_world[3];
 	matrix_transpose_product(3, 3, 3, 1, cam->R, ray, ray_world);
 
@@ -428,7 +413,7 @@ v3_t GeneratePointAtInfinity(vector<CImageDataBase*> imageData,
 	return v3_new(pt_inf[0], pt_inf[1], pt_inf[2]);
 }
 
-/* Triangulate a subtrack */
+// Triangulate a subtrack
 v3_t TriangulateNViews(const vector<CImageDataBase*> imageData,
 					   const ImageKeyVector &views, 
 					   int *added_order, camera_params_t *cameras,
@@ -454,14 +439,6 @@ v3_t TriangulateNViews(const vector<CImageDataBase*> imageData,
 		//double p3[3] = { key.m_x, key.m_y, 1.0 };
 		FeatPoint &key = imageData[image_idx]->GetKeyPoint(key_idx); //GetKey(image_idx, key_idx);
 		double p3[3] = { key.cx, key.cy, 1.0 };
-
-		/*
-		if (m_optimize_for_fisheye) 
-		{
-			// Undistort the point
-			double x = p3[0], y = p3[1];
-			m_image_data[image_idx].UndistortPoint(x, y, p3[0], p3[1]);
-		}*/
 
 		double K[9], Kinv[9];
 		GetIntrinsics(cameras[camera_idx], K);
@@ -504,12 +481,7 @@ v3_t TriangulateNViews(const vector<CImageDataBase*> imageData,
 			explicit_camera_centers ? 1 : 0,
 			estimate_distortion ? 1 : 0);
 
-		/*if (m_optimize_for_fisheye) 
-		{
-			double x = Vx(pr), y = Vy(pr);
-			m_image_data[image_idx].DistortPoint(x, y, Vx(pr), Vy(pr));
-		}*/        
-
+	
 		double dx = Vx(pr) - key.cx; //key.m_x;
 		double dy = Vy(pr) - key.cy; //key.m_y;
 
@@ -564,23 +536,23 @@ int BundleAdjustAddAllNewPoints(int num_points, int num_cameras,
 			FeatPoint &key = imageData[image_idx1]->GetKeyPoint(j); 
 
 			if (key.track == -1)
-				continue;  /* Key belongs to no track */
+				continue;  //Key belongs to no track 
 
 			if (key.extra != -1)
-				continue;  /* Key is outlier or has already been added */
+				continue;  // Key is outlier or has already been added 
 
 			int track_idx = key.track;
 
-			/* Check if this track is already associated with a point */
+			// Check if this track is already associated with a point
 			if (trackSeq[track_idx].extra != -1)
 				continue;
 
-			/* Check if we've seen this track */
+			//Check if we've seen this track 
 			int seen = tracks_seen[track_idx];
 
 			if (seen == -1) 
 			{
-				/* We haven't yet seen this track, create a new track */
+				//We haven't yet seen this track, create a new track
 				tracks_seen[track_idx] = (int) new_tracks.size();
 
 				ImageKeyVector track;
@@ -600,8 +572,8 @@ int BundleAdjustAddAllNewPoints(int num_points, int num_cameras,
 
 	delete [] tracks_seen;
 
-	/* Now for each (sub) track, triangulate to see if the track is
-	* consistent */
+	//Now for each (sub) track, triangulate to see if the track is
+	
 	int pt_count = num_points;
 
 	int num_ill_conditioned = 0;
@@ -717,7 +689,7 @@ int BundleAdjustAddAllNewPoints(int num_points, int num_cameras,
 			continue;
 		}
 
-		/* All tests succeeded, so let's add the point */
+	
 
 		fflush(stdout);
 
@@ -765,7 +737,7 @@ int BundleAdjustAddAllNewPoints(int num_points, int num_cameras,
 	return pt_count;
 }
 
-/* Find the camera with the most matches to existing points */
+//Find the camera with the most matches to existing points
 int FindCameraWithMostMatches(int num_cameras, int *added_order,
 							  int &parent_idx, int &max_matches,
 							  vector<CImageDataBase*> imageData,
@@ -802,7 +774,7 @@ int FindCameraWithMostMatches(int num_cameras, int *added_order,
 		int num_existing_matches = 0;
 		int parent_idx_best = -1;
 
-		/* Find the tracks seen by this image */
+		//Find the tracks seen by this image 
 		const std::vector<int> &tracks = imageData[i]->GetTrackSeq();//m_image_data[i].m_visible_points;
 		int num_tracks = (int) tracks.size();
 
@@ -3004,79 +2976,3 @@ int TrackSeqImageOrder(vector<TrackInfo>& trackSeq, vector<int> cameraIDOrder)
 	return 1;
 }
 
-
-
-//////////////////////////////////////////////////////////////////////////
-//3D model 
-//ply mode file header
-/*
-static char ply_header[] = 
-"ply\n"
-"format ascii 1.0\n"
-"element face 0\n"
-"property list uchar int vertex_indices\n"
-"element vertex %d\n"
-"property float x\n"
-"property float y\n"
-"property float z\n"
-"property uchar diffuse_red\n"
-"property uchar diffuse_green\n"
-"property uchar diffuse_blue\n"
-"end_header\n";
-*/
-
-CPlyModel::CPlyModel()
-{
-
-}
-CPlyModel::~CPlyModel()
-{
-
-}
-
-int CPlyModel::Save(char *modelFile, vector<Point3DDouble> pts)
-{
-	
-	int r=255,g=0,b=0;
-
-	int num_good_pts = pts.size();
-
-	FILE* fp = fopen(modelFile, "w");
-
-	fprintf(fp, ply_header, num_good_pts);
-    for(int i=0; i<num_good_pts; i++)
-	{
-		fprintf(fp, "%0.6e %0.6e %0.6e %d %d %d\n", 
-			Vx(pts[i]), Vy(pts[i]), Vz(pts[i]),
-			r,g,b);
-	}
-	fclose(fp);
-
-
-	return 1;
-}
-
-int CPlyModel::Save(char* modelFile, vector<Point3DDouble> pts, vector<Point3DDouble> colors)
-{
-
-	int r,g,b;
-	int num_good_pts = pts.size();
-
-	FILE* fp = fopen(modelFile, "w");
-
-	fprintf(fp, ply_header, num_good_pts);
-	for(int i=0; i<num_good_pts; i++)
-	{
-		r = Vx(colors[i]);
-		g = Vy(colors[i]);
-		b = Vz(colors[i]);
-
-		//fprintf(fp, "%0.6e %0.6e %0.6e %d %d %d\n", 
-		fprintf(fp, "%6.3lf %6.3lf %6.3lf %d %d %d\n", 
-			Vx(pts[i]), Vy(pts[i]), Vz(pts[i]),
-			r,g,b);
-	}
-	fclose(fp);
-
-	return 1;
-}

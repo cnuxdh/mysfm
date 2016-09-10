@@ -1,5 +1,10 @@
 
+
 #include "bundlerio.hpp"
+
+//matrix
+#include"vector.h"
+
 
 
 
@@ -55,6 +60,102 @@ int ReadBundlerOutFile(char* filename, vector<stPOS>& camParas, vector<stTrack>&
 			singleTrack.ptid.push_back(nPtIndex);
 		}		
 		tracks.push_back(singleTrack);
+	}
+	fclose(fp);
+
+	return 1;
+}
+
+
+
+
+
+
+//////////////////////////////////////////////////////////////////////////
+//3D model 
+//ply mode file header
+/*
+static char ply_header[] = 
+"ply\n"
+"format ascii 1.0\n"
+"element face 0\n"
+"property list uchar int vertex_indices\n"
+"element vertex %d\n"
+"property float x\n"
+"property float y\n"
+"property float z\n"
+"property uchar diffuse_red\n"
+"property uchar diffuse_green\n"
+"property uchar diffuse_blue\n"
+"end_header\n";
+*/
+
+static char ply_header[] = 
+"ply\n"
+"format ascii 1.0\n"
+"element face 0\n"
+"property list uchar int vertex_indices\n"
+"element vertex %d\n"
+"property float x\n"
+"property float y\n"
+"property float z\n"
+"property uchar diffuse_red\n"
+"property uchar diffuse_green\n"
+"property uchar diffuse_blue\n"
+"end_header\n";
+
+
+CPlyModel::CPlyModel()
+{
+
+}
+
+CPlyModel::~CPlyModel()
+{
+
+}
+
+int CPlyModel::Save(char *modelFile, vector<Point3DDouble> pts)
+{
+	
+	int r=255,g=0,b=0;
+
+	int num_good_pts = pts.size();
+
+	FILE* fp = fopen(modelFile, "w");
+
+	fprintf(fp, ply_header, num_good_pts);
+    for(int i=0; i<num_good_pts; i++)
+	{
+		fprintf(fp, "%0.6e %0.6e %0.6e %d %d %d\n", 
+			Vx(pts[i]), Vy(pts[i]), Vz(pts[i]),
+			r,g,b);
+	}
+	fclose(fp);
+
+
+	return 1;
+}
+
+int CPlyModel::Save(char* modelFile, vector<Point3DDouble> pts, vector<Point3DDouble> colors)
+{
+
+	int r,g,b;
+	int num_good_pts = pts.size();
+
+	FILE* fp = fopen(modelFile, "w");
+
+	fprintf(fp, ply_header, num_good_pts);
+	for(int i=0; i<num_good_pts; i++)
+	{
+		r = Vx(colors[i]);
+		g = Vy(colors[i]);
+		b = Vz(colors[i]);
+
+		//fprintf(fp, "%0.6e %0.6e %0.6e %d %d %d\n", 
+		fprintf(fp, "%6.3lf %6.3lf %6.3lf %d %d %d\n", 
+			Vx(pts[i]), Vy(pts[i]), Vz(pts[i]),
+			r,g,b);
 	}
 	fclose(fp);
 

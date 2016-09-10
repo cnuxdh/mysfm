@@ -191,26 +191,6 @@ private:
 };
 
 
-//////////////////////////////////////////////////////////////////////////
-//output 3D points into model file
-class DLL_EXPORT CModelFileBase
-{
-public:
-	CModelFileBase(){}
-	virtual ~CModelFileBase(){}
-	virtual int Save(char* modelFile, vector<Point3DDouble> pts){return 0;}
-	virtual int Save(char* modelFile, vector<Point3DDouble> pts, vector<Point3DDouble> colors){return 0;}
-};
-
-class DLL_EXPORT CPlyModel: public CModelFileBase
-{
-public:
-	CPlyModel();
-	~CPlyModel();
-	int Save(char* modelFile, vector<Point3DDouble> pts);
-	int Save(char* modelFile, vector<Point3DDouble> pts, vector<Point3DDouble> colors);
-};
-
 
 
 #endif

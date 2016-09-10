@@ -1,7 +1,9 @@
 
+#ifdef _WIN32
 #include "windows.h"
 //#include "time.h"
 #include "mmsystem.h"
+#endif
 
 
 #include "register.hpp"
@@ -17,7 +19,7 @@
 
 //sift dll
 #include "siftmatch.h"
-#include "ransac.h"
+#include "grosserror.h"
 
 //matrix
 #include "matrix/matrix.h"
@@ -547,8 +549,10 @@ int CKNNMatch::Match(ImgFeature& lImage, ImgFeature& rImage, vector<MatchPairInd
 	if(lImage.featPts.size()<8 || rImage.featPts.size()<8)
 		return 0;
 
+#ifdef _WIN32
 	//int64 t1 = getTickCount();
 	unsigned long t1 = timeGetTime();
+#endif
 
 	int nDim = lImage.featPts[0].feat.size();
 
@@ -593,11 +597,13 @@ int CKNNMatch::Match(ImgFeature& lImage, ImgFeature& rImage, vector<MatchPairInd
    
 	delete[] matchSet.matpoint;
 
+#ifdef _WIN32
 	//int64 t2 = getTickCount();
 	unsigned long t2 = timeGetTime();
 
 	//printf("match time: %lf \n", (double)(t2-t1) / getTickFrequency());
 	printf("match time: %lf \n", (double)(t2-t1) / 1000 );
+#endif
 
 
 	return 1;
@@ -609,8 +615,9 @@ int CKNNMatch::Match(ImgFeature& lImage, ImgFeature& rImage, PairMatchRes& pairM
 	if(lImage.featPts.size()<8 || rImage.featPts.size()<8)
 		return 0;
 
-
+#ifdef _WIN32
 	unsigned long t1 = timeGetTime();
+#endif
 
 	int nDim = lImage.featPts[0].feat.size();
 
@@ -666,8 +673,10 @@ int CKNNMatch::Match(ImgFeature& lImage, ImgFeature& rImage, PairMatchRes& pairM
 
 	delete[] matchSet.matpoint;
 
+#ifdef _WIN32
 	unsigned long t2 = timeGetTime();
 	printf("match time: %lf s \n", (double)(t2-t1) / 1000 );
+#endif
 
 	return 1;	
 }
@@ -719,8 +728,11 @@ int CSiftMatch::Match(ImgFeature& lImage, ImgFeature& rImage, vector<MatchPairIn
 //two images matching
 int CSiftMatch::Match(ImgFeature& lImage, ImgFeature& rImage, PairMatchRes& pairMatch )
 {
+	#ifdef _WIN32
 	unsigned long t1 = timeGetTime();
-
+	#endif
+	
+	
 	//feature convert
 	unsigned char* lKey = NULL;
 	int nLeftKey  = ConvertFeatToUChar(lImage.featPts, &lKey);
@@ -789,8 +801,10 @@ int CSiftMatch::Match(ImgFeature& lImage, ImgFeature& rImage, PairMatchRes& pair
 
 	printf("Matching Point Number: %d \n", pairMatch.matchs.size());
 
+#ifdef _WIN32
 	unsigned long t2 = timeGetTime();
 	printf("matching time: %lf s \n", (double)(t2-t1)/1000.0 );
+#endif
 
 	return 1;
 }

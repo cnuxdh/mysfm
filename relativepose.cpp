@@ -27,7 +27,7 @@
 
 
 //corelib
-#include "Matrix.h"
+//#include "Matrix.h"
 #include "commonfile.h"
 
 //sfm driver lib
@@ -1170,7 +1170,7 @@ int RelativePoseEstimation(char* filename1, char* filename2, double focalLen1, d
 }
 
 
-int CalculateEssentialMatrix(double* R, double* T, double* F)
+int CalculateEssentialMatrix1(double* R, double* T, double* F)
 {
 	//generate the asymmetric matrix
 	double aT[3][3];
@@ -1178,7 +1178,8 @@ int CalculateEssentialMatrix(double* R, double* T, double* F)
 	aT[1][0] = T[2];	aT[1][1]=0;		 aT[1][2]=-T[0];
 	aT[2][0] = -T[1];	aT[2][1]=T[0];	 aT[2][2]=0;
 
-	mult(*aT, R, F, 3, 3, 3);
+	//mult(*aT, R, F, 3, 3, 3);
+  matrix_product(3,3,3,3,*aT, R, F);
     
 	return 0;
 }

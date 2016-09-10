@@ -1,0 +1,25 @@
+#generate cvlib
+
+INCLUDE_DIRECTORIES(/usr/local/include  
+										../
+										../CoreDll
+										../Corelib
+										../sfm-driver
+										../matrix
+										../5point
+										../imagelib
+										../siftlib
+										)
+
+
+ADD_LIBRARY(cvlib
+	absOri.cpp
+	absOri.hpp
+	panorama.cpp
+	panorama.hpp
+	relativepose.hpp
+	relativepose.cpp
+	register.cpp
+	sift.cpp
+	bundlerio.cpp
+	)
