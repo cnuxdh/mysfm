@@ -20,18 +20,70 @@
 
 
 
+/* projection from sphere space to planes
 
-/* panorama to plane projection
+
+*/
+int PanoToPlanes(char* srcFile)
+{
+	
+	char title[256];
+	
+	
+	//projection from panorama to plane 
+	int nAngleStep = 30;
+	int nProjectNum = 360 / nAngleStep;
+	double vangle = 60;
+	double hangle = 60;
+	double ratio = 1;
+	for(int i=0; i<nProjectNum; i++)
+	{
+		
+		
+		double lat = 90; //from top to bottom: 0-180
+		double lon = i*nAngleStep / 180.0 * PI; //from left to right: 0-360
+		
+		//printf("input image: %s \n", filename);
+		//printf("input angle: %lf %lf \n", vangle,hangle);
+		
+		//calculate the direction according to (lon,lat), must be the opposite
+		double direction[3];
+		direction[0] = -sin(lon)*sin(lat);  //x
+		direction[1] = -cos(lon)*sin(lat);  //y
+		direction[2] = -cos(lat);           //z
+		
+		
+		printf("direction: %lf %lf %lf \n", direction[0], direction[1], direction[2]);
+		
+		
+		char outfile[256];
+		sprintf(outfile, "%d_%d.jpg", int(lat/PI*180), int(lon/PI*180));
+		PanoToPlane(filename, outfile, vangle, hangle, direction, 1);
+	  
+		
+	}
+	
+	
+	return 0;
+}
+
+
+
+/* panorama to one plane projection
+inputs:
    srcImageFile: panoram file 
    outImageFile: output file
    vangle:    vertical fov angle
    hangle:    horizonal fov angle
    direction: the plane image normal direction
    focalLenRatio:  focalLen / panorama radius
+output:
+	 pR: rotation from the spherical coordinate to projection plane coordinate
+   
 */
 int PanoToPlane(char* srcImageFile, char* outImageFile, 
 				double vangle, double hangle,
-				double* direction, double focalLenRatio)
+				double* direction, double focalLenRatio, double* pR )
 {
 	
 	double R[9];
@@ -57,7 +109,7 @@ int PanoToPlane(char* srcImageFile, char* outImageFile,
 	dstPts[0] = xp;
 	dstPts[1] = yp;
 	dstPts[2] = zp;
-  RotationAlign(srcPts, dstPts, R);
+  RotationAlign(srcPts, dstPts, R); //from projection image space to sphere space
   
 	//char   filename[256];	
 	//strcpy(filename, argv[1]);
@@ -108,11 +160,11 @@ int PanoToPlane(char* srcImageFile, char* outImageFile,
 			grd[0] = x;
 			grd[1] = y;
 
-			//from image space to sphere space
+			//from projection image space to sphere space
 			double rg[3];
 			mult(R, grd, rg, 3, 3, 1);
 
-			//for sphere 3D to panoram image 
+			//for sphere 3D to panoram image spance
 			double ix, iy;
 			GrdToSphere( rg[0], rg[1], rg[2], radius, ix, iy);	
 			//printf("%lf %lf \n", ix, iy);
@@ -140,6 +192,11 @@ int PanoToPlane(char* srcImageFile, char* outImageFile,
 		
 	cvReleaseImage(&planeImage);
 	cvReleaseImage(&pImage);
+	
+	//generate the projection rotation
+	memcpy(pR, R, sizeof(double)*9);
+	invers_matrix(pR, 3);
+	
 	
 	printf("pano to plane projection Finished! \n");
 

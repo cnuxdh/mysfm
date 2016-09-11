@@ -44,9 +44,14 @@ DLL_EXPORT int SphereToCilinder(char* infile, char* outfile);
    hangle:    horizonal fov angle
    direction: the plane image normal direction
    focalLenRatio:  focalLen / panaram radius
+   
+output:
+	 pR: rotation from the spherical coordinate to projection plane coordinate
+	 
 */
 DLL_EXPORT int PanoToPlane(char* srcImageFile, char* outImageFile, 
-				double vangle, double hangle, double* direction, double focalLenRatio);
+				double vangle, double hangle, double* direction, double focalLenRatio, double* pR);
+
 
 
 

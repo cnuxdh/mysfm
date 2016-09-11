@@ -171,11 +171,11 @@ int EstimatePose5Point_Pano( vector<Point3DDouble>& p1,
 	double az = atan( R[1]/R[0]) /PI*180;
 
 
-	printf("residuals ... \n");
+	//printf("residuals ... \n");
 	for (int i = 0; i < num_pts; i++) 
 	{
 		double dis = fmatrix_compute_residual_pano(em, k1_pts[i], k2_pts[i], radius);
-		printf("%d  %lf \n", i, dis);
+		//printf("%d  %lf \n", i, dis);
 		residual[i] = dis;
 	}
 
