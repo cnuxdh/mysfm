@@ -20,55 +20,6 @@
 
 
 
-/* projection from sphere space to planes
-
-
-*/
-int PanoToPlanes(char* srcFile)
-{
-	
-	char title[256];
-	
-	
-	//projection from panorama to plane 
-	int nAngleStep = 30;
-	int nProjectNum = 360 / nAngleStep;
-	double vangle = 60;
-	double hangle = 60;
-	double ratio = 1;
-	for(int i=0; i<nProjectNum; i++)
-	{
-		
-		
-		double lat = 90; //from top to bottom: 0-180
-		double lon = i*nAngleStep / 180.0 * PI; //from left to right: 0-360
-		
-		//printf("input image: %s \n", filename);
-		//printf("input angle: %lf %lf \n", vangle,hangle);
-		
-		//calculate the direction according to (lon,lat), must be the opposite
-		double direction[3];
-		direction[0] = -sin(lon)*sin(lat);  //x
-		direction[1] = -cos(lon)*sin(lat);  //y
-		direction[2] = -cos(lat);           //z
-		
-		
-		printf("direction: %lf %lf %lf \n", direction[0], direction[1], direction[2]);
-		
-		
-		char outfile[256];
-		sprintf(outfile, "%d_%d.jpg", int(lat/PI*180), int(lon/PI*180));
-		PanoToPlane(filename, outfile, vangle, hangle, direction, 1);
-	  
-		
-	}
-	
-	
-	return 0;
-}
-
-
-
 /* panorama to one plane projection
 inputs:
    srcImageFile: panoram file 
@@ -202,6 +153,69 @@ int PanoToPlane(char* srcImageFile, char* outImageFile,
 
 	return 0;
 }
+
+/* projection from sphere space to several planes
+inputs:
+	srcFile: the panorama file
+	R:  the rotation matrix of the panorama 
+	T:  the translation vector of the panorama
+outputs:
+	
+*/
+int PanoToPlanes( char* srcFile, double anglestep,
+									double vangle, double hangle, double fratio,
+									double* R, double* T)
+{
+	
+	char title[256];
+	strcpy(title, srcFile);
+	strcpy(title+strlen(title)-4, "\0");
+	
+	
+	//projection from panorama to plane 
+	int nAngleStep  = anglestep;
+	int nProjectNum = 360 / nAngleStep;
+	//double vangle   = 60;
+	//double hangle   = 60;
+	//double ratio = 1;
+	for(int i=0; i<nProjectNum; i++)
+	{
+		
+		double lat = 90 / 180.0 * PI; //from top to bottom: 0-180
+		double lon = i*nAngleStep / 180.0 * PI; //from left to right: 0-360
+		
+		//printf("input image: %s \n", filename);
+		//printf("input angle: %lf %lf \n", vangle,hangle);
+		
+		//calculate the direction according to (lon,lat), must be the opposite
+		double direction[3];
+		direction[0] = -sin(lon)*sin(lat);  //x
+		direction[1] = -cos(lon)*sin(lat);  //y
+		direction[2] = -cos(lat);           //z
+		
+		
+		printf("direction: %lf %lf %lf \n", direction[0], direction[1], direction[2]);
+		
+		
+		char outfile[256];
+		sprintf(outfile, "%s_%d_%d.jpg", title, int(lat/PI*180+0.5), int(lon/PI*180+0.5));
+		printf("plane file: %s \n", outfile);
+		
+		
+		double pR[9]; //rotation matrix for plane 
+		//generate the plane projection image and save it
+		PanoToPlane(srcFile, outfile, vangle, hangle, direction, fratio, pR);
+	  
+	  //generate the projection matrix for PMVS and save it	  
+	  
+	}
+	
+	
+	return 0;
+}
+
+
+
 
 
 
