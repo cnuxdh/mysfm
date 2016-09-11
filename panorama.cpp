@@ -18,6 +18,9 @@
 //corelib
 #include "corelib/matrix.h"
 
+//matrix lib
+#include "matrix/matrix.h"
+
 
 
 /* panorama to one plane projection
@@ -157,7 +160,7 @@ int PanoToPlane(char* srcImageFile, char* outImageFile,
 	//get the inner parameters of projection camera
 	focalLen = projFocus;
 	outHt = projHt;
-	outwd = projWd;
+	outWd = projWd;
 	
 	printf("pano to plane projection Finished! \n");
 
@@ -212,13 +215,20 @@ int PanoToPlanes( char* srcFile, double anglestep,
 		printf("plane file: %s \n", outfile);
 		
 		
-		double pR[9]; //rotation matrix for plane 
+		double Rp[9]; //rotation matrix for plane 
 		//generate the plane projection image and save it
 		double focalLen;
 		int outHt, outWd;
 		PanoToPlane(srcFile, outfile, vangle, hangle, direction, fratio, 
-								focalLen, outHt, outWd, pR);
+								focalLen, outHt, outWd, Rp);
 	  
+	  //transform from spherical space to image space,
+	  //Xs = Rg.Xg + Tg, Xp = Rp.Xs ---> Xp = Rp.Rg.Xg + Rp.Tg, define Rpg = Rp.Rg, Tpg=Rp.Tg
+	  double Rpg[9];
+	  double Tpg[3];
+	  mult(Rp, R, Rpg, 3, 3, 3);
+	  mult(Rp, T, Tpg, 3, 3, 1);
+	   
 	  
 	  //generate the projection matrix for PMVS and save it	  
 	  char projFile[256];
@@ -226,28 +236,28 @@ int PanoToPlanes( char* srcFile, double anglestep,
 		
 	  double K[9] = 
             { -focalLen, 0.0, 0.5 * outWd - 0.5,
-              0.0, focalLen, 0.5 * outHt - 0.5,
+              0.0, focalLen,  0.5 * outHt - 0.5,
               0.0, 0.0, 1.0 };
 
     double Ptmp[12] = 
-        { pR[0], pR[1], pR[2], T[0],
-          pR[3], pR[4], pR[5], T[1],
-          pR[6], pR[7], pR[8], T[2] };
+        { Rpg[0], Rpg[1], Rpg[2], Tpg[0],
+          Rpg[3], Rpg[4], Rpg[5], Tpg[1],
+          Rpg[6], Rpg[7], Rpg[8], Tpg[2] };
     
     double P[12];
     matrix_product(3, 3, 3, 4, K, Ptmp, P);
     matrix_scale(3, 4, P, -1.0, P);
 
-		FILE* fp = fopen(projFile, "w");
+		FILE* f = fopen(projFile, "w");
     fprintf(f, "CONTOUR\n");
     fprintf(f, "%0.6f %0.6f %0.6f %0.6f\n", P[0], P[1], P[2],  P[3]);
     fprintf(f, "%0.6f %0.6f %0.6f %0.6f\n", P[4], P[5], P[6],  P[7]);
     fprintf(f, "%0.6f %0.6f %0.6f %0.6f\n", P[8], P[9], P[10], P[11]);
     fprintf(f, "%lf %d %d \n", focalLen, outHt, outWd);
-    fprintf(f, "%lf %lf %lf \n", T[0], T[1], T[2]);
-    fprintf(f, "%lf %lf %lf \n", pR[0], pR[1], pR[2]);
-    fprintf(f, "%lf %lf %lf \n", pR[3], pR[4], pR[5]);
-    fprintf(f, "%lf %lf %lf \n", pR[6], pR[7], pR[8]);
+    fprintf(f, "%lf %lf %lf \n", Tpg[0], Tpg[1], Tpg[2]);
+    fprintf(f, "%lf %lf %lf \n", Rpg[0], Rpg[1], Rpg[2]);
+    fprintf(f, "%lf %lf %lf \n", Rpg[3], Rpg[4], Rpg[5]);
+    fprintf(f, "%lf %lf %lf \n", Rpg[6], Rpg[7], Rpg[8]);
     fclose(f);
 	  
 	}
