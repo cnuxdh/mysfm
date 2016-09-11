@@ -50,9 +50,9 @@ output:
 	 
 */
 DLL_EXPORT int PanoToPlane(char* srcImageFile, char* outImageFile, 
-				double vangle, double hangle, double* direction, double focalLenRatio, double* pR);
-
-
+				double vangle, double hangle, double* direction, double focalLenRatio, 
+				double& focalLen, int& outHt, int& outWd,
+				double* pR);
 
 
 int PanoToPlanes( char* srcFile, double anglestep,

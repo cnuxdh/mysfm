@@ -29,12 +29,15 @@ inputs:
    direction: the plane image normal direction
    focalLenRatio:  focalLen / panorama radius
 output:
+	 focalLen: 
+	 outHt,outWd:
 	 pR: rotation from the spherical coordinate to projection plane coordinate
    
 */
 int PanoToPlane(char* srcImageFile, char* outImageFile, 
 				double vangle, double hangle,
-				double* direction, double focalLenRatio, double* pR )
+				double* direction, double focalLenRatio, 
+				double& focalLen, int& outHt, int& outWd, double* pR )
 {
 	
 	double R[9];
@@ -87,6 +90,9 @@ int PanoToPlane(char* srcImageFile, char* outImageFile,
 	
 	int projHt = projFocus*tan(vangle*radianAngle*0.5)*2;
 	int projWd = projFocus*tan(hangle*radianAngle*0.5)*2;
+	
+	
+
 	
 	printf("proj width:%d   height:%d \n", projWd, projHt);
 	
@@ -148,6 +154,10 @@ int PanoToPlane(char* srcImageFile, char* outImageFile,
 	memcpy(pR, R, sizeof(double)*9);
 	invers_matrix(pR, 3);
 	
+	//get the inner parameters of projection camera
+	focalLen = projFocus;
+	outHt = projHt;
+	outwd = projWd;
 	
 	printf("pano to plane projection Finished! \n");
 
@@ -204,12 +214,43 @@ int PanoToPlanes( char* srcFile, double anglestep,
 		
 		double pR[9]; //rotation matrix for plane 
 		//generate the plane projection image and save it
-		PanoToPlane(srcFile, outfile, vangle, hangle, direction, fratio, pR);
+		double focalLen;
+		int outHt, outWd;
+		PanoToPlane(srcFile, outfile, vangle, hangle, direction, fratio, 
+								focalLen, outHt, outWd, pR);
+	  
 	  
 	  //generate the projection matrix for PMVS and save it	  
+	  char projFile[256];
+		sprintf(projFile, "%s_%d_%d.txt", title, int(lat/PI*180+0.5), int(lon/PI*180+0.5));
+		
+	  double K[9] = 
+            { -focalLen, 0.0, 0.5 * outWd - 0.5,
+              0.0, focalLen, 0.5 * outHt - 0.5,
+              0.0, 0.0, 1.0 };
+
+    double Ptmp[12] = 
+        { pR[0], pR[1], pR[2], T[0],
+          pR[3], pR[4], pR[5], T[1],
+          pR[6], pR[7], pR[8], T[2] };
+    
+    double P[12];
+    matrix_product(3, 3, 3, 4, K, Ptmp, P);
+    matrix_scale(3, 4, P, -1.0, P);
+
+		FILE* fp = fopen(projFile, "w");
+    fprintf(f, "CONTOUR\n");
+    fprintf(f, "%0.6f %0.6f %0.6f %0.6f\n", P[0], P[1], P[2],  P[3]);
+    fprintf(f, "%0.6f %0.6f %0.6f %0.6f\n", P[4], P[5], P[6],  P[7]);
+    fprintf(f, "%0.6f %0.6f %0.6f %0.6f\n", P[8], P[9], P[10], P[11]);
+    fprintf(f, "%lf %d %d \n", focalLen, outHt, outWd);
+    fprintf(f, "%lf %lf %lf \n", T[0], T[1], T[2]);
+    fprintf(f, "%lf %lf %lf \n", pR[0], pR[1], pR[2]);
+    fprintf(f, "%lf %lf %lf \n", pR[3], pR[4], pR[5]);
+    fprintf(f, "%lf %lf %lf \n", pR[6], pR[7], pR[8]);
+    fclose(f);
 	  
 	}
-	
 	
 	return 0;
 }
