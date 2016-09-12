@@ -248,12 +248,10 @@ int DirectBlendTemplate(char** filenames, int nFile,
 			pSrcBand->RasterIO(GF_Read,0,0,wd,ht,pSrc,wd,ht,ntype,0,0);
 
 			//locate the rectangle of each file
-			stGeoInfo sgeo;
-			GetGeoInformation(filenames[i], sgeo);
-			int sl = (sgeo.left - minx) / outImageResolution;
-			int sr = sl + (sgeo.wd*fabs(sgeo.dx)) / outImageResolution;
-			int st = (maxy - sgeo.top) / outImageResolution;
-			int sb = st + (sgeo.ht*fabs(sgeo.dy)) / outImageResolution;
+			int sl = (geoArray[i].left - minx) / outImageResolution;
+			int sr = sl + (geoArray[i].wd*fabs(geoArray[i].dx)) / outImageResolution;
+			int st = (maxy - geoArray[i].top) / outImageResolution;
+			int sb = st + (geoArray[i].ht*fabs(geoArray[i].dy)) / outImageResolution;
 
 			//collect pixel index 
 			vector<iPoint> ptIndex; 

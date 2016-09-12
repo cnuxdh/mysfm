@@ -3344,7 +3344,21 @@ int BlendMosaicGeoTiff(char** filenames, int nFile, char* outFile, double outRes
 	for(int i=0; i<nFile; i++)
 	{	
 		//printf("%s \n", filenames[i]);
-		GetGeoInformation( filenames[i], geoArray[i]);
+		char* postfix;
+		GetPostfix(filenames[i], &postfix);
+		printf("postfix: %s \n", postfix);
+
+		if( strcmp(postfix, "tif")==0 || strcmp(postfix, "TIF")==0 )
+		{
+			GetGeoInformation( filenames[i], geoArray[i]);
+		}
+		else if(strcmp(postfix, "jpeg")==0 || strcmp(postfix, "JPEG")==0)
+		{
+			char geofile[256];
+			strcpy(geofile, filenames[i]);
+			strcpy(geofile+strlen(geofile)-4, "geo");
+			ReadGeoFile(geofile, geoArray[i]);
+		}
 	}
 		
 	double minx,maxx,miny,maxy;
