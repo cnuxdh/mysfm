@@ -161,6 +161,8 @@ int DirectBlendTemplate(char** filenames, int nFile,
 	int oht = (maxy-miny) / outImageResolution;
 	int owd = (maxx-minx) / outImageResolution;
 
+	printf("mosaic size - ht:%d  wd:%d \n", oht, owd);
+
 	GDALDriver* poDriver   = NULL;
 	GDALDataset *poDataset = NULL;   
 	GDALRasterBand *poBand = NULL;

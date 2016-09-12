@@ -19,7 +19,9 @@
 
 //sift dll
 #include "siftmatch.h"
-#include "grosserror.h"
+//#include "grosserror.h"
+#include "ransac.h"
+
 
 //matrix
 #include "matrix/matrix.h"

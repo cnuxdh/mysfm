@@ -2988,6 +2988,7 @@ int DirectMosaicGeoTiff(char** filenames, int nFile, char* outFile, double outRe
 		//printf("%s \n", filenames[i]);
 		char* postfix;
 		GetPostfix(filenames[i], &postfix);
+		printf("postfix: %s \n", postfix);
 
 		if( strcmp(postfix, "tif")==0 || strcmp(postfix, "TIF")==0 )
 		{

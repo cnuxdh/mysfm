@@ -18,14 +18,6 @@
 #include <vector>
 using namespace std;
 
-typedef struct STRU_TRACK
-{
-	double x,y,z;
-	unsigned char r,g,b;
-	vector<POINT2> imgpt;
-	vector<int> imgid;
-	vector<int> ptid;
-}stTrack;
 
 
 

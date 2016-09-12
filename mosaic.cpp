@@ -184,8 +184,8 @@ int GetUInt16GrayImage(char* filename, Mat& image, double ratio)
 	int nMax = 0;
 	for(int i=0; i<zht*zwd; i++)
 	{
-		nMin = min(nMin, pBuffer[i]);
-		nMax = max(nMax, pBuffer[i]);
+		nMin = min((double)(nMin), (double)(pBuffer[i]));
+		nMax = max((double)(nMax), (double)(pBuffer[i]));
 	}
 	
 	printf("%d %d \n", nMin, nMax);

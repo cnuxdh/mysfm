@@ -1,6 +1,9 @@
 #ifndef CV_DEFINES_H
 #define CV_DEFINES_H
 
+#include "commondata.h"
+
+
 // interface for feature detection
 #include <vector>
 using namespace std;
@@ -147,6 +150,15 @@ typedef struct stCameraPara
 
 //////////////////////////////////////////////////////////////////////////
 //fro Bundle Adjustment
+
+typedef struct STRU_TRACK
+{
+	double x,y,z;
+	unsigned char r,g,b;
+	vector<POINT2> imgpt;
+	vector<int> imgid;
+	vector<int> ptid;
+}stTrack;
 
 
 

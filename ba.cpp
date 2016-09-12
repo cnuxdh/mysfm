@@ -7,6 +7,7 @@
 #include "cali.hpp"
 #include "relativepose.hpp"
 #include "distortion.hpp"
+#include "bundlerio.hpp"
 
 //matrix
 #include "matrix/matrix.h"
@@ -42,8 +43,22 @@
 //triangulate
 #include "triangulate.h"
 
+#include "bundlerio.hpp"
 
 
+static char ply_header1[] = 
+"ply\n"
+"format ascii 1.0\n"
+"element face 0\n"
+"property list uchar int vertex_indices\n"
+"element vertex %d\n"
+"property float x\n"
+"property float y\n"
+"property float z\n"
+"property uchar diffuse_red\n"
+"property uchar diffuse_green\n"
+"property uchar diffuse_blue\n"
+"end_header\n";
 
 /* Write point files to a ply file */
 void DumpPointsToPly(char *output_directory, char *filename, 
@@ -75,7 +90,7 @@ void DumpPointsToPly(char *output_directory, char *filename,
 	}
 
 	/* Print the ply header */
-	fprintf(f, ply_header, num_good_pts + 2 * num_cameras);
+	fprintf(f, ply_header1, num_good_pts + 2 * num_cameras);
 
 	/* Now triangulate all the correspondences */
 	for (int i = 0; i < num_points; i++) 
