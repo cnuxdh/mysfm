@@ -47,5 +47,5 @@ ADD_LIBRARY(cvlib
 	../siftlib/kdtree.cpp
 	../siftlib/minpq.cpp
 	../siftlib/publicfunction.cpp
-	../siftlib/grosserror.cpp
+	../siftlib/ransac.cpp
 	)

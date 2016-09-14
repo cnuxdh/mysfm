@@ -5,10 +5,9 @@
 #include "mmsystem.h"
 #endif
 
-//sift dll
+//siftlib
 #include "siftmatch.h"
-//#include "grosserror.h"
-#include "ransac.h"
+#include "siftlib/ransac.h"
 
 #include "register.hpp"
 #include "relativepose.hpp"

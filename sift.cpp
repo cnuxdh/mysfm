@@ -1,5 +1,18 @@
 
 
+#ifdef OPENCV_1X 
+	#include "cv.h"
+	#include "highgui.h"
+	#include "cxcore.h"
+#else
+	#include "opencv2/core/core.hpp"
+	#include "opencv2/imgproc/imgproc_c.h"
+	#include "opencv2/highgui/highgui.hpp"
+	using namespace cv;
+#endif
+
+using namespace std;
+
 #include "sift.hpp"
 
 //siftdll
@@ -16,18 +29,6 @@
 
 
 
-#ifdef OPENCV_1X 
-	#include "cv.h"
-	#include "highgui.h"
-	#include "cxcore.h"
-#else
-	#include "opencv2/core/core.hpp"
-	#include "opencv2/imgproc/imgproc_c.h"
-	#include "opencv2/highgui/highgui.hpp"
-	using namespace cv;
-#endif
-
-using namespace std;
 
 
 CSIFT::CSIFT()
