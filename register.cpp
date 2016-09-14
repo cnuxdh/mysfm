@@ -5,6 +5,10 @@
 #include "mmsystem.h"
 #endif
 
+//sift dll
+#include "siftmatch.h"
+//#include "grosserror.h"
+#include "ransac.h"
 
 #include "register.hpp"
 #include "relativepose.hpp"
@@ -17,10 +21,7 @@
 //coredll
 #include "main.h"
 
-//sift dll
-#include "siftmatch.h"
-//#include "grosserror.h"
-#include "ransac.h"
+
 
 
 //matrix
