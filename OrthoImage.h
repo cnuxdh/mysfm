@@ -12,7 +12,9 @@ using namespace std;
 #include "geotiff.h"
 
 //cvlib
-#include "bundlerio.hpp"
+//#include "bundlerio.hpp"
+#include "defines.hpp"
+
 
 //gdal
 #include "gdal_priv.h"

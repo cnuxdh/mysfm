@@ -722,6 +722,7 @@ int  GenerateSingleZipOrtho(char*   filename,  // jpg
 	int maxImageSize = sqrt( double(ht*ht+wd*wd) );
 	if( max(oht,owd)>maxImageSize )
 	{
+		printf("[GenerateSingleZipOrtho]: the size of orthoimage is two big! \n");
 		return -1;
 	}
 
