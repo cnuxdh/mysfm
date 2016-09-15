@@ -6,6 +6,9 @@
 #include"vector.h"
 
 
+//#include <iostream>
+//#include <string>
+//using namespace std;
 
 
 /* reading bundler *.out file, including camera pose information, ground point and its projections
@@ -162,10 +165,8 @@ int CPlyModel::Save(char* modelFile, vector<Point3DDouble> pts, vector<Point3DDo
 	return 1;
 }
 
-
 int ReadPMVSPly(char* filename, vector<stTrack>& tracks)
 {
-
 	char sline[256];
 
 	FILE* fp = fopen(filename, "r");
@@ -200,8 +201,30 @@ int ReadPMVSPly(char* filename, vector<stTrack>& tracks)
 
 int WritePMVSPly(char* filename, vector<stTrack>& tracks)
 {
+	FILE* fp = fopen(filename, "w");
+	fprintf(fp, "ply \n");
+	fprintf(fp, "format ascii 1.0 \n");
+	fprintf(fp, "element vertex %d \n", tracks.size());
+	fprintf(fp, "property float x \n");
+	fprintf(fp, "property float y \n");
+	fprintf(fp, "property float z \n");
+	fprintf(fp, "property float nx \n");
+	fprintf(fp, "property float ny \n");
+	fprintf(fp, "property float nz \n");
+	fprintf(fp, "property uchar diffuse_red \n");
+	fprintf(fp, "property uchar diffuse_green \n");
+	fprintf(fp, "property uchar diffuse_blue \n");
+	fprintf(fp, "end_header \n");
 
+	for(int i=0; i<tracks.size(); i++)
+	{
+		fprintf(fp, "%lf %lf %lf  %lf %lf %lf %d %d %d \n",
+			tracks[i].x,  tracks[i].y, tracks[i].z,
+			tracks[i].nx, tracks[i].ny, tracks[i].nz,
+			tracks[i].r,  tracks[i].g, tracks[i].b );
+	}
 
+	fclose(fp);
 
 	return 0;
 }

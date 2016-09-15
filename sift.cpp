@@ -11,7 +11,7 @@
 	using namespace cv;
 #endif
 
-using namespace std;
+//using namespace std;
 
 #include "sift.hpp"
 

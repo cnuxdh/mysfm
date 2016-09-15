@@ -5,15 +5,11 @@
 #include "export.hpp"
 #include "defines.hpp"
 
-
-
 //corelib
 //#include "commondata.h"
 
-
 //coredll
 #include "defs.h"
-
 
 #include <vector>
 using namespace std;
