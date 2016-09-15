@@ -161,3 +161,48 @@ int CPlyModel::Save(char* modelFile, vector<Point3DDouble> pts, vector<Point3DDo
 
 	return 1;
 }
+
+
+int ReadPMVSPly(char* filename, vector<stTrack>& tracks)
+{
+
+	char sline[256];
+
+	FILE* fp = fopen(filename, "r");
+
+	//skip the first two lines
+	for(int i=0; i<2; i++)
+		fgets(sline, 256, fp);
+
+	//reading the number of points
+	char tc[256];
+	int  nPt;
+	fscanf(fp, "%s %s %d", tc, tc, &nPt);
+
+	//skip the following 10 lines
+	for(int i=0; i<10; i++)
+		fgets(sline, 256, fp);
+
+	//reading the track points
+	tracks.resize(nPt);
+	for(int i=0; i<nPt; i++)
+	{
+		fscanf(fp, "%lf %lf %lf  %lf %lf %lf  %d %d %d ",
+			&(tracks[i].x), &(tracks[i].y), &(tracks[i].z), 
+			&(tracks[i].nx), &(tracks[i].ny), &(tracks[i].nz), 
+			&(tracks[i].r), &(tracks[i].g), &(tracks[i].b) );
+	}
+	
+	fclose(fp);
+	
+	return 0;
+}
+
+int WritePMVSPly(char* filename, vector<stTrack>& tracks)
+{
+
+
+
+	return 0;
+}
+

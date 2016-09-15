@@ -153,9 +153,10 @@ typedef struct stCameraPara
 
 typedef struct STRU_TRACK
 {
-	double x,y,z;
-	unsigned char r,g,b;
-	vector<POINT2> imgpt;
+	double x,y,z;        //position
+	double nx,ny,nz;     //normal 
+	unsigned char r,g,b; //color
+	vector<POINT2> imgpt; 
 	vector<int> imgid;
 	vector<int> ptid;
 }stTrack;

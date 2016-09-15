@@ -8,7 +8,7 @@
 
 
 //corelib
-#include "commondata.h"
+//#include "commondata.h"
 
 
 //coredll
@@ -24,6 +24,9 @@ using namespace std;
 DLL_EXPORT int ReadBundlerOutFile(char* filename, vector<stPOS>& camParas, vector<stTrack>& tracks );
 
 
+
+int ReadPMVSPly(char* filename, vector<stTrack>& tracks);
+int WritePMVSPly(char* filename, vector<stTrack>& tracks);
 
 
 //////////////////////////////////////////////////////////////////////////
