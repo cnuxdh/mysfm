@@ -2189,6 +2189,8 @@ int MosaicOnBundleWithDEM(char* imageListFile, char* bundleFile,
 	ReadSmoothedPointCloud(smoothedFile, tracks);	
 	WriteProgressValueToFile(5.0);
 
+
+	//getchar();
 	
 	//reading POS parameters 
 	bool bIsHavePos = false;
@@ -2357,6 +2359,8 @@ int MosaicOnBundleWithDEM(char* imageListFile, char* bundleFile,
 	//GenerateMosaicImage(ht, wd, filenames, rawResolution, outResolution, demHt, demWd, demScale, 
 	//	iz, camParas, absPosParams, minx, maxx, miny, maxy, meanHeight, outFile);
 	
+
+	printf("generating orthoimage.... \n");
 	//mosaic with fusion
 	GenerateMosaicImageWithFusion(filenames, rawResolution, outResolution, demHt, demWd, demScale, 
 		iz, camParas, absPosParams, minx, maxx, miny, maxy, meanHeight, outFile );

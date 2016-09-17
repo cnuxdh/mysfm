@@ -21,8 +21,17 @@ DLL_EXPORT int ReadBundlerOutFile(char* filename, vector<stPOS>& camParas, vecto
 
 
 
-int ReadPMVSPly(char* filename, vector<stTrack>& tracks);
-int WritePMVSPly(char* filename, vector<stTrack>& tracks);
+DLL_EXPORT int ReadPMVSPly(char* filename, vector<stTrack>& tracks);
+DLL_EXPORT int WritePMVSPly(char* filename, vector<stTrack>& tracks);
+
+
+DLL_EXPORT int ReadPMVSPly(char* filename, stTrack** tracks, int* nTrack);
+DLL_EXPORT int WritePMVSPly(char* filename, stTrack* tracks, int nTrack);
+
+
+DLL_EXPORT int WritePMVSPly(char* filename, 
+	double* px, double* py,  double* pz, int nPt);
+
 
 
 //////////////////////////////////////////////////////////////////////////
