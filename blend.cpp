@@ -3224,9 +3224,9 @@ int DirectMosaicGeoTiff(char** filenames, int nFile, char* outFile, double outRe
 	printf("\n");
 	WriteProgressValueToFile(10.0);
 
-#ifdef _DEBUG
-	GdalWriteImageUShort("d:\\allmask.tif", pAllMask, maskHt, maskWd);
-#endif	
+//#ifdef _DEBUG
+	//GdalWriteImageUShort("d:\\allmask.tif", pAllMask, maskHt, maskWd);
+//#endif	
 	
 	////////////////////////   blend ////////////////////////////
 	{	

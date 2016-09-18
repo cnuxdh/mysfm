@@ -2332,7 +2332,7 @@ int MosaicOnBundleWithDEM(char* imageListFile, char* bundleFile,
 	free(pz);
 	WriteProgressValueToFile(10.0);
 
-	/*
+	
 #ifdef _DEBUG
 	//SaveBmpGeneral(iz, demHt, demWd, "d:\\dem.bmp");
 	stGeoInfo geoinfo;	
@@ -2343,7 +2343,7 @@ int MosaicOnBundleWithDEM(char* imageListFile, char* bundleFile,
 	geoinfo.dy = rawResolution*demScale;
 	GdalWriteFloat("d:\\dem.tif", iz, demHt, demWd, geoinfo);
 #endif
-	*/
+	
 
 	/*
 	stGeoInfo geoinfo;
