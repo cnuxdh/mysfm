@@ -55,9 +55,11 @@ DLL_EXPORT int PanoToPlane(char* srcImageFile, char* outImageFile,
 				double* pR);
 
 
-int PanoToPlanes( char* srcFile, double anglestep,
+//panoram image is projected to several images
+int PanoToPlanes(int nImageIndex, char* srcFile, double anglestep,
 									double vangle, double hangle, double fratio,
 									double* R, double* T);
+
 
 
 /* relative pose estimation for spherical panoramic images, based on 5-point algorithm, 

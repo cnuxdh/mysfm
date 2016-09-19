@@ -169,13 +169,14 @@ int PanoToPlane(char* srcImageFile, char* outImageFile,
 
 /* projection from sphere space to several planes
 inputs:
+  nImageIndex: 0,1,2.... N, the image index
 	srcFile: the panorama file
 	R:  the rotation matrix of the panorama 
 	T:  the translation vector of the panorama
 outputs:
-	
+	projected plane image series
 */
-int PanoToPlanes( char* srcFile, double anglestep,
+int PanoToPlanes( int nImageIndex, char* srcFile, double anglestep,
 									double vangle, double hangle, double fratio,
 									double* R, double* T)
 {
@@ -211,7 +212,8 @@ int PanoToPlanes( char* srcFile, double anglestep,
 		
 		
 		char outfile[256];
-		sprintf(outfile, "%s_%d_%d.jpg", title, int(lat/PI*180+0.5), int(lon/PI*180+0.5));
+		//sprintf(outfile, "%s_%d_%d.jpg", title, int(lat/PI*180+0.5), int(lon/PI*180+0.5));
+		sprintf(outfile, "%.8d.jpg", (nImageIndex*nProjectNum+i) );
 		printf("plane file: %s \n", outfile);
 		
 		
@@ -219,8 +221,8 @@ int PanoToPlanes( char* srcFile, double anglestep,
 		//generate the plane projection image and save it
 		double focalLen;
 		int outHt, outWd;
-		PanoToPlane(srcFile, outfile, vangle, hangle, direction, fratio, 
-								focalLen, outHt, outWd, Rp);
+		PanoToPlane( srcFile, outfile, vangle, hangle, direction, fratio, 
+								 focalLen, outHt, outWd, Rp);
 	  
 	  //transform from spherical space to image space,
 	  //Xs = Rg.Xg + Tg, Xp = Rp.Xs ---> Xp = Rp.Rg.Xg + Rp.Tg, define Rpg = Rp.Rg, Tpg=Rp.Tg
@@ -232,7 +234,8 @@ int PanoToPlanes( char* srcFile, double anglestep,
 	  
 	  //generate the projection matrix for PMVS and save it	  
 	  char projFile[256];
-		sprintf(projFile, "%s_%d_%d.txt", title, int(lat/PI*180+0.5), int(lon/PI*180+0.5));
+		//sprintf(projFile, "%s_%d_%d.txt", title, int(lat/PI*180+0.5), int(lon/PI*180+0.5));
+		sprintf(projFile, "%.8d.txt", (nImageIndex*nProjectNum+i) );
 		
 	  double K[9] = 
             { -focalLen, 0.0, 0.5 * outWd - 0.5,
@@ -254,6 +257,7 @@ int PanoToPlanes( char* srcFile, double anglestep,
     fprintf(f, "%0.6f %0.6f %0.6f %0.6f\n", P[4], P[5], P[6],  P[7]);
     fprintf(f, "%0.6f %0.6f %0.6f %0.6f\n", P[8], P[9], P[10], P[11]);
     fprintf(f, "%lf %d %d \n", focalLen, outHt, outWd);
+    //append the R and T for other applications
     fprintf(f, "%lf %lf %lf \n", Tpg[0], Tpg[1], Tpg[2]);
     fprintf(f, "%lf %lf %lf \n", Rpg[0], Rpg[1], Rpg[2]);
     fprintf(f, "%lf %lf %lf \n", Rpg[3], Rpg[4], Rpg[5]);
