@@ -146,8 +146,6 @@ int DirectBlendTemplate(char** filenames, int nFile,
 	double outImageResolution,
 	double maskResolution,
 	unsigned short* pAllMask, int mht, int mwd,
-	double* gainParas, //global intensity correction parameters
-	vector<double> cp, //color correction parameters
 	char* outFile
 	)
 {
@@ -202,15 +200,7 @@ int DirectBlendTemplate(char** filenames, int nFile,
 	int    pi = 0;
 
 	T* pMosaicBuffer = (T*)malloc(oht*owd*nByte);
-	
-	bool isColorCorrection = false;
-	if(cp.size()>0)
-		isColorCorrection = true;
-
-	double a1,b1,c1;  //exposure 
-	double v1,v2;     //vignetting
-
-	double scale = 1; //outImageResolution/maskResolution;
+	//double scale = 1; //outImageResolution/maskResolution;
 
 	for(int bandId=0; bandId<nBand; bandId++)
 	{
@@ -218,22 +208,6 @@ int DirectBlendTemplate(char** filenames, int nFile,
 
 		for(int i=0; i<nFile; i++)
 		{
-			scale = fabs(geoArray[i].dx) / maskResolution;
-
-			/*
-			if(isColorCorrection)
-			{
-				a1 = cp[i*9 + 3*bandId ];
-				b1 = cp[i*9 + 3*bandId + 1];	
-				c1 = cp[i*9 + 3*bandId + 2];
-				v1 = cp[cp.size()-2];
-				v2 = cp[cp.size()-1];
-			}
-			*/
-
-			//printf("band: %d  %s \n", bandId, filenames[i]);
-			//printf("gain: %lf \n \n ", gainParas[i]);
-
 			//reading file
 			GDALDataset *pSrcDataSet = (GDALDataset*)GDALOpen(filenames[i], GA_ReadOnly); 
 			if(pSrcDataSet==NULL)
@@ -249,26 +223,30 @@ int DirectBlendTemplate(char** filenames, int nFile,
 
 			//locate the rectangle of each file
 			int sl = (geoArray[i].left - minx) / outImageResolution;
-			int sr = sl + (geoArray[i].wd*fabs(geoArray[i].dx)) / outImageResolution;
+			int sr = sl + (geoArray[i].wd*fabs(geoArray[i].dx)) / outImageResolution + 0.5;
 			int st = (maxy - geoArray[i].top) / outImageResolution;
-			int sb = st + (geoArray[i].ht*fabs(geoArray[i].dy)) / outImageResolution;
+			int sb = st + (geoArray[i].ht*fabs(geoArray[i].dy)) / outImageResolution + 0.5;
 
 			//collect pixel index 
 			vector<iPoint> ptIndex; 
 			ptIndex.clear();
 			for(int m=st; m<sb; m++)
+			//for(int m=0; m<oht; m++)
+			{
 				for(int n=sl; n<sr; n++)
+				//for( int n=0; n<owd; n++ )
 				{
 					double x = n*outImageResolution;
-					double y = m*outImageResolution;	
+					double y = m*outImageResolution;
 
 					//mask space
 					int mx = x / maskResolution;
 					int my = y / maskResolution;
-					mx = min(mx, mwd-1);
-					my = min(my, mht-1);
+					mx = max(0, min(mx, mwd-1));
+					my = max(0, min(my, mht-1));
 
-					if( pAllMask[my*mwd+mx] == (i+1) )
+					//if( pAllMask[my*mwd+mx] == (i+1) )
+					if( pAllMask[my*mwd+mx] > 0 )
 					{
 						iPoint pi;
 						pi.x = n;
@@ -276,55 +254,40 @@ int DirectBlendTemplate(char** filenames, int nFile,
 						ptIndex.push_back(pi);
 					}
 				}
-				//printf("mask point: %d \n", ptIndex.size());
+			}
 
-				//fill the image pixel
-				for(int m=0; m<ptIndex.size(); m++)
-				{
-					//mosaic image space
-					double x = minx + ptIndex[m].x*outImageResolution;
-					double y = maxy - ptIndex[m].y*outImageResolution;
+			//fill the image pixel
+			for(int m=0; m<ptIndex.size(); m++)
+			{
+				//mosaic image space
+				double x = minx + ptIndex[m].x*outImageResolution;
+				double y = maxy - ptIndex[m].y*outImageResolution;
 
-					//single image space
-					int ix = (x - geoArray[i].left) / fabs(geoArray[i].dx) ;
-					int iy = (geoArray[i].top - y)  / fabs(geoArray[i].dx) ;
-					ix = max(0, min(ix, wd-1));
-					iy = max(0, min(iy, ht-1));
+				//single image space
+				int ix = (x - geoArray[i].left) / fabs(geoArray[i].dx) ;
+				int iy = (geoArray[i].top - y)  / fabs(geoArray[i].dx) ;
+				ix = max(0, min(ix, wd-1));
+				iy = max(0, min(iy, ht-1));
 
-					double cx = ix-wd*0.5;
-					double cy = iy-ht*0.5;
-					double radius = sqrt(cx*cx+cy*cy)*scale;				
+				//double cx = ix-wd*0.5;
+				//double cy = iy-ht*0.5;
+				//double radius = sqrt(cx*cx+cy*cy)*scale;				
 
-					int rawValue = pSrc[iy*wd+ix];
+				int rawValue = pSrc[iy*wd+ix];		
 
-					/*//color correction
-					if(isColorCorrection)
-					{
-						int correctValue = a1*rawValue + b1*rawValue*rawValue + c1 
-							+ v1*rawValue*pow(radius,2) + v2*rawValue*pow(radius,4);		
-						correctValue = min(255, correctValue);
-						pMosaicBuffer[ ptIndex[m].y*owd + ptIndex[m].x  ] = correctValue;
-					}
-					else if (gainParas!=NULL)
-					{
-						//global instensity correction
-						int value = rawValue; 
-						value *= gainParas[i];
-						pMosaicBuffer[ ptIndex[m].y*owd + ptIndex[m].x  ] = min(255, value);
-					}
-					else*/
-					{
-						pMosaicBuffer[ ptIndex[m].y*owd + ptIndex[m].x  ] = rawValue;
-					}					
-				}				
+				if(rawValue==0)
+					continue;
+				
+				pMosaicBuffer[ ptIndex[m].y*owd + ptIndex[m].x  ] = rawValue;									
+			}				
 
-				poBand = poDataset->GetRasterBand( bandId+1 );
-				poBand->RasterIO(GF_Write, 0, 0, owd, oht, pMosaicBuffer, owd, oht, ntype, 0, 0);
+			poBand = poDataset->GetRasterBand( bandId+1 );
+			poBand->RasterIO(GF_Write, 0, 0, owd, oht, pMosaicBuffer, owd, oht, ntype, 0, 0);
 
-				free(pSrc);
-				GDALClose( (GDALDatasetH) pSrcDataSet );
+			free(pSrc);
+			GDALClose( (GDALDatasetH) pSrcDataSet );
 
-				WriteProgressValueToFile( dStep );		
+			WriteProgressValueToFile( dStep );		
 		}
 	}
 

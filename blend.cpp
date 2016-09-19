@@ -239,7 +239,7 @@ int MorphDilateImage(unsigned char* pMask, int ht, int wd, int nsize)
 }
 
 
-//dilate 
+
 int MorphErodeImage(unsigned char* pMask, int ht, int wd, int nsize)
 {
 	//morphology processing
@@ -3017,6 +3017,7 @@ int DirectMosaicGeoTiff(char** filenames, int nFile, char* outFile, double outRe
 	{	
 		if(zoneNumber!=geoArray[i].zoneNumber)
 			continue;
+
 		//resolution
 		rx = geoArray[i].dx;
 		ry = fabs(geoArray[i].dy);
@@ -3041,6 +3042,7 @@ int DirectMosaicGeoTiff(char** filenames, int nFile, char* outFile, double outRe
 	printf("%lf %d %d \n", memRatio, oht, owd);
 	printf(" restricted resolution: %lf \n", resolution);
 			
+
 	//set the resolution for Mask 
 	double maskResolution = resolution*4;
 	int maskHt = (maxy-miny) / maskResolution;
@@ -3053,7 +3055,8 @@ int DirectMosaicGeoTiff(char** filenames, int nFile, char* outFile, double outRe
 		maskHt = (maxy-miny) / maskResolution;
 		maskWd = (maxx-minx) / maskResolution;
 	}
-		
+	
+	
 	//calculate the translation of each image in mask space
 	double mosaicRatio =  fabs(geoArray[0].dx) / resolution;
 	vector<POINT2> pts;
@@ -3069,7 +3072,7 @@ int DirectMosaicGeoTiff(char** filenames, int nFile, char* outFile, double outRe
 		int y = (maxy - geoArray[i].top)  / maskResolution;
 		pts[i].x = x;
 		pts[i].y = y;
-		vecRect[i].top = y;
+		vecRect[i].top  = y;
 		vecRect[i].left = x;
 
 		imageMedianSize.push_back( (geoArray[i].wd+geoArray[i].ht)*0.5*mosaicRatio );
@@ -3080,6 +3083,7 @@ int DirectMosaicGeoTiff(char** filenames, int nFile, char* outFile, double outRe
 	int nPyramidLevel = CalculatePyramidLevel( imageMedianSize[nFile*0.5] );
 	//nPyramidLevel = min(3, nPyramidLevel);
 	printf("pyramid level: %d \n", nPyramidLevel);
+	
 	
 	char** maskNames = f2c(nFile, 256);
 	for(int i=0; i<nFile; i++)
@@ -3107,6 +3111,7 @@ int DirectMosaicGeoTiff(char** filenames, int nFile, char* outFile, double outRe
 		int wd = geoInfo.wd;
 		mht = ht*ratio;
 		mwd = wd*ratio;
+		
 		ReadGeoFileByte(filenames[i], 1, ratio, &pMask, mht, mwd);
 		//convert to mask value
 		for(int k=0; k<mht*mwd; k++)
@@ -3115,16 +3120,12 @@ int DirectMosaicGeoTiff(char** filenames, int nFile, char* outFile, double outRe
 				pMask[k]=255;
 		}
 
-		/*
-		GenerateImageMask(filenames[i], 
-			fabs(geoArray[i].dx), 
-			maskResolution,
-			&pMask, mht, mwd);*/
-
-		vecRect[i].right  = vecRect[i].left + mwd;
-		vecRect[i].bottom = vecRect[i].top  + mht;
-
-		MorphErodeImage(pMask, mht, mwd, 9);
+		//vecRect[i].right  = vecRect[i].left + mwd;
+		//vecRect[i].bottom = vecRect[i].top  + mht;
+		//MorphErodeImage(pMask, mht, mwd, 5);
+		//MorphDilateImage(pMask, mht, mwd, 5);
+		MyErode(pMask, mht, mwd, 7);
+		MyDilate(pMask, mht, mwd, 7);
 
 		MyRect rect;
 		rect.height = mht;
@@ -3137,20 +3138,7 @@ int DirectMosaicGeoTiff(char** filenames, int nFile, char* outFile, double outRe
 
 		WriteProgressValueToFile(dStep);
 	}
-	
-	
-	//gain compensation
-	double* pg = (double*)malloc(nFile*sizeof(double));
-	for(int i=0; i<nFile; i++)
-		pg[i] = 1;
-	//CalculateGain(maskNames, filenames, nFile, vecRect, pg);
-	//CalculateGainOneByOne(maskNames, filenames, nFile, vecRect, pg);
-	
-	//color correction
-	vector<double> cp;
-	//CalculateGainAndVignettParas(maskNames, filenames, nFile, vecRect, cp);
-	//CalculateGainAndVignettParasUsingIntensity(maskNames, filenames, nFile, vecRect, cp);
-	
+		
 	//////////////////////////// finding seam line and generate the mask for mosaic ///////////////
 	char maskfile[256];
 	CSeamFinderBase* pSeamFinder = new CVoroniSeamFinder();
@@ -3205,7 +3193,7 @@ int DirectMosaicGeoTiff(char** filenames, int nFile, char* outFile, double outRe
 		//char maskfile[256];
 		//MorphCloseImage(pMask1, mht1, mwd1);
 		//MorphDilateImage(pMask1, mht1, mwd1, 3);
-		MyDilate(pMask1, mht1, mwd1, 3);
+		//MyDilate(pMask1, mht1, mwd1, 3);
 	
 		//SaveToJpg(pMask1, mht1, mwd1, maskfile);
 		SaveRawImage(pMask1, mht1, mwd1, maskNames[i]);
@@ -3224,8 +3212,14 @@ int DirectMosaicGeoTiff(char** filenames, int nFile, char* outFile, double outRe
 	printf("\n");
 	WriteProgressValueToFile(10.0);
 
+	//MyDilate(pAllMask, maskWd, maskHt, 5);
+	//MyErode(pAllMask, maskWd, maskHt, 5);
+	//MorphDilateImage(pAllMask, maskWd, maskHt, 3);
+	//MorphErodeImage(pAllMask, maskWd, maskHt, 3);
+
+
 //#ifdef _DEBUG
-	//GdalWriteImageUShort("d:\\allmask.tif", pAllMask, maskHt, maskWd);
+	GdalWriteImageUShort("d:\\allmask.tif", pAllMask, maskHt, maskWd);
 //#endif	
 	
 	////////////////////////   blend ////////////////////////////
@@ -3251,19 +3245,19 @@ int DirectMosaicGeoTiff(char** filenames, int nFile, char* outFile, double outRe
 			DirectBlendTemplate(filenames, nFile, geoArray, 
 				pByteBuffer,ntype, nByte,
 				minx,maxx,miny,maxy, 
-				outResolution, 
+				resolution, 
 				maskResolution, 
-				pAllMask, maskHt, maskWd, pg, cp, outFile);					
+				pAllMask, maskHt, maskWd, outFile);					
 			break;
 		case 2: //unsigned short
 			printf("unsigned short ...\n");
 			nByte = 2;
 			DirectBlendTemplate(filenames, nFile, geoArray, 
-				pUShortBuffer,ntype, nByte,
+				pUShortBuffer, ntype, nByte,
 				minx,maxx,miny,maxy, 
-				outResolution, 
+				resolution, 
 				maskResolution, 
-				pAllMask, maskHt, maskWd, pg, cp, outFile);	
+				pAllMask, maskHt, maskWd, outFile);	
 			break;
 		case 3: //short
 			printf("short ...\n");
@@ -3271,60 +3265,49 @@ int DirectMosaicGeoTiff(char** filenames, int nFile, char* outFile, double outRe
 			DirectBlendTemplate(filenames, nFile, geoArray, 
 				pShortBuffer,ntype, nByte,
 				minx,maxx,miny,maxy, 
-				outResolution, 
+				resolution, 
 				maskResolution, 
-				pAllMask, maskHt, maskWd, pg, cp, outFile);	
+				pAllMask, maskHt, maskWd, outFile);	
 			break;
 		case 4: //unsigned int
 			nByte = 4;
 			DirectBlendTemplate(filenames, nFile, geoArray, 
 				pUIntBuffer,ntype, nByte,
 				minx,maxx,miny,maxy, 
-				outResolution, 
+				resolution, 
 				maskResolution, 
-				pAllMask, maskHt, maskWd, pg, cp, outFile);	
+				pAllMask, maskHt, maskWd, outFile);	
 			break;
 		case 5: //int 
 			nByte = 4;
 			DirectBlendTemplate(filenames, nFile, geoArray, 
 				pIntBuffer,ntype, nByte,
 				minx,maxx,miny,maxy, 
-				outResolution, 
+				resolution, 
 				maskResolution, 
-				pAllMask, maskHt, maskWd, pg, cp, outFile);	
+				pAllMask, maskHt, maskWd, outFile);	
 			break;
 		case 6: //float
 			nByte = 4;
 			DirectBlendTemplate(filenames, nFile, geoArray, 
 				pFloatBuffer,ntype, nByte,
 				minx,maxx,miny,maxy, 
-				outResolution, 
+				resolution, 
 				maskResolution, 
-				pAllMask, maskHt, maskWd, pg, cp, outFile);	
+				pAllMask, maskHt, maskWd, outFile);	
 			break;
 		case 7: //double
 			nByte = 8;
 			DirectBlendTemplate(filenames, nFile, geoArray, 
 				pDoubleBuffer,ntype, nByte,
 				minx,maxx,miny,maxy, 
-				outResolution, 
+				resolution, 
 				maskResolution, 
-				pAllMask, maskHt, maskWd, pg, cp, outFile);	
+				pAllMask, maskHt, maskWd, outFile);	
 			break;
-		}
-
-
-		/*
-		DirectBlend(filenames, nFile, 
-			geoArray, 
-			minx,maxx,miny,maxy, 
-			outResolution, 
-			maskResolution, 
-			pAllMask, maskHt, maskWd, pg, cp, outFile);
-			*/
+		}	
 	}
 	
-	free(pg);
 	free(pAllMask);
 
 	printf("Finished ! \n");
