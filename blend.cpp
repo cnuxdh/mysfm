@@ -2499,6 +2499,155 @@ int MultiBandBlend(char** filenames, char** maskNames, int nFile,
 	return 0;
 }
 
+//this version can handle image of any format
+int WeightedLoGBlendGeneral( char** filenames, char** masknames, int nFile, 
+					 vector<stGeoInfo> geoArray,
+					 vector<MyRect> vecRect,
+					 double outImageResolution, 
+					 double maskResolution,
+					 double minx,double maxx,double miny, double maxy,
+					 int nPyramidLevel,	
+					 double* gainParas,
+					 char* outFile )
+{
+	if(nFile<=1)
+		return -1;
+
+	int oht = (maxy-miny) / outImageResolution;
+	int owd = (maxx-minx) / outImageResolution;
+	printf("oht: %d  owd: %d \n", oht, owd);
+
+	//generate the whole mask
+	printf("generate the whole mask....\n");
+	int mht = (maxy-miny) / maskResolution;
+	int mwd = (maxx-minx) / maskResolution;
+	unsigned char* pWholeMask = (unsigned char*)malloc(mht*mwd);
+	if(pWholeMask==NULL)
+	{
+		printf("failed to malloc memory for whole mask .... \n");
+		return -1;
+	}
+	memset(pWholeMask, 0, mht*mwd);
+	double maskRatio = outImageResolution / maskResolution;
+	for(int i=0; i<nFile; i++)
+	{		
+		//reading mask
+		unsigned char* pMask = NULL;
+		int ht,wd;
+		ReadRawImage(&pMask, ht, wd, masknames[i]);
+		printf("%d %s  %d %d \n", i, masknames[i], ht, wd);
+
+		MyDilate(pMask, ht, wd, 3);
+
+		int l = max(0, min(owd-1, int(vecRect[i].left)))*maskRatio;
+		int r = max(0, min(owd-1, int(vecRect[i].right)))*maskRatio;
+		int t = max(0, min(oht-1, int(vecRect[i].top)))*maskRatio;
+		int b = max(0, min(oht-1, int(vecRect[i].bottom)))*maskRatio;
+
+		l = min(mwd-1, l);
+		r = min(mwd-1, r);
+		t = min(mht-1, t);
+		b = min(mht-1, b);		
+		//printf("%d %d %d %d \n", l, r, t, b);
+		for(int kj=t; kj<=b; kj++)
+			for(int ki=l; ki<=r; ki++)
+			{
+				int my = max(0, min(ht-1, (kj-t)));
+				int mx = max(0, min(wd-1, (ki-l)));
+				if(pMask[my*wd + mx]==0)
+					continue;
+				pWholeMask[kj*mwd + ki] = pMask[my*wd + mx];
+			}
+
+		free(pMask);
+	}
+	MyErode(pWholeMask, mht, mwd, 3);
+
+#ifdef _DEBUG
+	SaveToJpg(pWholeMask, mht, mwd, "d:\\wholemask.jpg");
+#endif
+
+	//get the type of image format
+	stGeoInfo geoinfo;
+	GetGeoInformation( filenames[0], geoinfo );
+	int nBand = geoinfo.nband;
+
+	GDALDataType ntype = GetDataType(filenames[0]);
+	int nByte = 1;
+	unsigned char* pByteBuffer   = NULL;
+	unsigned short* pUShortBuffer = NULL;
+	short* pShortBuffer = NULL;
+	unsigned int* pUIntBuffer = NULL;
+	int*    pIntBuffer = NULL;
+	float*  pFloatBuffer = NULL;
+	double* pDoubleBuffer = NULL;
+
+	switch (ntype)
+	{
+	case 1: //byte
+		nByte = 1;
+		printf("unsigned char ...\n");
+		LoGBlendGeneral(filenames,masknames,nFile, geoArray, vecRect, outImageResolution
+			,maskResolution,minx,maxx,miny,maxy, nPyramidLevel, gainParas
+			,outFile,pWholeMask,maskRatio, mht, mwd,
+			pByteBuffer, ntype, nByte, nBand, oht, owd);
+						
+		break;
+	case 2: //unsigned short
+		printf("unsigned short ...\n");
+		nByte = 2;
+		LoGBlendGeneral(filenames,masknames,nFile, geoArray, vecRect, outImageResolution
+			,maskResolution,minx,maxx,miny,maxy, nPyramidLevel, gainParas
+			,outFile,pWholeMask,maskRatio, mht, mwd,
+			pUShortBuffer, ntype, nByte, nBand, oht, owd);
+		break;
+	case 3: //short
+		printf("short ...\n");
+		nByte = 2;
+		LoGBlendGeneral(filenames,masknames,nFile, geoArray, vecRect, outImageResolution
+			,maskResolution,minx,maxx,miny,maxy, nPyramidLevel, gainParas
+			,outFile,pWholeMask,maskRatio, mht, mwd,
+			pShortBuffer, ntype, nByte, nBand, oht, owd);
+
+		break;
+	case 4: //unsigned int
+		nByte = 4;
+		LoGBlendGeneral(filenames,masknames,nFile, geoArray, vecRect, outImageResolution
+			,maskResolution,minx,maxx,miny,maxy, nPyramidLevel, gainParas
+			,outFile,pWholeMask,maskRatio, mht, mwd,
+			pUIntBuffer, ntype, nByte, nBand, oht, owd);
+
+		break;
+	case 5: //int 
+		nByte = 4;
+		LoGBlendGeneral(filenames,masknames,nFile, geoArray, vecRect, outImageResolution
+			,maskResolution,minx,maxx,miny,maxy, nPyramidLevel, gainParas
+			,outFile,pWholeMask,maskRatio, mht, mwd,
+			pIntBuffer, ntype, nByte, nBand, oht, owd);
+
+		break;
+	case 6: //float
+		nByte = 4;
+		LoGBlendGeneral(filenames,masknames,nFile, geoArray, vecRect, outImageResolution
+			,maskResolution,minx,maxx,miny,maxy, nPyramidLevel, gainParas
+			,outFile,pWholeMask,maskRatio, mht, mwd,
+			pFloatBuffer, ntype, nByte, nBand, oht, owd);
+
+		break;
+	case 7: //double
+		nByte = 8;
+		LoGBlendGeneral(filenames,masknames,nFile, geoArray, vecRect, outImageResolution
+			,maskResolution,minx,maxx,miny,maxy, nPyramidLevel, gainParas
+			,outFile,pWholeMask,maskRatio, mht, mwd,
+			pDoubleBuffer, ntype, nByte, nBand, oht, owd);
+		break;
+	}	
+	
+	free(pWholeMask);
+
+	return 0;
+}
+
 int WeightedLoGBlend( char** filenames, char** masknames, int nFile, 
 					 vector<stGeoInfo> geoArray,
 					 vector<MyRect> vecRect,
@@ -3219,7 +3368,7 @@ int DirectMosaicGeoTiff(char** filenames, int nFile, char* outFile, double outRe
 
 
 //#ifdef _DEBUG
-	GdalWriteImageUShort("d:\\allmask.tif", pAllMask, maskHt, maskWd);
+	//GdalWriteImageUShort("d:\\allmask.tif", pAllMask, maskHt, maskWd);
 //#endif	
 	
 	////////////////////////   blend ////////////////////////////
@@ -3464,7 +3613,7 @@ int BlendMosaicGeoTiff(char** filenames, int nFile, char* outFile, double outRes
 		
 	{
 		int nPyramidLevel = CalculateSeqsPyramidLevel(geoArray, outResolution);
-		WeightedLoGBlend(filenames, maskNames, nFile, geoArray, vecRectMosaic,
+		WeightedLoGBlendGeneral(filenames, maskNames, nFile, geoArray, vecRectMosaic,
 			resolution, maskResolution, minx, maxx, miny, maxy, nPyramidLevel, pg, outFile);
 	}
 
