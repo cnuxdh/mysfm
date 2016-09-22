@@ -12,11 +12,13 @@
 
 #include "panorama.hpp"
 #include "absOri.hpp"
+#include "defines.hpp"
 //#include "relativepose.hpp"
 
 
 //corelib
 #include "corelib/matrix.h"
+
 
 //matrix lib
 #include "matrix/matrix.h"
@@ -40,7 +42,8 @@ output:
 int PanoToPlane(char* srcImageFile, char* outImageFile, 
 				double vangle, double hangle,
 				double* direction, double focalLenRatio, 
-				double& focalLen, int& outHt, int& outWd, double* pR )
+				double& focalLen, int& outHt, int& outWd, double* pR 
+				)
 {
 	
 	double R[9];
@@ -178,7 +181,8 @@ outputs:
 */
 int PanoToPlanes( int nImageIndex, char* srcFile, double anglestep,
 									double vangle, double hangle, double fratio,
-									double* R, double* T)
+									double* R, double* T,
+									vector<CameraPara>& camParas)
 {
 	
 	char title[256];
@@ -264,6 +268,17 @@ int PanoToPlanes( int nImageIndex, char* srcFile, double anglestep,
     fprintf(f, "%lf %lf %lf \n", Rpg[6], Rpg[7], Rpg[8]);
     fclose(f);
 	  
+	  //save the R and T into the array
+	  CameraPara cam;
+	  cam.focus = focalLen;
+	  cam.k1 = 0;
+	  cam.k2 = 0;
+	  cam.rows = outHt;
+	  cam.cols = outWd;
+	  memcpy(cam.R, Rpg, 9*sizeof(double));
+	  memcpy(cam.t, Tpg, 3*sizeof(double));
+	  
+	  camParas.push_back(cam);
 	}
 	
 	return 0;
