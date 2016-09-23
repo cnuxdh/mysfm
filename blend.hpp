@@ -391,16 +391,18 @@ int LoGBlendGeneral(char** filenames, char** masknames, int nFile,
 			double ratio = fabs(geoArray[i].dx) / outImageResolution;
 			int rht = ratio * geoArray[i].ht;
 			int rwd = ratio * geoArray[i].wd;			
-
+			printf("%d %d \n", rht, rwd);
 			T* pSrc = (T*)malloc(nByte*rwd*rht);
 			pSrcBand->RasterIO(GF_Read,0,0,wd,ht,pSrc,rwd,rht,ntype,0,0);
 			GDALClose( (GDALDatasetH) pSrcDataSet );
-						
+			printf("close image. \n");		
+
 			for(int kj=0; kj<rht*rwd; kj++)
 			{
 					pSrc[kj] = pSrc[kj]*gainParas[i] ;
 			}
 			
+			printf("reading mask... \n");
 			//reading mask
 			unsigned char* pMask = NULL;
 			int mht1,mwd1;
@@ -412,8 +414,11 @@ int LoGBlendGeneral(char** filenames, char** masknames, int nFile,
 
 
 			//generate gaussian pyramid and smoothed mask
+			printf("generate gaussian pyramid and smoothed mask! \n");
 			PYRAMID_IMAGE_GENERAL<T> pyramidImage; 
-			ConstructPyramidWithMask(pSrc, pResizeMask, ht, wd, pyramidImage, nPyramidLevel);
+			ConstructPyramidWithMask(pSrc, pResizeMask, rht, rwd, pyramidImage, nPyramidLevel);
+			
+
 			
 			free(pSrc);
 			free(pMask);
@@ -424,6 +429,7 @@ int LoGBlendGeneral(char** filenames, char** masknames, int nFile,
 #endif
 
 			//generate laplacian pyramid of each image
+			printf("generate laplacian pyramid of each image! \n");
 			PYRAMID_IMAGE_GENERAL<short> laplacianPI; 
 			ConstructLaplacianPyramid(pyramidImage, laplacianPI);
 
@@ -518,7 +524,6 @@ int LoGBlendGeneral(char** filenames, char** masknames, int nFile,
 			for(int i=0; i<rwd; i++)
 			{
 				int index = j*rwd+i;
-
 				int mx = min(mwd-1, int(i*maskRatio+0.5));
 
 				if(pWholeMask[my*mwd+mx]>0)
@@ -530,7 +535,7 @@ int LoGBlendGeneral(char** filenames, char** masknames, int nFile,
 		//sprintf(outfile, "d:\\blend_%d.jpg", bandId);
 		//SaveToJpgGeneral(pMosaicImage, rht, rwd, outfile);
 		printf("save band buffer... \n");
-		poBand = poDataset->GetRasterBand( bandId );
+		poBand = poDataset->GetRasterBand( bandId+1 );
 		poBand->RasterIO(GF_Write, 0, 0, owd, oht, pMosaicImage, owd, oht, ntype, 0, 0);
 
 		free(pMosaicImage);

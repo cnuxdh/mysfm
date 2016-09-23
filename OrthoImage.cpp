@@ -2333,16 +2333,16 @@ int MosaicOnBundleWithDEM(char* imageListFile, char* bundleFile,
 	WriteProgressValueToFile(10.0);
 
 	
-#ifdef _DEBUG
-	//SaveBmpGeneral(iz, demHt, demWd, "d:\\dem.bmp");
-	stGeoInfo geoinfo;	
-	memset(&geoinfo, 0, sizeof(stGeoInfo));
-	geoinfo.left = minx;
-	geoinfo.top = maxy;
-	geoinfo.dx = rawResolution*demScale;
-	geoinfo.dy = rawResolution*demScale;
-	GdalWriteFloat("d:\\dem.tif", iz, demHt, demWd, geoinfo);
-#endif
+//#ifdef _DEBUG
+//	//SaveBmpGeneral(iz, demHt, demWd, "d:\\dem.bmp");
+//	stGeoInfo geoinfo;	
+//	memset(&geoinfo, 0, sizeof(stGeoInfo));
+//	geoinfo.left = minx;
+//	geoinfo.top = maxy;
+//	geoinfo.dx = rawResolution*demScale;
+//	geoinfo.dy = rawResolution*demScale;
+//	GdalWriteFloat("d:\\dem.tif", iz, demHt, demWd, geoinfo);
+//#endif
 	
 
 	/*
