@@ -539,18 +539,18 @@ int LoGBlendGeneral(char** filenames, char** masknames, int nFile,
 				int index = j*rwd+i;
 				int mx = min(mwd-1, int(i*maskRatio+0.5));
 
+				//for common RGB color image
+				if(ntype == GDT_Byte)
+				{
+					if( mosaicImage[index]<0 )
+						mosaicImage[index] = 0;
+					if( mosaicImage[index]>255 )
+						mosaicImage[index] = 255;
+				}
+
 				if(pWholeMask[my*mwd+mx]>0)
 				{
-					pMosaicImage[index] = mosaicImage[index];		
-
-					//for common RGB color image
-					if(ntype == GDT_Byte)
-					{
-						if( pMosaicImage[index]<0 )
-							pMosaicImage[index] = 0;
-						if( pMosaicImage[index]>255 )
-							pMosaicImage[index] = 255;
-					}
+					pMosaicImage[index] = mosaicImage[index];					
 				}
 			}
 		}
