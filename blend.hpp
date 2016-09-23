@@ -242,11 +242,24 @@ int DirectBlendTemplate(char** filenames, int nFile,
 					//mask space
 					int mx = x / maskResolution;
 					int my = y / maskResolution;
-					mx = max(0, min(mx, mwd-1));
-					my = max(0, min(my, mht-1));
+					mx = max(1, min(mx, mwd-2));
+					my = max(1, min(my, mht-2));
+
+					//to solve the hole problem, added by xidonghai, 2016.9.23
+					int nIsHit = 0;
+					for(int nj=my-1; nj<=my+1; nj++)
+						for(int ni=mx-1; ni<=mx+1; ni++)
+						{
+							if( pAllMask[nj*mwd+ni] == (i+1) )
+							{
+								nIsHit = 1;
+								break;
+							}
+						}
 
 					//if( pAllMask[my*mwd+mx] == (i+1) )
-					if( pAllMask[my*mwd+mx] > 0 )
+					//if( pAllMask[my*mwd+mx] > 0 )
+					if(nIsHit>0)
 					{
 						iPoint pi;
 						pi.x = n;
@@ -527,7 +540,18 @@ int LoGBlendGeneral(char** filenames, char** masknames, int nFile,
 				int mx = min(mwd-1, int(i*maskRatio+0.5));
 
 				if(pWholeMask[my*mwd+mx]>0)
+				{
 					pMosaicImage[index] = mosaicImage[index];		
+
+					//for common RGB color image
+					if(ntype == GDT_Byte)
+					{
+						if( pMosaicImage[index]<0 )
+							pMosaicImage[index] = 0;
+						if( pMosaicImage[index]>255 )
+							pMosaicImage[index] = 255;
+					}
+				}
 			}
 		}
 		

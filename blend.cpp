@@ -3274,7 +3274,7 @@ int DirectMosaicGeoTiff(char** filenames, int nFile, char* outFile, double outRe
 		//MorphErodeImage(pMask, mht, mwd, 5);
 		//MorphDilateImage(pMask, mht, mwd, 5);
 		MyErode(pMask, mht, mwd, 7);
-		MyDilate(pMask, mht, mwd, 7);
+		MyDilate(pMask, mht, mwd, 5);
 
 		MyRect rect;
 		rect.height = mht;
