@@ -217,7 +217,7 @@ int PanoToPlanes( int nImageIndex, char* srcFile, double anglestep,
 		
 		char outfile[256];
 		//sprintf(outfile, "%s_%d_%d.jpg", title, int(lat/PI*180+0.5), int(lon/PI*180+0.5));
-		sprintf(outfile, "%.8d.jpg", (nImageIndex*nProjectNum+i) );
+		sprintf(outfile, "visualize/%.8d.jpg", (nImageIndex*nProjectNum+i) );
 		printf("plane file: %s \n", outfile);
 		
 		
@@ -239,7 +239,7 @@ int PanoToPlanes( int nImageIndex, char* srcFile, double anglestep,
 	  //generate the projection matrix for PMVS and save it	  
 	  char projFile[256];
 		//sprintf(projFile, "%s_%d_%d.txt", title, int(lat/PI*180+0.5), int(lon/PI*180+0.5));
-		sprintf(projFile, "%.8d.txt", (nImageIndex*nProjectNum+i) );
+		sprintf(projFile, "txt/%.8d.txt", (nImageIndex*nProjectNum+i) );
 		
 	  double K[9] = 
             { -focalLen, 0.0, 0.5 * outWd - 0.5,
