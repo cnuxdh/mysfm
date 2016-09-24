@@ -28,6 +28,7 @@ ADD_LIBRARY(cvlib
 	feature.cpp
 	cali.cpp
 	distortion.cpp
+	cvInvoke.cpp
 	../corelib/matrix.cpp
 	../corelib/matrix.h
 	../corelib/LatLong-UTMconversion.cpp

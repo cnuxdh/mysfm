@@ -50,19 +50,22 @@ typedef struct stPoint3DDouble
 // feature structure for point description and matching
 typedef struct stPtFeature
 {
-	int id;
-	double ori;
+	int    id;
+	float  ori;
 	int    key_octave,key_intvl;  // 特征点所在的组和层 
 	float  sub_intvl;             // 精确定位后特征点所在层的改正数
 	float  scl;                   // 关键点的尺度
 	float  scl_octave;            //
-	double row,col;               // image coordinate, for backup
-	double x,y;                   // coordinates of point  ( origin is topleft )
-	double cx,cy;                 // normalized coordinate ( origin is the center of image, y axis is up)
-	vector<double> feat;          // feature vector
+	float  row,col;               // image coordinate, for backup
+	float  x,y;                   // coordinates of point  ( origin is topleft )
+	float  cx,cy;                 // normalized coordinate ( origin is the center of image, y axis is up)
+	vector<float> feat;           // feature vector
 	int    trackIdx;              // corresponding track index
 	int    extra;                 // 
 }PtFeature;
+
+
+
 
 //feature pts in one image
 typedef struct stImgFeature

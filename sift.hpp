@@ -26,10 +26,14 @@ public:
 	CSIFTFloat();
 	~CSIFTFloat();
 	int Detect(char* filePath, char* featurePath);
-    int Detect(char* filePath, ImgFeature& imgFeat);
+  int Detect(char* filePath, ImgFeature& imgFeat);
 	int Detect(char* filePath, int dstHt, int dstWd, ImgFeature& imgFeat);
 private:
 
 };
+
+
+
+
 
 #endif

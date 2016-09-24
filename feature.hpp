@@ -30,6 +30,18 @@ public:
 
 
 
+//feature I/O
+class CFeatureIO
+{
+public:
+	CFeatureIO(){}
+	virtual ~CFeatureIO(){}
+	
+	virtual int WriteBin(ImgFeature& imgFeat){return 0;}
+	virtual int WriteTxt(ImgFeature& imgFeat){return 0;}
+};
+
+
 
 
 #endif
