@@ -3467,6 +3467,10 @@ int DirectMosaicGeoTiff(char** filenames, int nFile, char* outFile, double outRe
 
 int BlendMosaicGeoTiff(char** filenames, int nFile, char* outFile, double outResolution)
 {
+	if(nFile<2)
+		return -1;
+
+
 	WriteProgressValueToFile(0.0);
 
 	//reading the geo-infomation from the geotiff files
@@ -3491,6 +3495,8 @@ int BlendMosaicGeoTiff(char** filenames, int nFile, char* outFile, double outRes
 			strcpy(geofile+strlen(geofile)-4, "geo");
 			ReadGeoFile(geofile, geoArray[i]);
 		}
+
+		free(postfix);
 	}
 		
 	double minx,maxx,miny,maxy;
@@ -3567,10 +3573,29 @@ int BlendMosaicGeoTiff(char** filenames, int nFile, char* outFile, double outRes
 		printf("%d \n", i);
 		unsigned char* pMask = NULL;
 		int mht,mwd;
+
+		double ratio = fabs(geoArray[i].dx) / maskResolution;
+		stGeoInfo geoInfo;
+		GetGeoInformation(filenames[i], geoInfo);
+		int ht = geoInfo.ht;
+		int wd = geoInfo.wd;
+		mht = ht*ratio;
+		mwd = wd*ratio;
+
+		ReadGeoFileByte(filenames[i], 1, ratio, &pMask, mht, mwd);
+		//convert to mask value
+		for(int k=0; k<mht*mwd; k++)
+		{
+			if(pMask[k]>0)
+				pMask[k]=10;
+		}
+
+		/*
 		GenerateImageMask(filenames[i], 
 			fabs(geoArray[i].dx), 
 			maskResolution,
 			&pMask, mht, mwd, 10);	    
+			*/
 
 		//calculate the translation of each image in mask space
 		double mosaicRatio =  fabs(geoArray[i].dx) / outResolution;		
@@ -3601,7 +3626,15 @@ int BlendMosaicGeoTiff(char** filenames, int nFile, char* outFile, double outRes
 	double* pg = (double*)malloc(nFile*sizeof(double));
 	for(int i=0; i<nFile; i++)
 		pg[i] = 1;
-	CalculateGain(maskNames, filenames, nFile, vecRectMask, pg);
+	
+	//calculate the gain only for RGB true colr images
+	char* postfix;
+	GetPostfix(filenames[0], &postfix);
+	if( strcmp(postfix, "jpg")==0 || strcmp(postfix, "JPG")==0 )
+	{
+		CalculateGain(maskNames, filenames, nFile, vecRectMask, pg);
+	}	
+	free(postfix);
 	WriteProgressValueToFile(10.0);
 
 	

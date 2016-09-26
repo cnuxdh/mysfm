@@ -438,7 +438,7 @@ int LoGBlendGeneral(char** filenames, char** masknames, int nFile,
 			free(pResizeMask);
 
 #ifdef _DEBUG
-			//WritePyramidImage(pyramidImage);
+			WritePyramidImage(pyramidImage);
 #endif
 
 			//generate laplacian pyramid of each image
@@ -447,7 +447,7 @@ int LoGBlendGeneral(char** filenames, char** masknames, int nFile,
 			ConstructLaplacianPyramid(pyramidImage, laplacianPI);
 
 #ifdef _DEBUG
-			//WritePyramidImage(laplacianPI);
+			WritePyramidImage(laplacianPI);
 #endif
 			double imageRatio = 1;
 			for(int li=0; li<laplacianPI.nL; li++)
