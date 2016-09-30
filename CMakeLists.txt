@@ -1,8 +1,11 @@
 #generate cvlib
 
 
+#for header files
 INCLUDE_DIRECTORIES(/usr/local/include  
 										../
+										../CVLib
+									  ../datalib
 										../CoreDll
 										../Corelib
 										../sfm-driver
@@ -14,7 +17,7 @@ INCLUDE_DIRECTORIES(/usr/local/include
 										../cminpack
 										)
 
-
+#source files
 ADD_LIBRARY(cvlib
 	absOri.cpp
 	absOri.hpp
@@ -29,6 +32,7 @@ ADD_LIBRARY(cvlib
 	cali.cpp
 	distortion.cpp
 	cvInvoke.cpp
+	../dataLib/dataBase.cpp
 	../corelib/matrix.cpp
 	../corelib/matrix.h
 	../corelib/LatLong-UTMconversion.cpp

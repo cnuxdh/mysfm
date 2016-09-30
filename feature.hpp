@@ -30,7 +30,7 @@ public:
 
 
 
-//feature I/O
+//feature I/O base class
 class CFeatureIO
 {
 public:
