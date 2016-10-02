@@ -26,10 +26,12 @@
 
 #include "keys.h"
 
+/*
 enum MotionModel {
     MotionRigid,
     MotionHomography,
 };
+*/
 
 /* Estimate a transform between two sets of keypoints */
 std::vector<int> EstimateTransform(const std::vector<Keypoint> &k1, 

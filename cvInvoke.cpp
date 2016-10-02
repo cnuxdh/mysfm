@@ -44,12 +44,9 @@ int DetectFileFeaturePts(char** filenames, int nFile, char* outpath)
 		sprintf(featPath, "%s/%s.dat", outpath, title);
 		printf("%s \n", featPath);
 		
-		pFeatureData->Write(featPath, feats);
-		
-	}
-	
+		pFeatureData->Write(featPath, feats);		
+	}	
 	delete pFeatDetect;
-	
 	
 	return 0;
 }

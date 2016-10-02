@@ -166,6 +166,17 @@ typedef struct STRU_TRACK
 }stTrack;
 
 
+#define HOMOGRAPHY_THRESHOLD 4
+#define HOMOGRAPHY_ROUNDS    256
+
+typedef enum 
+{
+	MotionNone,
+	MotionRigid,
+	MotionHomography,
+	MotionFundametalMatrix,
+}MotionModel;
+
 
 
 #endif

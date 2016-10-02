@@ -9,14 +9,6 @@
 #include "imagedata.hpp"
 
 
-#define HOMOGRAPHY_THRESHOLD 4
-#define HOMOGRAPHY_ROUNDS    256
-
-enum MotionModel
-{
-	MotionRigid,
-	MotionHomography,
-};
 
 //base class for feature matching
 class DLL_EXPORT CMatchBase
