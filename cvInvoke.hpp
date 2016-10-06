@@ -12,7 +12,6 @@ int DetectFileFeaturePts(char** filenames, int nFile, char* outpath);
 
 
 
-
 #endif
 
 

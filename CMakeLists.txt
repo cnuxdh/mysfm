@@ -47,6 +47,7 @@ ADD_LIBRARY(cvlib
 	../coredll/vim_imgs.h
 	../coredll/vim_sift.cpp
 	../coredll/keys2a.cpp
+	../coredll/geotiff.cpp
 	../siftlib/siftmatch.cpp
 	../siftlib/siftfeature.cpp
 	../siftlib/kdtree.cpp

@@ -19,7 +19,12 @@
 
 
 
-//core function for feature detection of multiple images
+// function for feature detection of multiple images, for input files
+// Input
+//	filenames : the image files
+//  nFile :
+// Output 
+//	outpath: image feature files saved into the output path
 int DetectFileFeaturePts(char** filenames, int nFile, char* outpath)
 {
 	//retrive the file title
@@ -50,7 +55,13 @@ int DetectFileFeaturePts(char** filenames, int nFile, char* outpath)
 	
 	delete pFeatDetect;
 	
-	
 	return 0;
 }
 
+
+int MatchFeatureFiles()
+{
+	
+	
+	return 0;
+}
