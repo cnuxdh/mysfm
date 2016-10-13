@@ -1098,11 +1098,10 @@ int CFastGenerateTrack::GenerateTracks(vector<ImgFeature>& imgFeatures, vector<P
 	int nTrackIndex = 0;
 	for(int i=0; i<nMatchPair; i++)
 	{
-		int nLeftImage = pairMatchs[i].lId;
+		int nLeftImage  = pairMatchs[i].lId;
 		int nRightImage = pairMatchs[i].rId;
-		int nMatchNum = pairMatchs[i].matchs.size();
+		int nMatchNum   = pairMatchs[i].matchs.size();
 
-		TrackInfo tp;
 
 		for(int j=0; j<nMatchNum; j++)
 		{
@@ -1112,8 +1111,9 @@ int CFastGenerateTrack::GenerateTracks(vector<ImgFeature>& imgFeatures, vector<P
 			int lTrackIndex = imgFeatures[nLeftImage].featPts[nLeftFeatIndex].extra;
 			int rTrackIndex = imgFeatures[nRightImage].featPts[nRightFeatIndex].extra;
 
+			TrackInfo tp;
 			ImageKey ik;
-
+			
 			//create a new track point
 			if( lTrackIndex==-1 && rTrackIndex==-1 )
 			{
@@ -1519,3 +1519,48 @@ void PruneBadTracks(vector<TrackInfo>& trackSeq)
 	trackSeq = trackSeqRight;
 }
 
+
+int LoadMatchFile( char* filename, vector<PairMatchRes>& pairMatchs)
+{
+
+	FILE *f = fopen(filename, "r");
+
+	if (f == NULL) 
+	{
+		printf("[LoadMatchFile] Error opening file %s for reading\n", filename);	
+		return -1;
+	}
+
+	char buf[256];
+	while (fgets(buf, 256, f)) 
+	{
+		PairMatchRes pair;
+		
+		// Read the images
+		int i1, i2;
+		sscanf(buf, "%d %d\n", &i1, &i2);
+
+		pair.lId = i1;
+		pair.rId = i2;
+
+		// Read the number of matches
+		int nMatches;
+		fscanf(f, "%d\n", &nMatches);
+
+		// Read the matches
+		for (int i = 0; i < nMatches; i++) 
+		{
+			int k1, k2;
+			fscanf(f, "%d %d\n", &k1, &k2);
+
+			MatchPairIndex mi;
+			mi.l = k1;
+			mi.r = k2;
+			pair.matchs.push_back(mi);
+		}
+		pairMatchs.push_back(pair);
+	}
+	fclose(f);
+
+	return 0;
+}
