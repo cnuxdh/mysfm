@@ -118,6 +118,7 @@ public:
 
 
 //loading matching file
+int LoadMatchFile( char* filename, vector<PairMatchRes>& pairMatchs);
 
 
 /////////////////  functions for retrieving information from tracks ///////////////////
