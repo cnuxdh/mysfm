@@ -5,7 +5,6 @@
 
 #include "defines.hpp"
 
-
 //the maximal image height for feature detection
 #define DETECT_IMAGE_HT 640
 

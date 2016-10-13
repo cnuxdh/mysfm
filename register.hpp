@@ -64,8 +64,6 @@ public:
 };
 
 
-
-
 class DLL_EXPORT CSiftMatch: public CMatchBase
 {
 public:
@@ -83,11 +81,6 @@ public:
 
 
 
-
-
-
-
-
 //////////////////////////////////////////////////////////////////////////
 //base class for generating tracks
 class DLL_EXPORT CGenerateTracksBase
@@ -95,8 +88,9 @@ class DLL_EXPORT CGenerateTracksBase
 public:
 	CGenerateTracksBase(){}
 	virtual ~CGenerateTracksBase(){}
-	virtual  int GenerateTracks( vector<PairMatchRes> pairMatchs, vector<TrackInfo>& tracks ){return 0;}
-	virtual  int GenerateTracks( vector<PairMatchRes> pairMatchs, vector<CImageDataBase*> imageData, vector<TrackInfo>& tracks ){return 0;}
+	virtual  int GenerateTracks( vector<PairMatchRes>& pairMatchs, vector<TrackInfo>& tracks ){return 0;}
+	virtual  int GenerateTracks( vector<ImgFeature>& imgFeatures, vector<PairMatchRes>& pairMatchs, vector<TrackInfo>& tracks ){return 0;}
+	virtual  int GenerateTracks( vector<PairMatchRes>& pairMatchs, vector<CImageDataBase*> imageData, vector<TrackInfo>& tracks ){return 0;}
 };
 
 class DLL_EXPORT CMyGenerateTrack: public CGenerateTracksBase
@@ -104,9 +98,23 @@ class DLL_EXPORT CMyGenerateTrack: public CGenerateTracksBase
 public:
 	CMyGenerateTrack();
 	~CMyGenerateTrack();
-	int GenerateTracks( vector<PairMatchRes> pairMatchs, vector<TrackInfo>& tracks );
-	int GenerateTracks( vector<PairMatchRes> pairMatchs, vector<CImageDataBase*> imageData, vector<TrackInfo>& tracks );
+	int GenerateTracks( vector<PairMatchRes>& pairMatchs, vector<TrackInfo>& tracks );
+	int GenerateTracks( vector<ImgFeature>& imgFeatures, vector<PairMatchRes>& pairMatchs, vector<TrackInfo>& tracks );
+	int GenerateTracks( vector<PairMatchRes>& pairMatchs, vector<CImageDataBase*> imageData, vector<TrackInfo>& tracks );
 };
+
+
+//generating the tracks using fast method
+class DLL_EXPORT CFastGenerateTrack: public CGenerateTracksBase
+{
+public:
+	CFastGenerateTrack();
+	~CFastGenerateTrack();
+	int GenerateTracks( vector<PairMatchRes>& pairMatchs, vector<TrackInfo>& tracks );
+	int GenerateTracks( vector<ImgFeature>& imgFeatures, vector<PairMatchRes>& pairMatchs, vector<TrackInfo>& tracks );
+	int GenerateTracks( vector<PairMatchRes>& pairMatchs, vector<CImageDataBase*> imageData, vector<TrackInfo>& tracks );
+};
+
 
 
 
@@ -121,6 +129,8 @@ DLL_EXPORT int PrintTracks(vector<TrackInfo> tracks, char* filename);
 /* input the image pair ( imgId1, imgId2), get the track including this pair
 */
 DLL_EXPORT void GetMatch(int imgId1, int imgId2, vector<TrackInfo>& tracks, vector<TrackInfo>& trackSeq);
+
+
 
 /*search the projections in special image corresponding to 3D points
 input:
@@ -148,9 +158,6 @@ DLL_EXPORT int AddNewTracks(int imgId, vector<int> cameraIDOrder, vector<CameraP
 
 //prune suspicious tracks
 void PruneBadTracks(vector<TrackInfo>& trackSeq);
-
-//set track id for projected feature points
-
 
 
 /* Estimate a transform between two sets of keypoints */

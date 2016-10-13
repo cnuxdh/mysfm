@@ -1,5 +1,5 @@
 
-#ifdef _WIN32
+#ifdef WIN32
 #include "windows.h"
 //#include "time.h"
 #include "mmsystem.h"
@@ -553,7 +553,7 @@ int CKNNMatch::Match(ImgFeature& lImage, ImgFeature& rImage, vector<MatchPairInd
 
 #ifdef _WIN32
 	//int64 t1 = getTickCount();
-	unsigned long t1 = timeGetTime();
+	//unsigned long t1 = timeGetTime();
 #endif
 
 	int nDim = lImage.featPts[0].feat.size();
@@ -601,10 +601,10 @@ int CKNNMatch::Match(ImgFeature& lImage, ImgFeature& rImage, vector<MatchPairInd
 
 #ifdef _WIN32
 	//int64 t2 = getTickCount();
-	unsigned long t2 = timeGetTime();
+	//unsigned long t2 = timeGetTime();
 
 	//printf("match time: %lf \n", (double)(t2-t1) / getTickFrequency());
-	printf("match time: %lf \n", (double)(t2-t1) / 1000 );
+	//printf("match time: %lf \n", (double)(t2-t1) / 1000 );
 #endif
 
 
@@ -618,7 +618,7 @@ int CKNNMatch::Match(ImgFeature& lImage, ImgFeature& rImage, PairMatchRes& pairM
 		return 0;
 
 #ifdef _WIN32
-	unsigned long t1 = timeGetTime();
+	//unsigned long t1 = timeGetTime();
 #endif
 
 	int nDim = lImage.featPts[0].feat.size();
@@ -676,8 +676,8 @@ int CKNNMatch::Match(ImgFeature& lImage, ImgFeature& rImage, PairMatchRes& pairM
 	delete[] matchSet.matpoint;
 
 #ifdef _WIN32
-	unsigned long t2 = timeGetTime();
-	printf("match time: %lf s \n", (double)(t2-t1) / 1000 );
+	//unsigned long t2 = timeGetTime();
+	//printf("match time: %lf s \n", (double)(t2-t1) / 1000 );
 #endif
 
 	return 1;	
@@ -731,7 +731,7 @@ int CSiftMatch::Match(ImgFeature& lImage, ImgFeature& rImage, vector<MatchPairIn
 int CSiftMatch::Match(ImgFeature& lImage, ImgFeature& rImage, PairMatchRes& pairMatch )
 {
 	#ifdef _WIN32
-	unsigned long t1 = timeGetTime();
+	//unsigned long t1 = timeGetTime();
 	#endif
 	
 	
@@ -804,8 +804,8 @@ int CSiftMatch::Match(ImgFeature& lImage, ImgFeature& rImage, PairMatchRes& pair
 	printf("Matching Point Number: %d \n", pairMatch.matchs.size());
 
 #ifdef _WIN32
-	unsigned long t2 = timeGetTime();
-	printf("matching time: %lf s \n", (double)(t2-t1)/1000.0 );
+	//unsigned long t2 = timeGetTime();
+	//printf("matching time: %lf s \n", (double)(t2-t1)/1000.0 );
 #endif
 
 	return 1;
@@ -900,7 +900,13 @@ CMyGenerateTrack::~CMyGenerateTrack()
 
 }
 
-int CMyGenerateTrack::GenerateTracks( vector<PairMatchRes> pairMatchs, vector<TrackInfo>& tracks )
+int CMyGenerateTrack::GenerateTracks(vector<ImgFeature>& imgFeatures, vector<PairMatchRes>& pairMatchs, vector<TrackInfo>& tracks )
+{
+
+	return 0;
+}
+
+int CMyGenerateTrack::GenerateTracks( vector<PairMatchRes>& pairMatchs, vector<TrackInfo>& tracks )
 {
 	int nTrack = 0;
 
@@ -969,7 +975,7 @@ int CMyGenerateTrack::GenerateTracks( vector<PairMatchRes> pairMatchs, vector<Tr
 }
 
 
-int CMyGenerateTrack::GenerateTracks( vector<PairMatchRes> pairMatchs, vector<CImageDataBase*> imageData, vector<TrackInfo>& tracks )
+int CMyGenerateTrack::GenerateTracks( vector<PairMatchRes>& pairMatchs, vector<CImageDataBase*> imageData, vector<TrackInfo>& tracks )
 {
 	int nTrack = 0;
 
@@ -1059,6 +1065,115 @@ int CMyGenerateTrack::GenerateTracks( vector<PairMatchRes> pairMatchs, vector<CI
 
 	return 1;
 }
+
+
+CFastGenerateTrack::CFastGenerateTrack()
+{
+
+}
+
+CFastGenerateTrack::~CFastGenerateTrack()
+{
+
+}
+
+int CFastGenerateTrack::GenerateTracks(vector<ImgFeature>& imgFeatures, vector<PairMatchRes>& pairMatchs, vector<TrackInfo>& tracks )
+{
+	int nImage = imgFeatures.size();
+
+	//clear the "extra" value
+	for(int i=0; i<nImage; i++)
+	{
+		int nFeat = imgFeatures[i].featPts.size();
+		for(int j=0; j<nFeat; j++)
+		{
+			imgFeatures[i].featPts[j].extra = -1;
+		}
+	}
+	
+	int nMatchPair = pairMatchs.size();
+
+	tracks.clear();
+
+	int nTrackIndex = 0;
+	for(int i=0; i<nMatchPair; i++)
+	{
+		int nLeftImage = pairMatchs[i].lId;
+		int nRightImage = pairMatchs[i].rId;
+		int nMatchNum = pairMatchs[i].matchs.size();
+
+		TrackInfo tp;
+
+		for(int j=0; j<nMatchNum; j++)
+		{
+			int nLeftFeatIndex  = pairMatchs[i].matchs[j].l;
+			int nRightFeatIndex = pairMatchs[i].matchs[j].r;
+
+			int lTrackIndex = imgFeatures[nLeftImage].featPts[nLeftFeatIndex].extra;
+			int rTrackIndex = imgFeatures[nRightImage].featPts[nRightFeatIndex].extra;
+
+			ImageKey ik;
+
+			//create a new track point
+			if( lTrackIndex==-1 && rTrackIndex==-1 )
+			{
+				ik.first = nLeftImage;
+				ik.second = nLeftFeatIndex;
+				tp.views.push_back(ik);
+
+				ik.first = nRightImage;
+				ik.second = nRightFeatIndex;
+				tp.views.push_back(ik);
+
+				tp.id = nTrackIndex;
+
+				imgFeatures[nLeftImage].featPts[nLeftFeatIndex].extra = nTrackIndex;
+				imgFeatures[nRightImage].featPts[nRightFeatIndex].extra = nTrackIndex;
+
+				tracks.push_back(tp);
+
+				nTrackIndex ++;
+			}
+			///////////////////////////////////////////////////////////////////////
+			
+			//adding the match point into existing track point
+			if(lTrackIndex != -1 && rTrackIndex == -1)
+			{
+				ik.first = nRightImage;
+				ik.second = nRightFeatIndex;
+				tp.views.push_back(ik);
+
+				tracks[lTrackIndex].views.push_back(ik);
+				imgFeatures[nRightImage].featPts[nRightFeatIndex].extra = lTrackIndex;
+			}
+			if(lTrackIndex == -1 && rTrackIndex != -1)
+			{
+				ik.first = nLeftImage;
+				ik.second = nLeftFeatIndex;
+				tp.views.push_back(ik);
+
+				tracks[rTrackIndex].views.push_back(ik);
+				imgFeatures[nLeftImage].featPts[nLeftFeatIndex].extra = rTrackIndex;
+			}
+			////////////////////////////////////////////////////////////////////////////
+
+		}
+	}
+
+	return 0;
+}
+
+int CFastGenerateTrack::GenerateTracks( vector<PairMatchRes>& pairMatchs, vector<TrackInfo>& tracks )
+{
+	
+	return 0;
+}
+int CFastGenerateTrack::GenerateTracks( vector<PairMatchRes>& pairMatchs, vector<CImageDataBase*> imageData, vector<TrackInfo>& tracks )
+{
+	return 0;
+}
+
+
 
 
 //////////////////////////////////////////////////////////////////////////

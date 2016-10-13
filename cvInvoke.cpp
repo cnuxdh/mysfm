@@ -1,10 +1,6 @@
 
 #include"stdio.h"
 
-
-
-
-
 #include"cvInvoke.hpp"
 #include"sift.hpp"
 #include"dataBase.hpp"
@@ -15,8 +11,6 @@
 
 
 //multiple cpu cores
-
-
 
 
 //core function for feature detection of multiple images
@@ -50,4 +44,8 @@ int DetectFileFeaturePts(char** filenames, int nFile, char* outpath)
 	
 	return 0;
 }
+
+
+
+
 

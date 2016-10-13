@@ -120,7 +120,7 @@ typedef std::vector<ImageKey> ImageKeyVector;   //all projections of a track
 typedef struct stTrackInfo
 {
 	int id;
-	int extra;     //save extra information
+	int extra;             //save extra information
 	Point3DDouble  grd;
 	ImageKeyVector views;
 }TrackInfo;

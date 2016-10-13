@@ -22,13 +22,10 @@
 #include "main.h"
 
 
-#ifdef _WIN32
+#ifdef WIN32
 #include "windows.h"
 #include "mmsystem.h"
 #endif
-
-
-
 
 
 CSIFT::CSIFT()
@@ -186,7 +183,7 @@ int CSIFTFloat::Detect(char* filePath, ImgFeature& imgFeat)
 	int keynumber = 0;
 	
 	#ifdef _WIN32
-	unsigned long t1 = timeGetTime();
+	//unsigned long t1 = timeGetTime();
 	#endif
 	
 	//int64 t1 = getTickCount();
@@ -194,10 +191,10 @@ int CSIFTFloat::Detect(char* filePath, ImgFeature& imgFeat)
 	printf("Feature Number: %d \n", keynumber);
 	
 	#ifdef _WIN32
-	unsigned long t2 = timeGetTime();	
+	//unsigned long t2 = timeGetTime();	
 	//int64 t2 = getTickCount();
 	//printf("time for detection: %lf s \n", (double)(t2-t1)/getTickFrequency() );
-	printf("time for detection: %lf s \n", (double)(t2-t1)/1000 );
+	//printf("time for detection: %lf s \n", (double)(t2-t1)/1000 );
   #endif
    
 	
