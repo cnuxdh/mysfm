@@ -1098,11 +1098,11 @@ int CFastGenerateTrack::GenerateTracks(vector<ImgFeature>& imgFeatures, vector<P
 	int nTrackIndex = 0;
 	for(int i=0; i<nMatchPair; i++)
 	{
-		int nLeftImage  = pairMatchs[i].lId;
-		int nRightImage = pairMatchs[i].rId;
+		int nLeftImage  = pairMatchs[i].lId; //left image index
+		int nRightImage = pairMatchs[i].rId; //right image index
 		int nMatchNum   = pairMatchs[i].matchs.size();
 
-
+		//process each match point pair
 		for(int j=0; j<nMatchNum; j++)
 		{
 			int nLeftFeatIndex  = pairMatchs[i].matchs[j].l;
@@ -1127,6 +1127,7 @@ int CFastGenerateTrack::GenerateTracks(vector<ImgFeature>& imgFeatures, vector<P
 
 				tp.id = nTrackIndex;
 
+				//bridge the image point and track
 				imgFeatures[nLeftImage].featPts[nLeftFeatIndex].extra = nTrackIndex;
 				imgFeatures[nRightImage].featPts[nRightFeatIndex].extra = nTrackIndex;
 
@@ -1139,19 +1140,21 @@ int CFastGenerateTrack::GenerateTracks(vector<ImgFeature>& imgFeatures, vector<P
 			//adding the match point into existing track point
 			if(lTrackIndex != -1 && rTrackIndex == -1)
 			{
-				ik.first = nRightImage;
+				ik.first  = nRightImage;
 				ik.second = nRightFeatIndex;
 				tp.views.push_back(ik);
-
+				
+				//adding the right image point into the track
 				tracks[lTrackIndex].views.push_back(ik);
 				imgFeatures[nRightImage].featPts[nRightFeatIndex].extra = lTrackIndex;
 			}
 			if(lTrackIndex == -1 && rTrackIndex != -1)
 			{
-				ik.first = nLeftImage;
+				ik.first  = nLeftImage;
 				ik.second = nLeftFeatIndex;
 				tp.views.push_back(ik);
 
+				//adding the left image point into the track
 				tracks[rTrackIndex].views.push_back(ik);
 				imgFeatures[nLeftImage].featPts[nLeftFeatIndex].extra = rTrackIndex;
 			}
