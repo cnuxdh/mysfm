@@ -1102,6 +1102,8 @@ int CFastGenerateTrack::GenerateTracks(vector<ImgFeature>& imgFeatures, vector<P
 		int nRightImage = pairMatchs[i].rId; //right image index
 		int nMatchNum   = pairMatchs[i].matchs.size();
 
+		printf("match pair: %d - %d \n", nLeftImage, nRightImage);
+		
 		//process each match point pair
 		for(int j=0; j<nMatchNum; j++)
 		{
@@ -1163,8 +1165,33 @@ int CFastGenerateTrack::GenerateTracks(vector<ImgFeature>& imgFeatures, vector<P
 		}
 	}
 
+	//remove the track with multiple projections in the same image
+	vector<TrackInfo> newTracks;
+	for(int i=0; i<tracks.size(); i++)
+	{
+		vector<int> vecNumberFreq;
+		vecNumberFreq.resize(nImage, 0);
+		bool bIsRemove = false;
+		for(int j=0; j<tracks[i].views.size(); j++)
+		{
+			int nImageIndex = tracks[i].views[j].first;
+			vecNumberFreq[nImageIndex]++;
+
+			if(vecNumberFreq[nImageIndex]>1)
+			{
+				bIsRemove = true;
+				break;
+			}
+		}
+		if(!bIsRemove)
+			newTracks.push_back(tracks[i]);
+	}
+
+	tracks = newTracks;
+
 	return 0;
 }
+
 
 int CFastGenerateTrack::GenerateTracks( vector<PairMatchRes>& pairMatchs, vector<TrackInfo>& tracks )
 {
