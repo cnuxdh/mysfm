@@ -529,7 +529,7 @@ int CEstimatePose5Point::EstimatePose( vector<Point2DDouble> lPts, vector<Point2
    
 	//print results
 #ifdef _DEBUG
-	FILE* fp = fopen("d:\\myRelativePose.txt", "w");
+	FILE* fp = fopen("c:\\temp\\myRelativePose.txt", "w");
 	fprintf(fp, "%d %d \n", 0, 1);
 	fprintf(fp, "focus: %lf \n", cam2.focus);
 	fprintf(fp, "Rotation Matrix: \n");

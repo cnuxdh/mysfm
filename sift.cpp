@@ -55,6 +55,9 @@ int CSIFT::Detect(char* filePath, ImgFeature& imgFeat)
 	//resize the image
 	int dstHt,dstWd;
 	GetResizeDimension(ht, wd, dstHt, dstWd);
+
+	double sx = (double)(wd) / (double)(dstWd);
+	double sy = (double)(ht) / (double)(dstHt);
 	
 	//sift feature detect
 	struct feature* pFeat = NULL;
@@ -62,8 +65,8 @@ int CSIFT::Detect(char* filePath, ImgFeature& imgFeat)
 	nFeat = siftFeatures(filePath, dstHt, dstWd, &pFeat);	
 	printf("feature Number: %d \n", nFeat);
 
-	imgFeat.ht = dstHt;
-	imgFeat.wd = dstWd;
+	imgFeat.ht = ht;
+	imgFeat.wd = wd;
 
 	for(int i=0; i<nFeat; i++)
 	{
@@ -71,10 +74,10 @@ int CSIFT::Detect(char* filePath, ImgFeature& imgFeat)
 		feat.id         = i;   //pFeat[i].index;
 		feat.scl        = pFeat[i].scl;
 		feat.ori        = pFeat[i].ori;
-		feat.x = pFeat[i].x;
-		feat.y = pFeat[i].y;
-		feat.cx = feat.x - dstWd*0.5; //normalized coordinate
-		feat.cy = dstHt*0.5 - feat.y; //normalized coordinate        
+		feat.x = pFeat[i].x * sx ;
+		feat.y = pFeat[i].y * sx;
+		feat.cx = feat.x - wd*0.5; //normalized coordinate
+		feat.cy = ht*0.5 - feat.y; //normalized coordinate        
 		for(int j=0; j<128; j++)
 			feat.feat.push_back( pFeat[i].descr[j]);
 		feat.trackIdx = -1;
