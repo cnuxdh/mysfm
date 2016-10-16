@@ -610,7 +610,7 @@ void CTriangulateCV::Triangulate(std::vector<Point2DDouble> lPts, std::vector<Po
          
 		v3_t gp = PtTriangulate( p, q, camera1, camera2, error, in_front, angle, true);
 		
-		
+		//the projection error is beyond the threshold
 		if (error > 4) 
 		{
 			//printf(" skipping point\n");
