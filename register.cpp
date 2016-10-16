@@ -56,8 +56,8 @@ static int CountInliers(const vector<stPtFeature> &k1,
 
 		double p[3];
 
-		p[0] = k1[matches[i].l].cx;
-		p[1] = k1[matches[i].l].cy;
+		p[0] = k1[matches[i].l].x;
+		p[1] = k1[matches[i].l].y;
 		p[2] = 1.0;
 
 		double q[3];
@@ -66,8 +66,8 @@ static int CountInliers(const vector<stPtFeature> &k1,
 		double qx = q[0] / q[2];
 		double qy = q[1] / q[2];
 
-		double dx = qx - k2[matches[i].r].cx;
-		double dy = qy - k2[matches[i].r].cy;
+		double dx = qx - k2[matches[i].r].x;
+		double dy = qy - k2[matches[i].r].y;
 
 		double dist = sqrt(dx * dx + dy * dy);
 
@@ -259,12 +259,12 @@ vector<int> EstimateTransform(const vector<stPtFeature> &k1,
 			int idx1 = matches[match_idxs[i]].l;
 			int idx2 = matches[match_idxs[i]].r;
 
-			Vx(l_pts[i]) = k1[idx1].cx;
-			Vy(l_pts[i]) = k1[idx1].cy;
+			Vx(l_pts[i]) = k1[idx1].x;
+			Vy(l_pts[i]) = k1[idx1].y;
 			Vz(l_pts[i]) = 1.0;
 
-			Vx(r_pts[i]) = k2[idx2].cx;
-			Vy(r_pts[i]) = k2[idx2].cy;
+			Vx(r_pts[i]) = k2[idx2].x;
+			Vy(r_pts[i]) = k2[idx2].y;
 			Vz(r_pts[i]) = 1.0;
 
 			weight[i] = 1.0;
@@ -781,22 +781,23 @@ int CSiftMatch::Match(ImgFeature& lImage, ImgFeature& rImage, PairMatchRes& pair
 	}	
 	
 	//wrong match removal based on Homography
-	double dH[9];
-	vector<int> inliers = EstimateTransform( lImage.featPts, rImage.featPts, pairMatch.matchs,
-											 MotionHomography, HOMOGRAPHY_ROUNDS, HOMOGRAPHY_THRESHOLD, dH);
-  	
-	
-	//inlier ratio
-	pairMatch.inlierRatio = (double)(inliers.size()) / (double)( pairMatch.matchs.size() );
-	//pairMatch.inlierRatio =  (double)(lKeyIds.size())/(double)();
-
-	vector<MatchPairIndex> rightMatch;
-	for(int i=0; i<inliers.size(); i++)
+	if(1)
 	{
-		rightMatch.push_back( pairMatch.matchs[ inliers[i] ] );
+		double dH[9];
+		vector<int> inliers = EstimateTransform( lImage.featPts, rImage.featPts, pairMatch.matchs,
+			MotionHomography, HOMOGRAPHY_ROUNDS, HOMOGRAPHY_THRESHOLD, dH);
+		
+		//inlier ratio
+		pairMatch.inlierRatio = (double)(inliers.size()) / (double)( pairMatch.matchs.size() );
+		//pairMatch.inlierRatio =  (double)(lKeyIds.size())/(double)();
+
+		vector<MatchPairIndex> rightMatch;
+		for(int i=0; i<inliers.size(); i++)
+		{
+			rightMatch.push_back( pairMatch.matchs[ inliers[i] ] );
+		}
+		pairMatch.matchs = rightMatch;
 	}
-	pairMatch.matchs = rightMatch;
-	
 
 	free(lKey);
 	free(rKey);

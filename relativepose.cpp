@@ -610,13 +610,13 @@ void CTriangulateCV::Triangulate(std::vector<Point2DDouble> lPts, std::vector<Po
          
 		v3_t gp = PtTriangulate( p, q, camera1, camera2, error, in_front, angle, true);
 		
-		/*
-		if (error > PROJECTION_ESTIMATION_THRESHOLD) 
+		
+		if (error > 4) 
 		{
-			printf(" skipping point\n");
+			//printf(" skipping point\n");
 			continue;
 		}
-		*/
+		
 
 		Point3DDouble p3;
 		p3.p[0] = gp.p[0]; p3.p[1] = gp.p[1]; p3.p[2] = gp.p[2];

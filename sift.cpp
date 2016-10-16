@@ -74,10 +74,13 @@ int CSIFT::Detect(char* filePath, ImgFeature& imgFeat)
 		feat.id         = i;   //pFeat[i].index;
 		feat.scl        = pFeat[i].scl;
 		feat.ori        = pFeat[i].ori;
-		feat.x = pFeat[i].x * sx ;
-		feat.y = pFeat[i].y * sx;
+		
+		feat.x = pFeat[i].x * sx;
+		feat.y = pFeat[i].y * sy;
+
 		feat.cx = feat.x - wd*0.5; //normalized coordinate
-		feat.cy = ht*0.5 - feat.y; //normalized coordinate        
+		feat.cy = ht*0.5 - feat.y; //normalized coordinate       
+
 		for(int j=0; j<128; j++)
 			feat.feat.push_back( pFeat[i].descr[j]);
 		feat.trackIdx = -1;
