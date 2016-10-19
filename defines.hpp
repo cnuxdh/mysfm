@@ -38,6 +38,7 @@ typedef struct stFeatPoint
 typedef struct stPoint2DDouble
 {
 	double p[2];
+	double x,y;
 } Point2DDouble;
 
 /* 3D vector of doubles */
@@ -120,7 +121,7 @@ typedef std::vector<ImageKey> ImageKeyVector;   //all projections of a track
 typedef struct stTrackInfo
 {
 	int id;
-	int extra;             //save extra information
+	int extra;              //save extra information
 	Point3DDouble  grd;
 	ImageKeyVector views;
 }TrackInfo;
@@ -142,7 +143,7 @@ typedef struct stCameraPara
 	double t[3];
 	double xs,ys,zs; //absolute position of camera
 	double lon,lat;  //the lon/lat of position of camera
-	double ax,ay,az; //rotation angle around x,y,z (degree)
+	double ax,ay,az; //rotation angle around x,y,z (Eular degree)
 	int    rows,cols;    //the size of image in pixels
 }CameraPara;
 

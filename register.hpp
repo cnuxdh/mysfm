@@ -128,6 +128,7 @@ DLL_EXPORT int ReadTracks(char* filename, vector<TrackInfo>& tracks);
 //output the tracks into the file
 DLL_EXPORT int PrintTracks(vector<TrackInfo> tracks, char* filename);
 
+
 /* input the image pair ( imgId1, imgId2), get the track including this pair
 */
 DLL_EXPORT void GetMatch(int imgId1, int imgId2, vector<TrackInfo>& tracks, vector<TrackInfo>& trackSeq);

@@ -6,7 +6,7 @@
 #include "defines.hpp"
 
 //the maximal image height for feature detection
-#define DETECT_IMAGE_HT 640
+#define DETECT_IMAGE_HT 480
 
 //get the image dimension after scale
 void GetResizeDimension(int srcHt, int srcWd, int& dstHt, int& dstWd);

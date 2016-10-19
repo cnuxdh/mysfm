@@ -602,7 +602,6 @@ int CKNNMatch::Match(ImgFeature& lImage, ImgFeature& rImage, vector<MatchPairInd
 #ifdef _WIN32
 	//int64 t2 = getTickCount();
 	//unsigned long t2 = timeGetTime();
-
 	//printf("match time: %lf \n", (double)(t2-t1) / getTickFrequency());
 	//printf("match time: %lf \n", (double)(t2-t1) / 1000 );
 #endif
@@ -1299,7 +1298,7 @@ void GetMatch(int imgId1, int imgId2, vector<TrackInfo>& tracks, vector<TrackInf
 		{
 			ImageKey key = tracks[i].views[j]; //key for image point
 			int nImgId = key.first;
-			int nPtId = key.second;
+			int nPtId  = key.second;
 
 			/*
 			if( nImgId==imgId1 || nImgId==imgId2)
@@ -1311,19 +1310,19 @@ void GetMatch(int imgId1, int imgId2, vector<TrackInfo>& tracks, vector<TrackInf
 			if( nImgId==imgId1)
 			{
 				nFind++;
-				key.first = 0;
+				//key.first = 0;
 				oneTrack.views.push_back(key);
 			}
 			if( nImgId==imgId2)
 			{
 				nFind++;
-				key.first = 1;
+				//key.first = 1;
 				oneTrack.views.push_back(key);
 			}
 		}
 		if(nFind==2)
 		{
-			oneTrack.extra = i;
+			oneTrack.extra = i; //the track point index
 			trackSeq.push_back(oneTrack);
 		}
 	}

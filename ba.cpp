@@ -1821,7 +1821,7 @@ double runSFMApi( int num_pts, int num_cameras, int start_camera,
 	int num_dists      = 0;
 
 	int  *remap   = new int [num_pts];
-	v3_t *nz_pts = new v3_t[num_pts];
+	v3_t *nz_pts  = new v3_t[num_pts];
 
 	do{
 		if (num_pts - total_outliers < MIN_POINTS) 
@@ -2297,6 +2297,259 @@ vector<MatchPairIndex> GetMatchList(int imgId1, int imgId2, vector<CImageDataBas
 }
 
 
+int CeresBA( vector<TrackInfo> trackSeq, vector<ImgFeature> imageFeatures, 
+			 vector<int> cameraIDOrder,	vector<CameraPara> &cameras)
+{
+
+	int  num_pts = trackSeq.size();
+	int  num_cameras = cameraIDOrder.size();
+
+	//collect camera parameters
+	double* pInteriorParams = new double[3];          //focal length, k1, k2
+	pInteriorParams[0] = cameras[0].focus;
+	pInteriorParams[1] = 0;
+	pInteriorParams[2] = 0;	
+	double* pOuterParams = new double[num_cameras*6]; //omiga, phi, kapa, t0,t1,t2
+	for(int i=0; i<num_cameras; i++)
+	{
+		pOuterParams[i*6] = cameras[i].ax;
+		pOuterParams[i*6+1] = cameras[i].ay;
+		pOuterParams[i*6+2] = cameras[i].az;
+		pOuterParams[i*6+3] = cameras[i].t[0];
+		pOuterParams[i*6+4] = cameras[i].t[1];
+		pOuterParams[i*6+5] = cameras[i].t[2];
+	}
+
+	//collect ground points
+	double* grdPt = new double[num_pts*3]; //(double*)malloc( _pts*3*sizeof(double) );
+	for(int i=0; i<num_pts; i++)
+	{
+		grdPt[i*3]   = trackSeq[i].grd.p[0];
+		grdPt[i*3+1] = trackSeq[i].grd.p[1];
+		grdPt[i*3+2] = trackSeq[i].grd.p[2];
+	}
+	
+	//generate observation points
+	int nProjection = 0;
+	for(int i=0; i<trackSeq.size(); i++)
+	{
+		int nview = trackSeq[i].views.size();
+		nProjection += nview;
+	}
+
+	vector<int> vecCamIndex; //camera index for each projection point
+	vector<int> vecTrackIndex; // track point index for each projection point
+	vecCamIndex.resize(nProjection);
+	vecTrackIndex.resize(nProjection);
+
+	double* projections = new double[nProjection*2]; //(double*)malloc(nProjection*2*sizeof(double));
+	int ip = 0;
+	for(int i=0; i<trackSeq.size(); i++)
+	{   
+		int trackIndex = trackSeq[i].extra;
+		int nview = trackSeq[i].views.size();
+		for(int j=0; j<nview; j++)
+		{
+			int cameraID = trackSeq[i].views[j].first;
+			//int cameraID = cameraIDOrder[index];		
+			int ptIndex  = trackSeq[i].views[j].second;
+
+			projections[ip*2]   = imageFeatures[cameraID].featPts[ptIndex].cx; 
+			projections[ip*2+1] = imageFeatures[cameraID].featPts[ptIndex].cy; 			
+			ip++;
+
+			vecCamIndex[ip] = trackIndex;
+			vecTrackIndex[ip] = cameraID;
+		}
+	}
+
+	
+	//invoke ceres functions
+
+
+
+
+	printf("3D Points: %d   projection number: %d \n", num_pts, nProjection);
+
+
+	return 0;
+}
+
+int DoSFM( vector<TrackInfo> trackSeq, vector<ImgFeature> imageFeatures, vector<int> cameraIDOrder,
+	vector<CameraPara> &cameras)
+{
+	//vector<Point3DDouble> pt3, vector<ImageKeyVector> ptViews,
+	int  num_pts = trackSeq.size();
+	int  num_cameras = cameraIDOrder.size();
+	v3_t *init_pts = (v3_t*)malloc(sizeof(v3_t)*num_pts);
+
+	for(int i=0; i<num_pts; i++)
+	{
+		init_pts[i].p[0] = trackSeq[i].grd.p[0];
+		init_pts[i].p[1] = trackSeq[i].grd.p[1];
+		init_pts[i].p[2] = trackSeq[i].grd.p[2];
+	}
+
+	int nProjection = 0;
+	for(int i=0; i<trackSeq.size(); i++)
+	{
+		int nview = trackSeq[i].views.size();
+		nProjection += nview;
+	}
+
+	printf("3D Points: %d   projection number: %d \n", num_pts, nProjection);
+
+	//generate mask to indicate whose cameras the 3D point lies? 
+	char* vmask = (char*)malloc(num_pts*num_cameras);
+	memset(vmask, 0, sizeof(char));
+	for(int i=0; i<trackSeq.size(); i++)
+	{
+		int nview = trackSeq[i].views.size();
+		for(int j=0; j<nview; j++)
+		{
+			int index = trackSeq[i].views[j].first;
+			vmask[i*num_cameras + index] = 1;
+		}
+	}
+
+	//generate projection points
+	double* projections = (double*)malloc(nProjection*2*sizeof(double));
+	int ip = 0;
+	for(int i=0; i<trackSeq.size(); i++)
+	{
+		int nview = trackSeq[i].views.size();
+		for(int j=0; j<nview; j++)
+		{
+			int index = trackSeq[i].views[j].first;
+			int cameraID = cameraIDOrder[index];		
+			int ptIndex  = trackSeq[i].views[j].second;
+
+			projections[ip*2]   = imageFeatures[cameraID].featPts[ptIndex].cx; 
+			projections[ip*2+1] = imageFeatures[cameraID].featPts[ptIndex].cy; 			
+			ip++;
+		}
+	}
+
+	//invoke sfm-driver
+	camera_params_t *pCameras = (camera_params_t *)malloc(sizeof(camera_params_t)*num_cameras);//new camera_params_t[num_cameras];
+	for(int i=0; i<num_cameras; i++)
+	{
+		InitializeCameraParams(pCameras[i]);
+		int camId = cameraIDOrder[i];
+		pCameras[i].f = cameras[camId].focus;
+		pCameras[i].k[0] = cameras[camId].k1;
+		pCameras[i].k[1] = cameras[camId].k2;
+		memcpy(pCameras[i].R, cameras[camId].R, sizeof(double)*9);
+		memcpy(pCameras[i].t, cameras[camId].t, sizeof(double)*3);
+	}    
+
+	int    ncons = 0;
+	int    est_focal_length = 1; //not fixed
+	int    constant_focus = 0;   //focus is not constant  
+	int    undistort = 1;        //distortion is considered
+	int    explicit_camera_centers = 1;  //R(X-T)
+	int    fix_points = 0;               //?
+	int    use_constraints = 1;          //?
+	int    use_point_constraints = 0;    //?
+	double pt_constraint_weight = 0;   
+	int    optimize_for_fisheye = 0;
+	double eps2 = 1.0e-12;
+
+	//setup constraints
+	for(int i=0; i<num_cameras; i++)
+	{
+		SetConstraints(pCameras+i, est_focal_length, undistort);
+	}
+
+	run_sfm(num_pts, 
+		num_cameras, 
+		ncons, 
+		vmask, 
+		projections, 
+		est_focal_length, 
+		constant_focus, 
+		undistort, 
+		explicit_camera_centers, 
+		pCameras, init_pts, 
+		use_constraints, 
+		use_point_constraints, 
+		NULL, 
+		pt_constraint_weight, 
+		fix_points, 
+		optimize_for_fisheye, 
+		eps2, NULL, NULL, NULL, NULL
+		);
+
+	//output
+	for(int i=0; i<num_cameras; i++)
+	{
+		printf("Camera: %d \n", i);
+		printf("Focus: %lf \n", pCameras[i].f);
+		printf("translation:  %lf %lf %lf \n", pCameras[i].t[0], pCameras[i].t[1], pCameras[i].t[2]);
+		printf("rotation: \n");
+		for(int m=0; m<3; m++)
+		{
+			for(int n=0; n<3; n++)
+			{
+				printf("%lf ", pCameras[i].R[m*3+n]);
+			}
+			printf("\n");
+		}
+		printf("\n\n");
+	}
+
+	for(int i=0; i<num_cameras; i++)
+	{
+		int camId = cameraIDOrder[i];
+		cameras[camId].focus = pCameras[i].f;
+		cameras[camId].k1 = pCameras[i].k[0];
+		cameras[camId].k2 = pCameras[i].k[1];
+		memcpy(cameras[camId].R, pCameras[i].R, sizeof(double)*9);
+		memcpy(cameras[camId].t, pCameras[i].t, sizeof(double)*3);
+	}    
+	for(int i=0; i<num_pts; i++)
+	{
+		trackSeq[i].grd.p[0] = init_pts[i].p[0];
+		trackSeq[i].grd.p[1] = init_pts[i].p[1];
+		trackSeq[i].grd.p[2] = init_pts[i].p[2];
+	}
+
+	free(projections);
+	free(vmask);
+	free(init_pts);
+	free(pCameras);
+
+	return 1;
+}
+
+int TrackSeqImageOrder(vector<TrackInfo>& trackSeq, vector<int> cameraIDOrder)
+{
+
+	for(int j=0; j<trackSeq.size(); j++)
+	{
+		int nview = trackSeq[j].views.size();
+		for(int i=0; i<nview; i++)
+		{
+			int id = trackSeq[j].views[i].first;
+
+			int newId = 0;
+			for(int k=0; k<cameraIDOrder.size(); k++)
+			{
+				if( cameraIDOrder[k]==id )
+				{
+					newId = k;
+					break;
+				}
+			}
+			trackSeq[j].views[i].first = newId;
+		}
+	}
+
+
+	return 1;
+}
+
+
 CSBA::CSBA()
 {
 	//m_estimate_focal_length = 1;
@@ -2469,6 +2722,15 @@ colors.push_back(c);
 colors.push_back(c);
 pOutput->Save("d:\\model.ply", gpts,colors);
 */
+
+int CSBA::BundleAdjust(int numCameras, vector<CameraPara>& cameras, vector<ImgFeature>& imageFeatures, 
+	vector<PairMatchRes>& pairMatchs, vector<TrackInfo>& tracks)
+{
+
+
+
+	return 0;
+}
 
 int CSBA::BundleAdjust(int numCameras, vector<CameraPara>& cameras, vector<CImageDataBase*> imageData, 
 				       vector<PairMatchRes> pairMatchs, vector<TrackInfo> tracks, char* outDir)
@@ -2796,7 +3058,7 @@ int CSBA::BundleAdjust(int numCameras, vector<CameraPara>& cameras,vector<ImgFea
 		int nNewCamId = FindNewImage(cameras.size(), cameraIDOrder, tracks, trackSeq);
 		printf("New Camera: %d \n", nNewCamId);
 
-		//3.2 update current tracks
+		//3.2 get the 3D and 2D for new image, for DLT 
 		vector<Point3DDouble> pt3;
 		vector<Point2DDouble> pt2;
 		int newId = cameraIDOrder.size();
@@ -2817,177 +3079,122 @@ int CSBA::BundleAdjust(int numCameras, vector<CameraPara>& cameras,vector<ImgFea
 	return 1;
 }
 
-int DoSFM( vector<TrackInfo> trackSeq, vector<ImgFeature> imageFeatures, vector<int> cameraIDOrder,
-		   vector<CameraPara> &cameras)
+
+///////////////////////////////////////////////////////////////////////////////////////
+CCeresBA::CCeresBA()
 {
-	//vector<Point3DDouble> pt3, vector<ImageKeyVector> ptViews,
-	int  num_pts = trackSeq.size();
-	int  num_cameras = cameraIDOrder.size();
-	v3_t *init_pts = (v3_t*)malloc(sizeof(v3_t)*num_pts);
 
-	for(int i=0; i<num_pts; i++)
+}
+
+CCeresBA::~CCeresBA()
+{
+
+}
+
+int CCeresBA::RunSFM( vector<Point3DDouble> pt3, vector<ImageKeyVector> ptViews, 
+	vector<ImgFeature> imageFeatures,  vector<int> cameraIDOrder,
+	vector<CameraPara>& cameras)
+{
+
+
+	return 0;
+}
+
+//
+int CCeresBA::BundleAdjust( int numCameras, vector<CameraPara>& cameras,vector<ImgFeature> imageFeatures, 
+	vector<PairMatchRes> pairMatchs, vector<TrackInfo> tracks, char* outDir)
+{
+
+
+	return 0;
+}
+
+
+//new interface, including more input parameters
+int CCeresBA::BundleAdjust(int numCameras, vector<CameraPara>& cameras, vector<CImageDataBase*> imageData, 
+	vector<PairMatchRes> pairMatchs, vector<TrackInfo> tracks, char* outDir)
+{
+
+
+	return 0;
+}
+
+
+int CCeresBA::BundleAdjust(int numCameras, 
+							vector<CameraPara>&   cameras,     
+							vector<ImgFeature>&   imageFeatures, //feature points
+							vector<PairMatchRes>& pairMatchs,    //matching results
+							vector<TrackInfo>& tracks)           //track points ( connecting points )
+{
+	//1. select the initial pair
+	double maxInlier = 0;
+	int    index = 0;
+	for(int i=0; i<pairMatchs.size(); i++)
 	{
-		init_pts[i].p[0] = trackSeq[i].grd.p[0];
-		init_pts[i].p[1] = trackSeq[i].grd.p[1];
-		init_pts[i].p[2] = trackSeq[i].grd.p[2];
+		if( maxInlier<pairMatchs[i].matchs.size() )
+		{
+			maxInlier = pairMatchs[i].matchs.size();
+			index = i;
+		}
 	}
 
-	int nProjection = 0;
-	for(int i=0; i<trackSeq.size(); i++)
+	int leftImageId  = pairMatchs[index].lId;
+	int rightImageId = pairMatchs[index].rId;
+	vector<TrackInfo> trackSeq;
+	GetMatch(leftImageId, rightImageId, tracks, trackSeq);    
+
+	//2. relative pose estimation
+	//2.1 pose estimation
+	vector<Point2DDouble> lpts,rpts;	
+	int nMatch = trackSeq.size();
+	for(int i=0; i<nMatch; i++)
 	{
-		int nview = trackSeq[i].views.size();
-		nProjection += nview;
+		int imgId1 = trackSeq[i].views[0].first;
+		int ptId1  = trackSeq[i].views[0].second;
+		int imgId2 = trackSeq[i].views[1].first;
+		int ptId2  = trackSeq[i].views[1].second;		
+		Point2DDouble pl,pr;
+
+		if( imgId1==leftImageId && imgId2==rightImageId )
+		{
+			pl.p[0] = imageFeatures[imgId1].featPts[ptId1].cx;
+			pl.p[1] = imageFeatures[imgId1].featPts[ptId1].cy;
+			lpts.push_back(pl);
+			pr.p[0] = imageFeatures[imgId2].featPts[ptId2].cx;
+			pr.p[1] = imageFeatures[imgId2].featPts[ptId2].cy;
+			rpts.push_back(pr);
+		}
+		else
+		{
+			pl.p[0] = imageFeatures[imgId2].featPts[ptId2].cx;
+			pl.p[1] = imageFeatures[imgId2].featPts[ptId2].cy;
+			lpts.push_back(pl);
+			pr.p[0] = imageFeatures[imgId1].featPts[ptId1].cx;
+			pr.p[1] = imageFeatures[imgId1].featPts[ptId1].cy;
+			rpts.push_back(pr);		
+		}
 	}
+
+	CRelativePoseBase* pRP = new CEstimatePose5Point();
+	pRP->EstimatePose(lpts, rpts, cameras[leftImageId], cameras[rightImageId] );   
+
+	//2.2 triangulation
+	CTriangulateBase* pTri = new CTriangulateCV();
+	vector<Point3DDouble> gpts;
+	pTri->Triangulate(lpts, rpts, cameras[leftImageId], cameras[rightImageId], gpts);
+
+
+	//2.3 bundle adjust for pair
+	vector<int> cameraIDOrder;
+	cameraIDOrder.push_back(leftImageId);
+	cameraIDOrder.push_back(rightImageId);
+	for(int i=0; i<gpts.size(); i++)
+	{
+		trackSeq[i].grd = gpts[i]; //save the initial ground points
+	}
+	WritePMVSPly("c:\\temp\\pair.ply", gpts);
+
 	
-	printf("3D Points: %d   projection number: %d \n", num_pts, nProjection);
 
-	//generate mask to indicate whose cameras the 3D point lies? 
-	char* vmask = (char*)malloc(num_pts*num_cameras);
-	memset(vmask, 0, sizeof(char));
-	for(int i=0; i<trackSeq.size(); i++)
-	{
-		int nview = trackSeq[i].views.size();
-		for(int j=0; j<nview; j++)
-		{
-			int index = trackSeq[i].views[j].first;
-			vmask[i*num_cameras + index] = 1;
-		}
-	}
-
-	//generate projection points
-	double* projections = (double*)malloc(nProjection*2*sizeof(double));
-	int ip = 0;
-	for(int i=0; i<trackSeq.size(); i++)
-	{
-		int nview = trackSeq[i].views.size();
-		for(int j=0; j<nview; j++)
-		{
-			int index = trackSeq[i].views[j].first;
-			int cameraID = cameraIDOrder[index];		
-			int ptIndex  = trackSeq[i].views[j].second;
-
-			projections[ip*2]   = imageFeatures[cameraID].featPts[ptIndex].cx; 
-			projections[ip*2+1] = imageFeatures[cameraID].featPts[ptIndex].cy; 			
-			ip++;
-		}
-	}
-
-	//invoke sfm-driver
-	camera_params_t *pCameras = (camera_params_t *)malloc(sizeof(camera_params_t)*num_cameras);//new camera_params_t[num_cameras];
-	for(int i=0; i<num_cameras; i++)
-	{
-		InitializeCameraParams(pCameras[i]);
-		int camId = cameraIDOrder[i];
-		pCameras[i].f = cameras[camId].focus;
-        pCameras[i].k[0] = cameras[camId].k1;
-		pCameras[i].k[1] = cameras[camId].k2;
-		memcpy(pCameras[i].R, cameras[camId].R, sizeof(double)*9);
-		memcpy(pCameras[i].t, cameras[camId].t, sizeof(double)*3);
-	}    
-
-	int    ncons = 0;
-	int    est_focal_length = 1; //not fixed
-	int    constant_focus = 0;   //focus is not constant  
-	int    undistort = 1;        //distortion is considered
-	int    explicit_camera_centers = 1;  //R(X-T)
-	int    fix_points = 0;               //?
-	int    use_constraints = 1;          //?
-	int    use_point_constraints = 0;    //?
-	double pt_constraint_weight = 0;   
-	int    optimize_for_fisheye = 0;
-	double eps2 = 1.0e-12;
-
-	//setup constraints
-	for(int i=0; i<num_cameras; i++)
-	{
-		SetConstraints(pCameras+i, est_focal_length, undistort);
-	}
-
-	run_sfm(num_pts, 
-		num_cameras, 
-		ncons, 
-		vmask, 
-		projections, 
-		est_focal_length, 
-		constant_focus, 
-		undistort, 
-		explicit_camera_centers, 
-		pCameras, init_pts, 
-		use_constraints, 
-		use_point_constraints, 
-		NULL, 
-		pt_constraint_weight, 
-		fix_points, 
-		optimize_for_fisheye, 
-		eps2, NULL, NULL, NULL, NULL
-		);
-
-	//output
-	for(int i=0; i<num_cameras; i++)
-	{
-		printf("Camera: %d \n", i);
-		printf("Focus: %lf \n", pCameras[i].f);
-		printf("translation:  %lf %lf %lf \n", pCameras[i].t[0], pCameras[i].t[1], pCameras[i].t[2]);
-		printf("rotation: \n");
-		for(int m=0; m<3; m++)
-		{
-			for(int n=0; n<3; n++)
-			{
-				printf("%lf ", pCameras[i].R[m*3+n]);
-			}
-			printf("\n");
-		}
-		printf("\n\n");
-	}
-
-	for(int i=0; i<num_cameras; i++)
-	{
-		int camId = cameraIDOrder[i];
-		cameras[camId].focus = pCameras[i].f;
-		cameras[camId].k1 = pCameras[i].k[0];
-		cameras[camId].k2 = pCameras[i].k[1];
-		memcpy(cameras[camId].R, pCameras[i].R, sizeof(double)*9);
-		memcpy(cameras[camId].t, pCameras[i].t, sizeof(double)*3);
-	}    
-	for(int i=0; i<num_pts; i++)
-	{
-		trackSeq[i].grd.p[0] = init_pts[i].p[0];
-		trackSeq[i].grd.p[1] = init_pts[i].p[1];
-		trackSeq[i].grd.p[2] = init_pts[i].p[2];
-	}
-
-	free(projections);
-	free(vmask);
-	free(init_pts);
-	free(pCameras);
-
-	return 1;
+	return 0;
 }
-
-int TrackSeqImageOrder(vector<TrackInfo>& trackSeq, vector<int> cameraIDOrder)
-{
-
-	for(int j=0; j<trackSeq.size(); j++)
-	{
-		int nview = trackSeq[j].views.size();
-		for(int i=0; i<nview; i++)
-		{
-			int id = trackSeq[j].views[i].first;
-
-			int newId = 0;
-			for(int k=0; k<cameraIDOrder.size(); k++)
-			{
-				if( cameraIDOrder[k]==id )
-				{
-					newId = k;
-					break;
-				}
-			}
-			trackSeq[j].views[i].first = newId;
-		}
-	}
-
-
-	return 1;
-}
-

@@ -34,6 +34,11 @@ DLL_EXPORT int WritePMVSPly(char* filename,
 
 
 
+DLL_EXPORT int WritePMVSPly(char* filename, const vector<Point3DDouble>& gpts);
+
+
+
+
 //////////////////////////////////////////////////////////////////////////
 //output 3D points into model file
 class DLL_EXPORT CModelFileBase

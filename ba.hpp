@@ -7,6 +7,11 @@
 
 #include "sfm.h"
 
+
+//ceres
+
+
+
 #define  PROJECTION_ESTIMATION_THRESHOLD 4.0
 #define  MIN_PROJ_ERROR_THRESHOLD  8.0
 #define  MAX_PROJ_ERROR_THRESHOLD  16.0
@@ -18,6 +23,67 @@
 #define  RAY_ANGLE_THRESHOLD 2.0
 #define  CONSTRAIN_FOCAL_WEIGHT 0.0001
 
+
+
+
+/////////////////////////////////////////////////////////////////
+//for ceres
+
+// Templated pinhole camera model for used with Ceres.  The camera is
+// parameterized using 9 parameters: 3 for rotation, 3 for translation, 1 for
+// focal length and 2 for radial distortion. The principal point is not modeled
+// (i.e. it is assumed be located at the image center).
+struct SFMReprojectionError 
+{
+	SFMReprojectionError(double observed_x, double observed_y)
+		: observed_x(observed_x), observed_y(observed_y) {}
+
+	template <typename T>
+	bool operator()(const T* const cameraIn,  //3 interior camera parameters
+					const T* const cameraOut, //6 outer camera parameters
+					const T* const point,     //3 parameters for ground point
+					T* residuals) const       //2 output residual parameters
+	{
+		double focal = cameraIn[0];
+		double k1 = cameraIn[1];
+		double k2 = cameraIn[2];
+		double omiga  = cameraOut[0];
+		double phi    = cameraOut[1];
+		double kapa   = cameraOut[2];
+		double t[3];
+		t[0] = cameraOut[3];
+		t[1] = cameraOut[4];
+		t[2] = cameraOut[5];
+
+		//int ht, wd;
+		double R[9];
+		GenerateRMatrix(omiga, phi, kapa, R);
+
+		double ix1,iy1;
+		GrdToImgWithDistort(p[0], p[1], p[2], &ix1, &iy1, R, t, focus, x0, y0, k1, k2);
+		
+		residuals[0] = ix1 - T(observed_x);
+		residuals[1] = iy1 - T(observed_y);
+
+		return true;
+	}
+
+	// Factory to hide the construction of the CostFunction object from
+	// the client code.
+	static ceres::CostFunction* Create(const double observed_x,
+		const double observed_y) {
+			return (new ceres::AutoDiffCostFunction<SFMReprojectionError, 2, 3, 6, 3>(
+				new SFMReprojectionError(observed_x, observed_y)));
+	}
+
+	double observed_x;
+	double observed_y;
+};
+
+
+
+
+/////////////////////////////////////////////////////////////////
 
 
 
@@ -162,6 +228,8 @@ public:
 	virtual int BundleAdjust(int numCameras, vector<CameraPara>& cameras, vector<CImageDataBase*> imageData, 
 		                     vector<PairMatchRes> pairMatchs, vector<TrackInfo> tracks, char* outDir){return 0;}
 
+	virtual int BundleAdjust(int numCameras, vector<CameraPara>& cameras, vector<ImgFeature>& imageFeatures, 
+		vector<PairMatchRes>& pairMatchs, vector<TrackInfo>& tracks){return 0;}
 };
 
 class DLL_EXPORT CSBA: public CBABase
@@ -183,14 +251,40 @@ public:
 	int BundleAdjust(int numCameras, vector<CameraPara>& cameras, vector<CImageDataBase*> imageData, 
 				      vector<PairMatchRes> pairMatchs, vector<TrackInfo> tracks, char* outDir);
 
+
+	int BundleAdjust(int numCameras, vector<CameraPara>& cameras, vector<ImgFeature>& imageFeatures, 
+		vector<PairMatchRes>& pairMatchs, vector<TrackInfo>& tracks);
+
 private:
-	//bool m_estimate_focal_length;
-	//bool m_estimate_distortion;
-	//bool m_constrain_focal;
-	//bool m_use_point_constraints;
 };
 
 
+
+class DLL_EXPORT CCeresBA: public CBABase
+{
+public:
+	CCeresBA();
+	~CCeresBA();
+
+	int RunSFM( vector<Point3DDouble> pt3, vector<ImageKeyVector> ptViews, 
+		vector<ImgFeature> imageFeatures,  vector<int> cameraIDOrder,
+		vector<CameraPara>& cameras);
+
+	//
+	int BundleAdjust( int numCameras, vector<CameraPara>& cameras,vector<ImgFeature> imageFeatures, 
+		vector<PairMatchRes> pairMatchs, vector<TrackInfo> tracks, char* outDir);
+
+
+	//new interface, including more input parameters
+	int BundleAdjust(int numCameras, vector<CameraPara>& cameras, vector<CImageDataBase*> imageData, 
+		vector<PairMatchRes> pairMatchs, vector<TrackInfo> tracks, char* outDir);
+
+
+	int BundleAdjust(int numCameras, vector<CameraPara>& cameras, vector<ImgFeature>& imageFeatures, 
+		vector<PairMatchRes>& pairMatchs, vector<TrackInfo>& tracks);
+
+private:
+};
 
 
 #endif
