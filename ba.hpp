@@ -8,8 +8,15 @@
 #include "sfm.h"
 
 
-//ceres
+#ifdef CERES_LIB
+//ceres lib
+#include "ceres/ceres.h"
+#include "ceres/rotation.h"
+#endif
 
+
+//
+#include"CalcAngle.h"
 
 
 #define  PROJECTION_ESTIMATION_THRESHOLD 4.0
@@ -33,6 +40,7 @@
 // parameterized using 9 parameters: 3 for rotation, 3 for translation, 1 for
 // focal length and 2 for radial distortion. The principal point is not modeled
 // (i.e. it is assumed be located at the image center).
+#ifdef CERES_LIB
 struct SFMReprojectionError 
 {
 	SFMReprojectionError(double observed_x, double observed_y)
@@ -44,13 +52,13 @@ struct SFMReprojectionError
 					const T* const point,     //3 parameters for ground point
 					T* residuals) const       //2 output residual parameters
 	{
-		double focal = cameraIn[0];
-		double k1 = cameraIn[1];
-		double k2 = cameraIn[2];
-		double omiga  = cameraOut[0];
-		double phi    = cameraOut[1];
-		double kapa   = cameraOut[2];
-		double t[3];
+		T focal = cameraIn[0];
+		T k1 = cameraIn[1];
+		T k2 = cameraIn[2];
+		T omiga  = cameraOut[0];
+		T phi    = cameraOut[1];
+		T kapa   = cameraOut[2];
+		T t[3];
 		t[0] = cameraOut[3];
 		t[1] = cameraOut[4];
 		t[2] = cameraOut[5];
@@ -60,7 +68,7 @@ struct SFMReprojectionError
 		GenerateRMatrix(omiga, phi, kapa, R);
 
 		double ix1,iy1;
-		GrdToImgWithDistort(p[0], p[1], p[2], &ix1, &iy1, R, t, focus, x0, y0, k1, k2);
+		GrdToImgWithDistort(point[0], point[1], point[2], &ix1, &iy1, R, t, focal, 0, 0, k1, k2);
 		
 		residuals[0] = ix1 - T(observed_x);
 		residuals[1] = iy1 - T(observed_y);
@@ -79,7 +87,7 @@ struct SFMReprojectionError
 	double observed_x;
 	double observed_y;
 };
-
+#endif
 
 
 
