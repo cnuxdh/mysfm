@@ -20,7 +20,6 @@ int MatchImageFiles(vector<ImgFeature>& imgFeatures, vector<PairMatchRes>& match
 
 
 
-
 #endif
 
 

@@ -11,7 +11,13 @@
 #include"commonfile.h"
 
 
-//core function for feature detection of multiple images
+
+// function for feature detection of multiple images, for input files
+// Input
+//	filenames : the image files
+//  nFile :
+// Output 
+//	outpath: image feature files saved into the output path
 int DetectFileFeaturePts(char** filenames, int nFile, char* outpath)
 {
 	//retrive the file title
@@ -62,8 +68,6 @@ int DetectFileFeaturePts(char** filenames, int nFile, vector<ImgFeature>& imgFea
 	}
 	
 	delete pFeatDetect;
-	//delete pFeatureData;
-
 	return 0;
 }
 
@@ -95,3 +99,4 @@ int MatchImageFiles(vector<ImgFeature>& imgFeatures, vector<PairMatchRes>& match
 
 	return 0;
 }
+
