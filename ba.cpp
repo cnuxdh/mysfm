@@ -2312,7 +2312,7 @@ int CeresBA( vector<TrackInfo> trackSeq, vector<ImgFeature> imageFeatures,
 	double* pOuterParams = new double[num_cameras*6]; //omiga, phi, kapa, t0,t1,t2
 	for(int i=0; i<num_cameras; i++)
 	{
-		pOuterParams[i*6] = cameras[i].ax;
+		pOuterParams[i*6]   = cameras[i].ax;
 		pOuterParams[i*6+1] = cameras[i].ay;
 		pOuterParams[i*6+2] = cameras[i].az;
 		pOuterParams[i*6+3] = cameras[i].t[0];
@@ -2337,8 +2337,8 @@ int CeresBA( vector<TrackInfo> trackSeq, vector<ImgFeature> imageFeatures,
 		nProjection += nview;
 	}
 
-	vector<int> vecCamIndex; //camera index for each projection point
-	vector<int> vecTrackIndex; // track point index for each projection point
+	vector<int> vecCamIndex;    // camera index for each projection point
+	vector<int> vecTrackIndex;  // track point index for each projection point
 	vecCamIndex.resize(nProjection);
 	vecTrackIndex.resize(nProjection);
 
@@ -2358,13 +2358,14 @@ int CeresBA( vector<TrackInfo> trackSeq, vector<ImgFeature> imageFeatures,
 			projections[ip*2+1] = imageFeatures[cameraID].featPts[ptIndex].cy; 			
 			ip++;
 
-			vecCamIndex[ip] = trackIndex;
-			vecTrackIndex[ip] = cameraID;
+			vecTrackIndex[ip]  = trackIndex;
+			vecCamIndex[ip]    = cameraID;
 		}
 	}
 
 	
-	//invoke ceres functions
+	//invoke ceres functions, each time adding one projection
+
 
 
 
@@ -3193,7 +3194,7 @@ int CCeresBA::BundleAdjust(int numCameras,
 		trackSeq[i].grd = gpts[i]; //save the initial ground points
 	}
 	WritePMVSPly("c:\\temp\\pair.ply", gpts);
-
+	CeresBA(trackSeq, imageFeatures, cameraIDOrder, cameras);
 	
 
 	return 0;

@@ -64,11 +64,11 @@ struct SFMReprojectionError
 		t[2] = cameraOut[5];
 
 		//int ht, wd;
-		double R[9];
-		GenerateRMatrix(omiga, phi, kapa, R);
+		T R[9];
+		GenerateRMatrixDirect(omiga, phi, kapa, R);
 
-		double ix1,iy1;
-		GrdToImgWithDistort(point[0], point[1], point[2], &ix1, &iy1, R, t, focal, 0, 0, k1, k2);
+		T ix1,iy1;
+		GrdToImgWithDistort(point[0], point[1], point[2], &ix1, &iy1, R, t, focal, T(0), T(0), k1, k2);
 		
 		residuals[0] = ix1 - T(observed_x);
 		residuals[1] = iy1 - T(observed_y);
