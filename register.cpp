@@ -1322,6 +1322,10 @@ void GetMatch(int imgId1, int imgId2, vector<TrackInfo>& tracks, vector<TrackInf
 		}
 		if(nFind==2)
 		{
+			//save the new track index in the original tracks
+			int currentTrackIndex = trackSeq.size();
+			tracks[i].extra = currentTrackIndex;
+
 			oneTrack.extra = i; //the track point index
 			trackSeq.push_back(oneTrack);
 		}

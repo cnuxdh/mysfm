@@ -285,7 +285,7 @@ DLL_EXPORT int WritePMVSPly(char* filename, const vector<Point3DDouble>& gpts)
 	{
 		fprintf(fp, "%lf %lf %lf  %lf %lf %lf %d %d %d \n",
 			gpts[i].p[0],  gpts[i].p[1], gpts[i].p[2],
-			1,1,1,255,0,0);
+			1.0,1.0,1.0,255,0,0);
 	}
 
 	fclose(fp);

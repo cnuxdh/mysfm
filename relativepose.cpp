@@ -517,8 +517,8 @@ int CEstimatePose5Point::EstimatePose( vector<Point2DDouble> lPts, vector<Point2
 	cam2.az = atan( R[1]/R[0])/PI*180;
 
 	double nt[3];
-	bool initialized = false;
-	if (!initialized) 
+	//bool initialized = false;
+	//if (!initialized) 
 	{
 		memcpy(cam2.R, R, sizeof(double) * 9);
 		
@@ -615,12 +615,13 @@ void CTriangulateCV::Triangulate(std::vector<Point2DDouble> lPts, std::vector<Po
 		{
 			//printf(" skipping point\n");
 			continue;
-		}
-		
+		}		
 
 		Point3DDouble p3;
 		p3.p[0] = gp.p[0]; p3.p[1] = gp.p[1]; p3.p[2] = gp.p[2];
-        gps.push_back(p3);
+        p3.extra = i;
+
+		gps.push_back(p3);
 
 		//printf("%lf %lf ")
 	}
@@ -660,17 +661,18 @@ void CTriangulateCV::Triangulate(vector<Point2DDouble> lPts, vector<Point2DDoubl
 
 		//printf(" tri.error[%d] = %0.3f\n", i, error);
 
-		/*
-		if (error > PROJECTION_ESTIMATION_THRESHOLD) 
+		
+		if (error > 4) 
 		{
 			printf(" skipping point\n");
 			continue;
 		}
-		*/
-
+		
 		Point3DDouble p3;
 		p3.p[0] = gp.p[0]; p3.p[1] = gp.p[1]; p3.p[2] = gp.p[2];
+		p3.extra = i;
 		gps.push_back(p3);
+
 
 		errorArray.push_back(error);
 		//printf("%lf %lf ")

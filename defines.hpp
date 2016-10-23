@@ -45,6 +45,7 @@ typedef struct stPoint2DDouble
 typedef struct stPoint3DDouble
 {
 	double p[3];
+	int    extra;
 } Point3DDouble;
 
 

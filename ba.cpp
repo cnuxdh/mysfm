@@ -2298,17 +2298,17 @@ vector<MatchPairIndex> GetMatchList(int imgId1, int imgId2, vector<CImageDataBas
 
 
 int CeresBA( vector<TrackInfo> trackSeq, vector<ImgFeature> imageFeatures, 
-			 vector<int> cameraIDOrder,	vector<CameraPara> &cameras)
+			 /*vector<int> cameraIDOrder,*/	vector<CameraPara> &cameras)
 {
-
 	int  num_pts = trackSeq.size();
-	int  num_cameras = cameraIDOrder.size();
+	int  num_cameras = cameras.size(); 
 
 	//collect camera parameters
 	double* pInteriorParams = new double[3];          //focal length, k1, k2
 	pInteriorParams[0] = cameras[0].focus;
 	pInteriorParams[1] = 0;
 	pInteriorParams[2] = 0;	
+	
 	double* pOuterParams = new double[num_cameras*6]; //omiga, phi, kapa, t0,t1,t2
 	for(int i=0; i<num_cameras; i++)
 	{
@@ -2319,6 +2319,22 @@ int CeresBA( vector<TrackInfo> trackSeq, vector<ImgFeature> imageFeatures,
 		pOuterParams[i*6+4] = cameras[i].t[1];
 		pOuterParams[i*6+5] = cameras[i].t[2];
 	}
+	
+
+	/*
+	double* pOuterParams = new double[num_cameras*9]; //omiga, phi, kapa, t0,t1,t2
+	for(int i=0; i<num_cameras; i++)
+	{
+		pOuterParams[i*9]   = cameras[i].focus;
+		pOuterParams[i*9+1] = 0;
+		pOuterParams[i*9+2] = 0;
+		pOuterParams[i*9+3] = cameras[i].ax;
+		pOuterParams[i*9+4] = cameras[i].ay;
+		pOuterParams[i*9+5] = cameras[i].az;
+		pOuterParams[i*9+6] = cameras[i].t[0];
+		pOuterParams[i*9+7] = cameras[i].t[1];
+		pOuterParams[i*9+8] = cameras[i].t[2];
+	}*/
 
 	//collect ground points
 	double* grdPt = new double[num_pts*3]; //(double*)malloc( _pts*3*sizeof(double) );
@@ -2346,32 +2362,73 @@ int CeresBA( vector<TrackInfo> trackSeq, vector<ImgFeature> imageFeatures,
 	int ip = 0;
 	for(int i=0; i<trackSeq.size(); i++)
 	{   
-		int trackIndex = trackSeq[i].extra;
 		int nview = trackSeq[i].views.size();
 		for(int j=0; j<nview; j++)
 		{
 			int cameraID = trackSeq[i].views[j].first;
-			//int cameraID = cameraIDOrder[index];		
 			int ptIndex  = trackSeq[i].views[j].second;
 
 			projections[ip*2]   = imageFeatures[cameraID].featPts[ptIndex].cx; 
 			projections[ip*2+1] = imageFeatures[cameraID].featPts[ptIndex].cy; 			
-			ip++;
-
-			vecTrackIndex[ip]  = trackIndex;
+			
+			vecTrackIndex[ip]  = i; 
 			vecCamIndex[ip]    = cameraID;
+
+			ip++;
 		}
 	}
 
-	
-	//invoke ceres functions, each time adding one projection
-
-
-
-
-
 	printf("3D Points: %d   projection number: %d \n", num_pts, nProjection);
 
+	//google::InitGoogleLogging(NULL);
+
+	//nProjection = nProjection - 1;
+
+	ceres::Problem problem;
+	//invoke ceres functions, each time adding one projection
+	for(int i=0; i<nProjection; i++)
+	{
+		ceres::CostFunction* cost_function =
+			SFMReprojectionError::Create(projections[2 * i + 0], projections[2 * i + 1]);
+
+		int cameraId = vecCamIndex[i];
+		int trackId  = vecTrackIndex[i];
+		
+		//printf("camera id: %d  track id: %d \n", cameraId, trackId);
+
+		problem.AddResidualBlock(cost_function,
+			NULL /* squared loss */,
+			pInteriorParams,			    //inner camera parameters: 3
+			pOuterParams + cameraId*6,      //outer camera parameters: 6
+			grdPt + trackId*3);			    //parameters for point :   3
+	}
+
+	//save the optimized results
+	ceres::Solver::Options options;
+	options.linear_solver_type = ceres::DENSE_SCHUR;
+	options.minimizer_progress_to_stdout = true;
+
+	ceres::Solver::Summary summary;
+	ceres::Solve(options, &problem, &summary);
+	std::cout << summary.FullReport() << "\n";
+
+	std::cout<<"optimized results: "<<"\n";
+
+	printf("Inner parameters... \n");
+	for(int i=0; i<3; i++)
+		std::cout<<pInteriorParams[i]<<" ";
+	std::cout<<endl;
+	
+	printf("Ounter parameters ...\n");
+	for(int i=0; i<num_cameras; i++)
+	{
+		for(int j=0; j<6; j++)
+		{
+			std::cout<<pOuterParams[i*9+j]<<" ";
+		}
+		std::cout<<endl;
+	}
+	
 
 	return 0;
 }
@@ -3141,7 +3198,7 @@ int CCeresBA::BundleAdjust(int numCameras,
 
 	int leftImageId  = pairMatchs[index].lId;
 	int rightImageId = pairMatchs[index].rId;
-	vector<TrackInfo> trackSeq;
+	vector<TrackInfo> trackSeq;  //current tracks for bundle adjustment
 	GetMatch(leftImageId, rightImageId, tracks, trackSeq);    
 
 	//2. relative pose estimation
@@ -3183,19 +3240,26 @@ int CCeresBA::BundleAdjust(int numCameras,
 	CTriangulateBase* pTri = new CTriangulateCV();
 	vector<Point3DDouble> gpts;
 	pTri->Triangulate(lpts, rpts, cameras[leftImageId], cameras[rightImageId], gpts);
-
-
+	 
+	 
 	//2.3 bundle adjust for pair
 	vector<int> cameraIDOrder;
 	cameraIDOrder.push_back(leftImageId);
 	cameraIDOrder.push_back(rightImageId);
+	vector<TrackInfo> trackSeqNew;
+	trackSeqNew.resize(gpts.size());
 	for(int i=0; i<gpts.size(); i++)
 	{
-		trackSeq[i].grd = gpts[i]; //save the initial ground points
+		int ti = gpts[i].extra;
+		trackSeqNew[i]     = trackSeq[ti];
+		trackSeqNew[i].grd = gpts[i]; //save the initial ground points
 	}
 	WritePMVSPly("c:\\temp\\pair.ply", gpts);
-	CeresBA(trackSeq, imageFeatures, cameraIDOrder, cameras);
+	CeresBA(trackSeqNew, imageFeatures, /*cameraIDOrder,*/ cameras);
 	
+
+	//3. adding new images
+
 
 	return 0;
 }
