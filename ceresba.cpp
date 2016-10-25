@@ -38,6 +38,7 @@ int SelectNewImage(vector<int> cameraVisited,
 
 			if( cameraVisited[nImageId] > 0 )
 				continue;
+
 			projFreq[nImageId] ++;
 		}
 	}
@@ -165,6 +166,46 @@ int CaculateTrackSeqGrd(vector<ImgFeature>&  imageFeatures,
 
 	return 0;
 }
+
+int CalculateNewCamParas(int nCameraId, 
+	vector<ImgFeature>&  imageFeatures,
+	vector<TrackInfo>& trackSeqNew, 
+	vector<TrackInfo>& tracks,
+	CameraPara& cam )
+{
+
+	vector<Point3DDouble> pt3;
+	vector<Point2DDouble> pt2;
+
+	for(int i=0; i<trackSeqNew.size(); i++)
+	{
+		int nTrackId = trackSeqNew[i].extra; //find the original track
+
+		for(int j=0; j<tracks[nTrackId].views.size(); j++)
+		{
+			int nImageId = tracks[nTrackId].views[j].first;
+			int nPtId = tracks[nTrackId].views[j].second;
+
+			if(nImageId == nCameraId)
+			{
+				pt3.push_back( trackSeqNew[i].grd );
+
+				Point2DDouble p2;
+				p2.p[0] = imageFeatures[nImageId].featPts[nPtId].cx;
+				p2.p[1] = imageFeatures[nImageId].featPts[nPtId].cy;
+				pt2.push_back(p2);
+			}
+		}
+	}
+
+	CPoseEstimationBase* pPE = new CDLTPose();
+	pPE->EstimatePose(pt3, pt2, cam);
+	
+	delete pPE;
+
+	return 0;
+}
+
 
 
 #ifdef CERES_LIB
@@ -471,6 +512,9 @@ int CCeresBA::BundleAdjust(int numCameras,
 
 		if(newCameraIndex<0)
 			break;
+
+		//calculate the camera parameters of new selected
+		CalculateNewCamParas(newCameraIndex, imageFeatures, trackSeq, tracks, cameras[newCameraIndex]);
 
 		UpdateBATracks(newCameraIndex, cameraVisited, imageFeatures, tracks, trackSeq);
 
