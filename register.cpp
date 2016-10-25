@@ -957,6 +957,7 @@ int CMyGenerateTrack::GenerateTracks( vector<PairMatchRes>& pairMatchs, vector<T
 			{
 				TrackInfo track;
 				track.id = nTrack;
+				track.extra = -1;
 				track.views.push_back(lkey);
 				track.views.push_back(rkey);
 				tracks.push_back(track);
@@ -1087,7 +1088,7 @@ int CFastGenerateTrack::GenerateTracks(vector<ImgFeature>& imgFeatures, vector<P
 		int nFeat = imgFeatures[i].featPts.size();
 		for(int j=0; j<nFeat; j++)
 		{
-			imgFeatures[i].featPts[j].extra = -1;
+			imgFeatures[i].featPts[j].extra = -1; //must be initialize as -1
 		}
 	}
 	
@@ -1114,6 +1115,8 @@ int CFastGenerateTrack::GenerateTracks(vector<ImgFeature>& imgFeatures, vector<P
 			int rTrackIndex = imgFeatures[nRightImage].featPts[nRightFeatIndex].extra;
 
 			TrackInfo tp;
+			tp.extra = -1;
+
 			ImageKey ik;
 			
 			//create a new track point
@@ -1130,7 +1133,7 @@ int CFastGenerateTrack::GenerateTracks(vector<ImgFeature>& imgFeatures, vector<P
 				tp.id = nTrackIndex;
 
 				//bridge the image point and track
-				imgFeatures[nLeftImage].featPts[nLeftFeatIndex].extra = nTrackIndex;
+				imgFeatures[nLeftImage].featPts[nLeftFeatIndex].extra   = nTrackIndex;
 				imgFeatures[nRightImage].featPts[nRightFeatIndex].extra = nTrackIndex;
 
 				tracks.push_back(tp);
@@ -1161,17 +1164,17 @@ int CFastGenerateTrack::GenerateTracks(vector<ImgFeature>& imgFeatures, vector<P
 				imgFeatures[nLeftImage].featPts[nLeftFeatIndex].extra = rTrackIndex;
 			}
 			////////////////////////////////////////////////////////////////////////////
-
 		}
 	}
 
 	//remove the track with multiple projections in the same image
-	vector<TrackInfo> newTracks;
+	//vector<TrackInfo> newTracks;
 	for(int i=0; i<tracks.size(); i++)
 	{
 		vector<int> vecNumberFreq;
 		vecNumberFreq.resize(nImage, 0);
 		bool bIsRemove = false;
+
 		for(int j=0; j<tracks[i].views.size(); j++)
 		{
 			int nImageIndex = tracks[i].views[j].first;
@@ -1183,11 +1186,32 @@ int CFastGenerateTrack::GenerateTracks(vector<ImgFeature>& imgFeatures, vector<P
 				break;
 			}
 		}
-		if(!bIsRemove)
-			newTracks.push_back(tracks[i]);
+		//if(!bIsRemove)
+		//	newTracks.push_back(tracks[i]);
+
+		if(bIsRemove)
+		{
+			for(int k=0; k<vecNumberFreq.size(); k++)
+				vecNumberFreq[k] = 0;
+
+			ImageKeyVector newView;
+			for(int j=0; j<tracks[i].views.size(); j++)
+			{
+				int nImageIndex = tracks[i].views[j].first;
+				vecNumberFreq[nImageIndex]++;
+
+				ImageKey ik = tracks[i].views[j];
+
+				if(vecNumberFreq[nImageIndex]==1)
+				{
+					newView.push_back(ik);
+				}
+			}
+			tracks[i].views = newView;
+		}
 	}
 
-	tracks = newTracks;
+	//tracks = newTracks;
 
 	return 0;
 }
@@ -1326,7 +1350,7 @@ void GetMatch(int imgId1, int imgId2, vector<TrackInfo>& tracks, vector<TrackInf
 			int currentTrackIndex = trackSeq.size();
 			tracks[i].extra = currentTrackIndex;
 
-			oneTrack.extra = i; //the track point index
+			oneTrack.extra = i; //save the new track point index
 			trackSeq.push_back(oneTrack);
 		}
 	}

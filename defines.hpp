@@ -123,6 +123,7 @@ typedef struct stTrackInfo
 {
 	int id;
 	int extra;              //save extra information
+	double derror;    
 	Point3DDouble  grd;
 	ImageKeyVector views;
 }TrackInfo;

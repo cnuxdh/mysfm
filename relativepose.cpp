@@ -661,22 +661,112 @@ void CTriangulateCV::Triangulate(vector<Point2DDouble> lPts, vector<Point2DDoubl
 
 		//printf(" tri.error[%d] = %0.3f\n", i, error);
 
-		
+		/*
 		if (error > 4) 
 		{
-			printf(" skipping point\n");
-			continue;
-		}
+		printf(" skipping point\n");
+		continue;
+		}*/
 		
 		Point3DDouble p3;
 		p3.p[0] = gp.p[0]; p3.p[1] = gp.p[1]; p3.p[2] = gp.p[2];
 		p3.extra = i;
 		gps.push_back(p3);
 
-
 		errorArray.push_back(error);
 		//printf("%lf %lf ")
 	}
+}
+
+void CTriangulateCV::Triangulate(vector<Point2DDouble> pts,  
+								 vector<CameraPara> cams, 
+							 	 Point3DDouble& gps,
+								 bool explicit_camera_centers,
+								 double& ferror)
+{
+	bool estimate_distortion = true;
+
+	int num_views = (int) cams.size();
+
+	camera_params_t *cameras = new camera_params_t[num_views];
+
+	for(int i=0; i<num_views; i++)
+	{
+		InitializeCameraParams(cameras[i]);
+		cameras[i].f = cams[i].focus;
+		cameras[i].known_intrinsics = false;
+		memcpy(cameras[i].R, cams[i].R, sizeof(double)*9);
+		memcpy(cameras[i].t, cams[i].t, sizeof(double)*3);
+	}
+	
+	v2_t *pv = new v2_t[num_views];
+	double *Rs = new double[9 * num_views];
+	double *ts = new double[3 * num_views];
+
+	for (int i = 0; i < num_views; i++) 
+	{
+		camera_params_t *cam = NULL;
+
+		double cx = pts[i].x;
+		double cy = pts[i].y;
+
+		double p3[3] = { cx, cy, 1.0 };
+
+		double K[9], Kinv[9];
+		GetIntrinsics(cameras[i], K);
+		matrix_invert(3, K, Kinv);
+
+		double p_n[3];
+		matrix_product(3, 3, 3, 1, Kinv, p3, p_n);
+
+		// EDIT!!!
+		pv[i] = v2_new(-p_n[0], -p_n[1]);
+		pv[i] = UndistortNormalizedPoint(pv[i], cameras[i]);
+
+		cam = cameras + i;
+
+		memcpy(Rs + 9 * i, cam->R, 9 * sizeof(double));
+		if (!explicit_camera_centers) 
+		{
+			memcpy(ts + 3 * i, cam->t, 3 * sizeof(double));
+		}
+		else 
+		{
+			matrix_product(3, 3, 3, 1, cam->R, cam->t, ts + 3 * i);
+			matrix_scale(3, 1, ts + 3 * i, -1.0, ts + 3 * i);
+		}
+	}
+
+	ferror = 0;
+	v3_t pt = triangulate_n(num_views, pv, Rs, ts, &ferror);
+
+	ferror = 0.0;
+	for (int i = 0; i < num_views; i++)
+	{
+		double cx = pts[i].x;
+		double cy = pts[i].y;
+
+		FeatPoint key; // = imageData[image_idx]->GetKeyPoint(key_idx);
+		key.cx = cx;
+		key.cy = cy;
+
+		v2_t pr = sfm_project_final(cameras + i, pt, 
+			explicit_camera_centers ? 1 : 0,
+			estimate_distortion ? 1 : 0);
+		
+		double dx = Vx(pr) - key.cx; //key.m_x;
+		double dy = Vy(pr) - key.cy; //key.m_y;
+
+		ferror += dx * dx + dy * dy;
+	}
+
+	ferror = sqrt(ferror / num_views);
+
+	delete [] pv;
+	delete [] Rs;
+	delete [] ts;
+
+	delete [] cameras;
 }
 
 //////////////////////////////////////////////////////////////////////////
