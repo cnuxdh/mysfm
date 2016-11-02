@@ -1313,6 +1313,9 @@ int GrdToImg(Point3DDouble grdpt, Point2DDouble& imgpt, CameraPara cam)
 	GenerateRMatrixDirect(omiga, phi, kapa, R);
 
 	double t[3];
+	t[0] = cam.t[0];
+	t[1] = cam.t[1];
+	t[2] = cam.t[2];
 
 	double ix1,iy1;
 	double gx = grdpt.p[0];

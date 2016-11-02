@@ -208,9 +208,25 @@ int CalculateNewCamParas(int nCameraId,
 		printf("\n optimization for DLT results: \n");
 
 		//remove the wrong projections
-		
+		vector<Point3DDouble> inlierPt3;
+		vector<Point2DDouble> inlierPt2;
+		for(int i=0; i<pt3.size(); i++)
+		{
+			Point2DDouble projPt;
+			GrdToImg(pt3[i], projPt, cam);
 
-		CeresBA(pt3, pt2, cam);
+			double dx = projPt.p[0] - pt2[i].p[0];
+			double dy = projPt.p[1] - pt2[i].p[1];
+			double projError = sqrt(dx*dx + dy*dy);
+
+			if(projError<16)
+			{
+				inlierPt3.push_back(pt3[i]);
+				inlierPt2.push_back(pt2[i]);
+			}
+		}		
+
+		CeresBA(inlierPt3, inlierPt2, cam);
 		printf("\n");
 	}
 	else
