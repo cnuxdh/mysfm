@@ -128,13 +128,60 @@ struct SFMReprojectionError
 };
 
 
+//when the coordinates of track points are fixed, only optimize the camera intrinsic parameters 
+struct RefineCameraError 
+{
+	RefineCameraError(double observed_x, double observed_y, double gx, double gy, double gz)
+		: observed_x(observed_x), observed_y(observed_y), gx(gx), gy(gy), gz(gz) {}
+	
+	template <typename T>
+	bool operator()(const T* const cameraIn,  //3 interior camera parameters
+					const T* const cameraOut, //6 outer camera parameters
+					T* residuals) const       //2 output residual parameters
+	{
+		T focal = cameraIn[0];
+		T k1    = cameraIn[1];
+		T k2    = cameraIn[2];
+
+		T omiga  = cameraOut[0];
+		T phi    = cameraOut[1];
+		T kapa   = cameraOut[2];
+		T t[3];
+		t[0] = cameraOut[3];
+		t[1] = cameraOut[4];
+		t[2] = cameraOut[5];
+
+		//int ht, wd;
+		T R[9];
+		GenerateRMatrixDirect(omiga, phi, kapa, R);
+
+		T ix1,iy1;
+		GrdToImgWithDistortFixedPt(gx, gy, gz, &ix1, &iy1, R, t, focal, T(0), T(0), k1, k2);
+		
+		residuals[0] = ix1 - T(observed_x);
+		residuals[1] = iy1 - T(observed_y);
+		
+		return true;
+	}
+	// Factory to hide the construction of the CostFunction object from
+	// the client code.
+	static ceres::CostFunction* Create(const double observed_x,	const double observed_y, 
+		const double gx, const double gy, const double gz) {
+			return (new ceres::AutoDiffCostFunction<RefineCameraError, 2, 3, 6>(
+				new RefineCameraError(observed_x, observed_y, gx, gy, gz) ) );
+	}
+
+	double observed_x;
+	double observed_y;
+	double gx,gy,gz;
+};
 
 
+//bundle adjustment for multiple cameras
+int CeresBA( vector<TrackInfo> trackSeq, vector<ImgFeature> imageFeatures, vector<CameraPara> &cameras);
 
-
-int CeresBA( vector<TrackInfo> trackSeq, vector<ImgFeature> imageFeatures, 
-			/*vector<int> cameraIDOrder,*/	vector<CameraPara> &cameras);
-
+//bundle adjustment for camera parameters only
+int CeresBA( vector<Point3DDouble>& grdPts, vector<Point2DDouble>& imgPts, CameraPara& camera );
 
 class DLL_EXPORT CCeresBA: public CBABase
 {

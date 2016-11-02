@@ -162,12 +162,6 @@ int CaculateTrackSeqGrd(vector<ImgFeature>&  imageFeatures,
 	return 0;
 }
 
-
-//adjust the camera parameters only, assuming the 3D points are right
-
-
-
-
 int CalculateNewCamParas(int nCameraId, 
 	vector<ImgFeature>&  imageFeatures,
 	vector<TrackInfo>& trackSeqNew, 
@@ -193,7 +187,6 @@ int CalculateNewCamParas(int nCameraId,
 
 			if(nImageId == nCameraId)
 			{
-
 				pt3.push_back( trackSeqNew[i].grd );
 
 				Point2DDouble p2;
@@ -212,7 +205,13 @@ int CalculateNewCamParas(int nCameraId,
 	//if successful, do bundle adjustment
 	if(r==0)
 	{
+		printf("\n optimization for DLT results: \n");
 
+		//remove the wrong projections
+		
+
+		CeresBA(pt3, pt2, cam);
+		printf("\n");
 	}
 	else
 	{
@@ -225,6 +224,7 @@ int CalculateNewCamParas(int nCameraId,
 
 
 #ifdef CERES_LIB
+
 int CeresBA( vector<TrackInfo> trackSeq, vector<ImgFeature> imageFeatures, 
 			 /*vector<int> cameraIDOrder,*/	vector<CameraPara> &cameras)
 {
@@ -399,6 +399,86 @@ int CeresBA( vector<TrackInfo> trackSeq, vector<ImgFeature> imageFeatures,
 
 	return 0;
 }
+
+
+int CeresBA( vector<Point3DDouble>& grdPts, vector<Point2DDouble>& imgPts, CameraPara& camera )
+{
+
+	double  pInteriorParams[3];
+	double  pOuterParams[6];
+
+	int nProjection = imgPts.size();
+
+	pInteriorParams[0] = camera.focus;
+	pInteriorParams[1] = camera.k1;
+	pInteriorParams[2] = camera.k2;
+
+	pOuterParams[0] = camera.ax;
+	pOuterParams[1] = camera.ay;
+	pOuterParams[2] = camera.az;
+	pOuterParams[3] = camera.t[0];
+	pOuterParams[4] = camera.t[1];
+	pOuterParams[5] = camera.t[2];
+		
+	ceres::Problem problem;
+	//invoke ceres functions, each time adding one projection
+	for(int i=0; i<nProjection; i++)
+	{
+		ceres::CostFunction* cost_function =
+			RefineCameraError::Create( imgPts[i].p[0] , imgPts[i].p[1], 
+			grdPts[i].p[0], grdPts[i].p[1], grdPts[i].p[2]);
+
+		problem.AddResidualBlock(cost_function,
+			NULL /* squared loss */,
+			pInteriorParams,   //inner camera parameters: 3
+			pOuterParams       //outer camera parameters: 6
+			);			   
+	}
+
+	//save the optimized results
+	ceres::Solver::Options options;
+	options.linear_solver_type = ceres::DENSE_SCHUR;
+	options.minimizer_progress_to_stdout = true;
+
+	ceres::Solver::Summary summary;
+	ceres::Solve(options, &problem, &summary);
+	std::cout << summary.FullReport() << "\n";
+
+	std::cout<<"optimized results: "<<"\n";
+	printf("Inner parameters... \n");
+	for(int i=0; i<3; i++)
+		std::cout<<pInteriorParams[i]<<"  ";
+	std::cout<<endl;
+
+	printf("Ounter parameters ...\n");
+
+	for(int i=0; i<6; i++)
+	{
+		std::cout<<pOuterParams[i]<<"   ";
+	}
+	
+	//save the optimized results
+	camera.focus = pInteriorParams[0];
+	camera.k1    = pInteriorParams[1];
+	camera.k2    = pInteriorParams[2];
+	camera.ax   = pOuterParams[0] ;
+	camera.ay   = pOuterParams[1];
+	camera.az   = pOuterParams[2];
+	camera.t[0] = pOuterParams[3];
+	camera.t[1] = pOuterParams[4];
+	camera.t[2] = pOuterParams[5];
+
+	//update the rotation matrix
+	double R[9];
+	GenerateRMatrixDirect(camera.ax, camera.ay, camera.az, R);
+	memcpy(camera.R, R, sizeof(double)*9);
+
+	std::cout<<endl;
+
+	return 0;
+}
+
+
 #endif
 
 
@@ -537,6 +617,7 @@ int CCeresBA::BundleAdjust(int numCameras,
 		cameraVisited[newCameraIndex] = 1;
 
 #ifdef CERES_LIB
+		printf("BA for all cameras... \n");
 		CeresBA(trackSeq, imageFeatures, cameras);
 #endif	
 	}

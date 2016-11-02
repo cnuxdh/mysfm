@@ -60,6 +60,21 @@ public:
 	int EstimatePose(vector<Point3DDouble> pt3, vector<Point2DDouble> pt2, double* K, double* R, double* t);
 	int EstimatePose(vector<Point3DDouble> pt3, vector<Point2DDouble> pt2, CameraPara& cam);
 };
+/////////////////////////////////////////////////////////////////////////
+
+
+/////////////////////////////////////////////////////////////////////////
+/* calculate the projection of 3D point
+   input: 
+		grdpt: ground point
+		cam:   camera parameters
+   output:
+		imgpt: normalized point, origin is the center of image
+*/
+int GrdToImg(Point3DDouble grdpt, Point2DDouble& imgpt, CameraPara cam);
+
+
+
 
 
 

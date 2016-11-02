@@ -30,6 +30,8 @@
 //#include "Matrix.h"
 #include "commonfile.h"
 
+#include "CalcAngle.h"
+
 //sfm driver lib
 //#include "sfm.h"
 
@@ -1295,3 +1297,32 @@ int CalculateEssentialMatrix1(double* R, double* T, double* F)
 	return 0;
 }
 
+
+
+int GrdToImg(Point3DDouble grdpt, Point2DDouble& imgpt, CameraPara cam)
+{
+	//int ht, wd;
+	double focal = cam.focus;
+	double k1    = cam.k1;
+	double k2    = cam.k2;
+	double omiga = cam.ax;
+	double phi   = cam.ay;
+	double kapa  = cam.az;
+
+	double R[9];
+	GenerateRMatrixDirect(omiga, phi, kapa, R);
+
+	double t[3];
+
+	double ix1,iy1;
+	double gx = grdpt.p[0];
+	double gy = grdpt.p[1];
+	double gz = grdpt.p[2];
+
+	GrdToImgWithDistort(gx, gy, gz, &ix1, &iy1, R, t, focal, 0.0, 0.0, k1, k2);
+
+	imgpt.p[0] = ix1;
+	imgpt.p[1] = iy1;
+
+	return 0;
+}
