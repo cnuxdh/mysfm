@@ -31,20 +31,21 @@
 #include "commonfile.h"
 
 //sfm driver lib
-#include "sfm.h"
+//#include "sfm.h"
 
 //5point lib 
-#include "5point.h"
+//#include "5point.h"
 
 //matrix lib
-#include "matrix/matrix.h"
+//#include "matrix/matrix.h"
+
 
 //imagelib
 #include "defines.h"
-#include "triangulate.h"
-#include "fmatrix.h"
+//#include "triangulate.h"
+//#include "fmatrix.h"
 
-
+#include "baselib.h"
 
 
 #include <algorithm>
@@ -57,10 +58,10 @@ int CalculateExplicitT(double* R, double* T, double* explicitT)
 
 	double iR[9];
 	memset(iR, 0, sizeof(double)*9);
-	matrix_invert(3, R, iR);
+	dll_matrix_invert(3, R, iR);
 
 	double eT[3];
-	matrix_product(3,3,3,1, iR, T, eT);
+	dll_matrix_product(3,3,3,1, iR, T, eT);
 	
 	explicitT[0] = -eT[0];
 	explicitT[1] = -eT[1];
@@ -78,13 +79,13 @@ void FixIntrinsics(double *P, double *K, double *R, double *t)
 
 	/* If odd parity, negate the instrinsic matrix */
 	if ((neg % 2) == 1) {
-		matrix_scale(3, 3, K, -1.0, K);
-		matrix_scale(3, 4, P, -1.0, P);
+		dll_matrix_scale(3, 3, K, -1.0, K);
+		dll_matrix_scale(3, 4, P, -1.0, P);
 	}
 
 	/* Now deal with case of even parity */
 	double fix[9];
-	matrix_ident(3, fix);
+	dll_matrix_ident(3, fix);
 	double tmp[9], tmp2[12];
 
 	if (K[0] < 0.0 && K[4] < 0.0) {
@@ -100,13 +101,13 @@ void FixIntrinsics(double *P, double *K, double *R, double *t)
 		/* No change needed */
 	}
 
-	matrix_product(3, 3, 3, 3, K, fix, tmp);
+	dll_matrix_product(3, 3, 3, 3, K, fix, tmp);
 	memcpy(K, tmp, sizeof(double) * 3 * 3);
 
 	double Kinv[9];
-	matrix_invert(3, K, Kinv);
+	dll_matrix_invert(3, K, Kinv);
 
-	matrix_product(3, 3, 3, 4, Kinv, P, tmp2);
+	dll_matrix_product(3, 3, 3, 4, Kinv, P, tmp2);
 
 	memcpy(R + 0, tmp2 + 0, sizeof(double) * 3);
 	memcpy(R + 3, tmp2 + 4, sizeof(double) * 3);
@@ -149,12 +150,12 @@ int EstimatePose5Point_Pano( vector<Point3DDouble>& p1,
 
 	for (int i = 0; i < num_pts; i++) 
 	{
-		k1_pts[i] = v3_new(p1[i].p[0], p1[i].p[1], p1[i].p[2]);
-		k2_pts[i] = v3_new(p2[i].p[0], p2[i].p[1], p2[i].p[2]);
+		k1_pts[i] = dll_v3_new(p1[i].p[0], p1[i].p[1], p1[i].p[2]);
+		k2_pts[i] = dll_v3_new(p2[i].p[0], p2[i].p[1], p2[i].p[2]);
 	}
 
 	double em[9];
-	int num_inliers = compute_pose_ransac_pano(num_pts, k1_pts, k2_pts, 
+	int num_inliers = dll_compute_pose_ransac_pano(num_pts, k1_pts, k2_pts, 
 		radius, threshold, num_trials, em, R, t);
     
 	/*
@@ -174,7 +175,7 @@ int EstimatePose5Point_Pano( vector<Point3DDouble>& p1,
 	//printf("residuals ... \n");
 	for (int i = 0; i < num_pts; i++) 
 	{
-		double dis = fmatrix_compute_residual_pano(em, k1_pts[i], k2_pts[i], radius);
+		double dis = dll_fmatrix_compute_residual_pano(em, k1_pts[i], k2_pts[i], radius);
 		//printf("%d  %lf \n", i, dis);
 		residual[i] = dis;
 	}
@@ -208,11 +209,11 @@ int EstimatePose5Point( vector<Point2DDouble>& p1,
 
 	for (int i = 0; i < num_pts; i++) 
 	{
-		k1_pts[i] = v2_new(p1[i].p[0], p1[i].p[1]);
-		k2_pts[i] = v2_new(p2[i].p[0], p2[i].p[1]);
+		k1_pts[i] = dll_v2_new(p1[i].p[0], p1[i].p[1]);
+		k2_pts[i] = dll_v2_new(p2[i].p[0], p2[i].p[1]);
 	}
 
-	int num_inliers = compute_pose_ransac(num_pts, k1_pts, k2_pts, 
+	int num_inliers = dll_compute_pose_ransac(num_pts, k1_pts, k2_pts, 
 		K1, K2, threshold, num_trials, R, t);
 
 	delete [] k1_pts;
@@ -232,7 +233,7 @@ bool CheckCheirality(v3_t p, const camera_params_t &camera)
 	pt[0] -= camera.t[0];
 	pt[1] -= camera.t[1];
 	pt[2] -= camera.t[2];
-	matrix_product(3, 3, 3, 1, (double *) camera.R, pt, cam);
+	dll_matrix_product(3, 3, 3, 1, (double *) camera.R, pt, cam);
 
 	// EDIT!!!
 	if (cam[2] > 0.0)
@@ -275,22 +276,22 @@ double ComputeRayAngle(v2_t p, v2_t q,
 	GetIntrinsics(cam2, K2);
 
 	double K1_inv[9], K2_inv[9];
-	matrix_invert(3, K1, K1_inv);
-	matrix_invert(3, K2, K2_inv);
+	dll_matrix_invert(3, K1, K1_inv);
+	dll_matrix_invert(3, K2, K2_inv);
 
 	double p3[3] = { Vx(p), Vy(p), 1.0 };
 	double q3[3] = { Vx(q), Vy(q), 1.0 };
 
 	double p3_norm[3], q3_norm[3];
-	matrix_product331(K1_inv, p3, p3_norm);
-	matrix_product331(K2_inv, q3, q3_norm);
+	dll_matrix_product331(K1_inv, p3, p3_norm);
+	dll_matrix_product331(K2_inv, q3, q3_norm);
 
-	v2_t p_norm = v2_new(p3_norm[0] / p3_norm[2], p3_norm[1] / p3_norm[2]);
-	v2_t q_norm = v2_new(q3_norm[0] / q3_norm[2], q3_norm[1] / q3_norm[2]);
+	v2_t p_norm = dll_v2_new(p3_norm[0] / p3_norm[2], p3_norm[1] / p3_norm[2]);
+	v2_t q_norm = dll_v2_new(q3_norm[0] / q3_norm[2], q3_norm[1] / q3_norm[2]);
 
 	double R1_inv[9], R2_inv[9];
-	matrix_transpose(3, 3, (double *) cam1.R, R1_inv);
-	matrix_transpose(3, 3, (double *) cam2.R, R2_inv);
+	dll_matrix_transpose(3, 3, (double *) cam1.R, R1_inv);
+	dll_matrix_transpose(3, 3, (double *) cam2.R, R2_inv);
 
 	double p_w[3], q_w[3];
 
@@ -299,22 +300,22 @@ double ComputeRayAngle(v2_t p, v2_t q,
 
 	double Rpv[3], Rqv[3];
 
-	matrix_product331(R1_inv, pv, Rpv);
-	matrix_product331(R2_inv, qv, Rqv);
+	dll_matrix_product331(R1_inv, pv, Rpv);
+	dll_matrix_product331(R2_inv, qv, Rqv);
 
-	matrix_sum(3, 1, 3, 1, Rpv, (double *) cam1.t, p_w);
-	matrix_sum(3, 1, 3, 1, Rqv, (double *) cam2.t, q_w);
+	dll_matrix_sum(3, 1, 3, 1, Rpv, (double *) cam1.t, p_w);
+	dll_matrix_sum(3, 1, 3, 1, Rqv, (double *) cam2.t, q_w);
 
 	/* Subtract out the camera center */
 	double p_vec[3], q_vec[3];
-	matrix_diff(3, 1, 3, 1, p_w, (double *) cam1.t, p_vec);
-	matrix_diff(3, 1, 3, 1, q_w, (double *) cam2.t, q_vec);
+	dll_matrix_diff(3, 1, 3, 1, p_w, (double *) cam1.t, p_vec);
+	dll_matrix_diff(3, 1, 3, 1, q_w, (double *) cam2.t, q_vec);
 
 	/* Compute the angle between the rays */
 	double dot;
-	matrix_product(1, 3, 3, 1, p_vec, q_vec, &dot);
+	dll_matrix_product(1, 3, 3, 1, p_vec, q_vec, &dot);
 
-	double mag = matrix_norm(3, 1, p_vec) * matrix_norm(3, 1, q_vec);
+	double mag = dll_matrix_norm(3, 1, p_vec) * dll_matrix_norm(3, 1, q_vec);
 
 	return acos(CLAMP(dot / mag, -1.0 + 1.0e-8, 1.0 - 1.0e-8));
 }
@@ -336,8 +337,8 @@ v3_t PtTriangulate(v2_t p, v2_t q,
 	GetIntrinsics(c1, K1);
 	GetIntrinsics(c2, K2);
 
-	matrix_invert(3, K1, K1inv);
-	matrix_invert(3, K2, K2inv);
+	dll_matrix_invert(3, K1, K1inv);
+	dll_matrix_invert(3, K2, K2inv);
 
 	/* Set up the 3D point */
 	// EDIT!!!
@@ -346,13 +347,13 @@ v3_t PtTriangulate(v2_t p, v2_t q,
 
 	double proj1_norm[3], proj2_norm[3];
 
-	matrix_product(3, 3, 3, 1, K1inv, proj1, proj1_norm);
-	matrix_product(3, 3, 3, 1, K2inv, proj2, proj2_norm);
+	dll_matrix_product(3, 3, 3, 1, K1inv, proj1, proj1_norm);
+	dll_matrix_product(3, 3, 3, 1, K2inv, proj2, proj2_norm);
 
-	v2_t p_norm = v2_new(proj1_norm[0] / proj1_norm[2],
+	v2_t p_norm = dll_v2_new(proj1_norm[0] / proj1_norm[2],
 		proj1_norm[1] / proj1_norm[2]);
 
-	v2_t q_norm = v2_new(proj2_norm[0] / proj2_norm[2],
+	v2_t q_norm = dll_v2_new(proj2_norm[0] / proj2_norm[2],
 		proj2_norm[1] / proj2_norm[2]);
 
 	/* Undo radial distortion */
@@ -366,7 +367,7 @@ v3_t PtTriangulate(v2_t p, v2_t q,
 	v3_t pt;
 	if (!explicit_camera_centers) 
 	{
-		pt = triangulate(p_norm, q_norm, c1.R, c1.t, c2.R, c2.t, &proj_error);
+		pt = dll_triangulate(p_norm, q_norm, c1.R, c1.t, c2.R, c2.t, &proj_error);
 	}
 	else 
 	{
@@ -374,12 +375,12 @@ v3_t PtTriangulate(v2_t p, v2_t q,
 		double t2[3];
 
 		/* Put the translation in standard form */
-		matrix_product(3, 3, 3, 1, c1.R, c1.t, t1);
-		matrix_scale(3, 1, t1, -1.0, t1);
-		matrix_product(3, 3, 3, 1, c2.R, c2.t, t2);
-		matrix_scale(3, 1, t2, -1.0, t2);
+		dll_matrix_product(3, 3, 3, 1, c1.R, c1.t, t1);
+		dll_matrix_scale(3, 1, t1, -1.0, t1);
+		dll_matrix_product(3, 3, 3, 1, c2.R, c2.t, t2);
+		dll_matrix_scale(3, 1, t2, -1.0, t2);
 
-		pt = triangulate(p_norm, q_norm, c1.R, t1, c2.R, t2, &proj_error);
+		pt = dll_triangulate(p_norm, q_norm, c1.R, t1, c2.R, t2, &proj_error);
 	}
 
 	proj_error = (c1.f + c2.f) * 0.5 * sqrt(proj_error * 0.5);
@@ -467,8 +468,8 @@ int CEstimatePose5Point::EstimatePose( PairMatchRes pairMatches, ImgFeature lIma
 	if (!initialized) 
 	{
 		memcpy(camera2.R, R0, sizeof(double) * 9);
-		matrix_transpose_product(3, 3, 3, 1, R0, t0, camera2.t);
-		matrix_scale(3, 1, camera2.t, -1.0, camera2.t);
+		dll_matrix_transpose_product(3, 3, 3, 1, R0, t0, camera2.t);
+		dll_matrix_scale(3, 1, camera2.t, -1.0, camera2.t);
 	}
 
 	memcpy(cam1.R, camera1.R, sizeof(double)*9);
@@ -522,8 +523,8 @@ int CEstimatePose5Point::EstimatePose( vector<Point2DDouble> lPts, vector<Point2
 	{
 		memcpy(cam2.R, R, sizeof(double) * 9);
 		
-		matrix_transpose_product(3, 3, 3, 1, R, t, nt);
-		matrix_scale(3, 1, nt, -1.0, nt);
+		dll_matrix_transpose_product(3, 3, 3, 1, R, t, nt);
+		dll_matrix_scale(3, 1, nt, -1.0, nt);
 		memcpy(cam2.t,nt,sizeof(double)*3);
 	}	
    
@@ -601,8 +602,8 @@ void CTriangulateCV::Triangulate(std::vector<Point2DDouble> lPts, std::vector<Po
 
 	for(int i=0; i<lPts.size(); i++)
 	{
-		v2_t p = v2_new(lPts[i].p[0], lPts[i].p[1]);
-		v2_t q = v2_new(rPts[i].p[0], rPts[i].p[1]);
+		v2_t p = dll_v2_new(lPts[i].p[0], lPts[i].p[1]);
+		v2_t q = dll_v2_new(rPts[i].p[0], rPts[i].p[1]);
         
 		double error = 0.0;
 		bool   in_front = true;
@@ -650,8 +651,8 @@ void CTriangulateCV::Triangulate(vector<Point2DDouble> lPts, vector<Point2DDoubl
 
 	for(int i=0; i<lPts.size(); i++)
 	{
-		v2_t p = v2_new(lPts[i].p[0], lPts[i].p[1]);
-		v2_t q = v2_new(rPts[i].p[0], rPts[i].p[1]);
+		v2_t p = dll_v2_new(lPts[i].p[0], lPts[i].p[1]);
+		v2_t q = dll_v2_new(rPts[i].p[0], rPts[i].p[1]);
 
 		double error = 0.0;
 		bool   in_front = true;
@@ -684,7 +685,8 @@ void CTriangulateCV::Triangulate(vector<Point2DDouble> pts,
 								 bool explicit_camera_centers,
 								 double& ferror)
 {
-	bool estimate_distortion = true;
+	
+	bool estimate_distortion = false;
 
 	int num_views = (int) cams.size();
 
@@ -694,7 +696,7 @@ void CTriangulateCV::Triangulate(vector<Point2DDouble> pts,
 	{
 		InitializeCameraParams(cameras[i]);
 		cameras[i].f = cams[i].focus;
-		cameras[i].known_intrinsics = false;
+		cameras[i].known_intrinsics = false; //we do not use the input intrisics!!!!
 		memcpy(cameras[i].R, cams[i].R, sizeof(double)*9);
 		memcpy(cameras[i].t, cams[i].t, sizeof(double)*3);
 	}
@@ -707,21 +709,21 @@ void CTriangulateCV::Triangulate(vector<Point2DDouble> pts,
 	{
 		camera_params_t *cam = NULL;
 
-		double cx = pts[i].x;
-		double cy = pts[i].y;
+		double cx = pts[i].p[0];
+		double cy = pts[i].p[1];
 
 		double p3[3] = { cx, cy, 1.0 };
 
 		double K[9], Kinv[9];
 		GetIntrinsics(cameras[i], K);
-		matrix_invert(3, K, Kinv);
+		dll_matrix_invert(3, K, Kinv);
 
 		double p_n[3];
-		matrix_product(3, 3, 3, 1, Kinv, p3, p_n);
+		dll_matrix_product(3, 3, 3, 1, Kinv, p3, p_n);
 
 		// EDIT!!!
-		pv[i] = v2_new(-p_n[0], -p_n[1]);
-		pv[i] = UndistortNormalizedPoint(pv[i], cameras[i]);
+		pv[i] = dll_v2_new(-p_n[0], -p_n[1]);
+		//pv[i] = UndistortNormalizedPoint(pv[i], cameras[i]);
 
 		cam = cameras + i;
 
@@ -732,25 +734,25 @@ void CTriangulateCV::Triangulate(vector<Point2DDouble> pts,
 		}
 		else 
 		{
-			matrix_product(3, 3, 3, 1, cam->R, cam->t, ts + 3 * i);
-			matrix_scale(3, 1, ts + 3 * i, -1.0, ts + 3 * i);
+			dll_matrix_product(3, 3, 3, 1, cam->R, cam->t, ts + 3 * i);
+			dll_matrix_scale(3, 1, ts + 3 * i, -1.0, ts + 3 * i);
 		}
 	}
 
 	ferror = 0;
-	v3_t pt = triangulate_n(num_views, pv, Rs, ts, &ferror);
+	v3_t pt = dll_triangulate_n(num_views, pv, Rs, ts, &ferror);
 
 	ferror = 0.0;
 	for (int i = 0; i < num_views; i++)
 	{
-		double cx = pts[i].x;
-		double cy = pts[i].y;
+		double cx = pts[i].p[0];
+		double cy = pts[i].p[1];
 
 		FeatPoint key; // = imageData[image_idx]->GetKeyPoint(key_idx);
 		key.cx = cx;
 		key.cy = cy;
 
-		v2_t pr = sfm_project_final(cameras + i, pt, 
+		v2_t pr = dll_sfm_project_final(cameras + i, pt, 
 			explicit_camera_centers ? 1 : 0,
 			estimate_distortion ? 1 : 0);
 		
@@ -761,6 +763,10 @@ void CTriangulateCV::Triangulate(vector<Point2DDouble> pts,
 	}
 
 	ferror = sqrt(ferror / num_views);
+
+	gps.p[0] = pt.p[0];
+	gps.p[1] = pt.p[1];
+	gps.p[2] = pt.p[2];
 
 	delete [] pv;
 	delete [] Rs;
@@ -789,7 +795,7 @@ int CDLTPose::EstimatePose(vector<Point3DDouble> pt3, vector<Point2DDouble> pt2,
 
 	//too few points
 	if (num_points < 9)
-		return 0;
+		return -1;
 
 	v3_t *points_solve = (v3_t*)malloc( num_points*sizeof(v3_t) );
 	v2_t *projs_solve  = (v2_t*)malloc( num_points*sizeof(v3_t) );
@@ -807,8 +813,19 @@ int CDLTPose::EstimatePose(vector<Point3DDouble> pt3, vector<Point2DDouble> pt2,
 	double proj_estimation_threshold = 4.0;
 	double proj_estimation_threshold_weak = 16.0*proj_estimation_threshold;
 
+#ifdef _DEBUG
+	FILE* fp = fopen("c:\\temp\\my_dlt.txt", "w");
+	for(int i=0; i<num_points; i++)
+	{
+		fprintf(fp, "%lf %lf %lf   %lf %lf \n", 
+			points_solve[i].p[0], points_solve[i].p[1], points_solve[i].p[2],
+			projs_solve[i].p[0], projs_solve[i].p[1]);
+	}
+	fclose(fp);
+#endif
+
 	//find the 3*4 projection matrix
-	r = find_projection_3x4_ransac(num_points, 
+	r = dll_find_projection_3x4_ransac(num_points, 
 		points_solve, projs_solve, 
 		P, /* 2048 */ 4096 /* 100000 */, 
 		proj_estimation_threshold);
@@ -818,7 +835,8 @@ int CDLTPose::EstimatePose(vector<Point3DDouble> pt3, vector<Point2DDouble> pt2,
 		printf("[FindAndVerifyCamera] Couldn't find projection matrix\n");
 		free(points_solve);
 		free(projs_solve);
-		return 0;
+
+		return -1;
 	}
 	
 	/* If number of inliers is too low, fail */
@@ -827,7 +845,8 @@ int CDLTPose::EstimatePose(vector<Point3DDouble> pt3, vector<Point2DDouble> pt2,
 		printf("[FindAndVerifyCamera] Too few inliers to use projection matrix\n");
 		free(points_solve);
 		free(projs_solve);
-		return 0;
+
+		return -1;
 	}
 
 	//decompose the P to K[R|t]
@@ -837,17 +856,17 @@ int CDLTPose::EstimatePose(vector<Point3DDouble> pt3, vector<Point2DDouble> pt2,
 	memcpy(KRinit + 6, P + 8, 3 * sizeof(double));
 
 	// RQ factorization of KR
-	dgerqf_driver(3, 3, KRinit, Kinit, Rinit);	    
+	dll_dgerqf_driver(3, 3, KRinit, Kinit, Rinit);	    
 
 	/* We want our intrinsics to have a certain form */
 	FixIntrinsics(P, Kinit, Rinit, tinit);
-	matrix_scale(3, 3, Kinit, 1.0 / Kinit[8], Kinit);
+	dll_matrix_scale(3, 3, Kinit, 1.0 / Kinit[8], Kinit);
 
 	printf("[FindAndVerifyCamera] Estimated intrinsics:\n");
-	matrix_print(3, 3, Kinit);
+	dll_matrix_print(3, 3, Kinit);
 	printf("[FindAndVerifyCamera] Estimated extrinsics:\n");
-	matrix_print(3, 3, Rinit);
-	matrix_print(1, 3, tinit);
+	dll_matrix_print(3, 3, Rinit);
+	dll_matrix_print(1, 3, tinit);
 	fflush(stdout);
 
 	/* Check cheirality constraint */
@@ -871,8 +890,8 @@ int CDLTPose::EstimatePose(vector<Point3DDouble> pt3, vector<Point2DDouble> pt2,
 						Vz(points_solve[j]), 1.0 };
 		double q[3], q2[3];
 
-		matrix_product(3, 4, 4, 1, Rigid, p, q);
-		matrix_product331(Kinit, q, q2);
+		dll_matrix_product(3, 4, 4, 1, Rigid, p, q);
+		dll_matrix_product331(Kinit, q, q2);
 
 		double pimg[2] = { -q2[0] / q2[2], -q2[1] / q2[2] };
 		double diff = 
@@ -911,7 +930,7 @@ int CDLTPose::EstimatePose(vector<Point3DDouble> pt3, vector<Point2DDouble> pt2,
 		printf("[FindAndVerifyCamera] Error: camera is pointing "
 			"away from scene\n");
 
-		return 0;
+		return -1;
 	}
 
 	memcpy(K, Kinit, sizeof(double) * 9);
@@ -921,9 +940,9 @@ int CDLTPose::EstimatePose(vector<Point3DDouble> pt3, vector<Point2DDouble> pt2,
 	//conversion from RX+t to R(X-t')
 	printf(" Conversion from RX+t to R(X-t') \n");
 	double nt[3];
-	matrix_transpose_product(3, 3, 3, 1, Rinit, tinit, nt);
-	matrix_scale(3, 1, nt, -1.0, nt);
-	matrix_print(1, 3, nt);
+	dll_matrix_transpose_product(3, 3, 3, 1, Rinit, tinit, nt);
+	dll_matrix_scale(3, 1, nt, -1.0, nt);
+	dll_matrix_print(1, 3, nt);
 	t[0]=nt[0]; t[1]=nt[1]; t[2]=nt[2];
 
 	/*
@@ -934,7 +953,7 @@ int CDLTPose::EstimatePose(vector<Point3DDouble> pt3, vector<Point2DDouble> pt2,
 	printf("Rotation Angle about x,y,z: %lf %lf %lf \n", ax, ay, az);
 	*/
 	
-	return 1;
+	return 0;
 }
 
 int CDLTPose::EstimatePose(vector<Point3DDouble> pt3, vector<Point2DDouble> pt2, CameraPara& cam)
@@ -1024,14 +1043,14 @@ void COpenCVFM::CalculateEpipolarLine(Point2DDouble pt, int flag, double& a, dou
 	//point from left image
 	if(flag==0)
 	{
-		matrix_product(3,3,3,1,m_FM, ip, line);
+		dll_matrix_product(3,3,3,1,m_FM, ip, line);
 		//mult(m_FM, ip, line, 3, 3, 1);
 	}
 
 	////point from right image
 	if(flag==1)
 	{
-		matrix_product(1,3,3,3, ip, m_FM, line);
+		dll_matrix_product(1,3,3,3, ip, m_FM, line);
 		//mult(ip, m_FM, line, 1, 3, 3);
 	}
 
@@ -1058,10 +1077,10 @@ double COpenCVFM::CalculateError(Point2DDouble lpt, Point2DDouble rpt)
 	double rline[3];
 
 	//point from left image
-	matrix_product(3,3,3,1,m_FM, lp, rline);
+	dll_matrix_product(3,3,3,1,m_FM, lp, rline);
 
 	//point from right image
-	matrix_product(1,3,3,3, rp, m_FM, lline);
+	dll_matrix_product(1,3,3,3, rp, m_FM, lline);
 	
 	//calculate the distance from image point to epipolar line, average of left and right 	
 	double dotValue = rp[0]*rline[0] + rp[1]*rline[1] + rp[2]*rline[2];
@@ -1085,7 +1104,7 @@ Point3DDouble TriangulatePt(Point2DDouble p, Point2DDouble q,
 	rp.p[0] = q.p[0];
 	rp.p[1] = q.p[1];
 
-	v3_t gp = triangulate(lp, rp, R0, t0, R1, t1, error );
+	v3_t gp = dll_triangulate(lp, rp, R0, t0, R1, t1, error );
 
 	Point3DDouble grdPt;
 	grdPt.p[0] = gp.p[0];
@@ -1271,7 +1290,7 @@ int CalculateEssentialMatrix1(double* R, double* T, double* F)
 	aT[2][0] = -T[1];	aT[2][1]=T[0];	 aT[2][2]=0;
 
 	//mult(*aT, R, F, 3, 3, 3);
-  matrix_product(3,3,3,3,*aT, R, F);
+	dll_matrix_product(3,3,3,3,*aT, R, F);
     
 	return 0;
 }

@@ -43,12 +43,15 @@ int CImageFeature::Load(char* filename)
 	int wd = pImage->width;
     cvReleaseImage(&pImage);
 
-	//get the dimension after resize
-	int dstHt,dstWd;
-	GetResizeDimension(ht, wd, dstHt, dstWd);
+	////get the dimension after resize
+	//int dstHt,dstWd;
+	//GetResizeDimension(ht, wd, dstHt, dstWd);
 
-	m_ht = dstHt;
-	m_wd = dstWd;
+	//m_ht = dstHt;
+	//m_wd = dstWd;
+
+	//set the initial focal length
+	m_initFocus = (ht+wd)*0.5;
 
 	return 1;
 }
@@ -71,7 +74,8 @@ int CImageFeature::DetectPtFeature(int featureType)
 		break;
 	}
 
-	pFeatDetect->Detect(m_strFileName, m_ht, m_wd, m_imageFeature);
+	//pFeatDetect->Detect(m_strFileName, m_ht, m_wd, m_imageFeature);
+	pFeatDetect->Detect(m_strFileName, m_imageFeature);
 
 	delete pFeatDetect;
 

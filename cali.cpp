@@ -1,7 +1,9 @@
 
 
 #include "cali.hpp"
-#include "matrix/matrix.h"
+#include "baselib.h"
+
+//#include "matrix/matrix.h"
 
 
 /*
@@ -24,7 +26,7 @@ using namespace cv;
 
 void InitializeCameraParams(CameraPara camPara, camera_params_t &camera)
 {
-	matrix_ident(3, camera.R);
+	dll_matrix_ident(3, camera.R);
 	camera.t[0] = camera.t[1] = camera.t[2] = 0.0;
 	camera.f = 0.0;
 	camera.k[0] = camera.k[1] = 0.0;
@@ -54,7 +56,7 @@ void InitializeCameraParams(CameraPara camPara, camera_params_t &camera)
 
 void InitializeCameraParams(camera_params_t &camera)
 {
-	matrix_ident(3, camera.R);
+	dll_matrix_ident(3, camera.R);
 	camera.t[0] = camera.t[1] = camera.t[2] = 0.0;
 	camera.f = 0.0;
 	camera.k[0] = camera.k[1] = 0.0;

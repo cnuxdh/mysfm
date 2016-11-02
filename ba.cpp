@@ -10,7 +10,7 @@
 #include "bundlerio.hpp"
 
 //matrix
-#include "matrix/matrix.h"
+//#include "matrix/matrix.h"
 
 
 #ifndef WIN32
@@ -30,20 +30,22 @@
 #include <algorithm>
 
 //sfm driver lib
-#include "sfm.h"
+//#include "sfm.h"
 
 //imagelib
-#include "qsort.h"
-#include "util.h"
+//#include "qsort.h"
+//#include "util.h"
 #include "defines.h"
 
 //matrix
-#include "matrix.h"
+//#include "matrix.h"
 
 //triangulate
-#include "triangulate.h"
+//#include "triangulate.h"
 
 #include "bundlerio.hpp"
+
+#include "baselib.h"
 
 
 static char ply_header1[] = 
@@ -105,9 +107,9 @@ void DumpPointsToPly(char *output_directory, char *filename,
 			Vx(points[i]), Vy(points[i]), Vz(points[i]),
 			// Vx(points[idx]), Vy(points[idx]), Vz(points[idx]),
 			// (reflect ? -1 : 1) * Vz(points[i]),
-			iround(Vx(colors[i])), 
-			iround(Vy(colors[i])), 
-			iround(Vz(colors[i])));
+			dll_iround(Vx(colors[i])), 
+			dll_iround(Vy(colors[i])), 
+			dll_iround(Vz(colors[i])));
 	}
 
 	for (int i = 0; i < num_cameras; i++) 
@@ -115,7 +117,7 @@ void DumpPointsToPly(char *output_directory, char *filename,
 		double c[3];
 
 		double Rinv[9];
-		matrix_invert(3, cameras[i].R, Rinv);
+		dll_matrix_invert(3, cameras[i].R, Rinv);
 
 		memcpy(c, cameras[i].t, 3 * sizeof(double));
 
@@ -132,7 +134,7 @@ void DumpPointsToPly(char *output_directory, char *filename,
 		// if (!reflect)
 		//    p_cam[2] *= -1.0;
 
-		matrix_product(3, 3, 3, 1, Rinv, p_cam, p);
+		dll_matrix_product(3, 3, 3, 1, Rinv, p_cam, p);
 
 		p[0] += c[0];
 		p[1] += c[1];
@@ -228,8 +230,8 @@ void DumpOutputFile(char *output_dir, char *filename,
 				cameras[idx].R[8]);
 
 			double t[3];
-			matrix_product(3, 3, 3, 1, cameras[idx].R, cameras[idx].t, t);
-			matrix_scale(3, 1, t, -1.0, t);
+			dll_matrix_product(3, 3, 3, 1, cameras[idx].R, cameras[idx].t, t);
+			dll_matrix_scale(3, 1, t, -1.0, t);
 			fprintf(f, "%0.10e %0.10e %0.10e\n", t[0], t[1], t[2]);
 		}
 		fprintf(f, "\n");
@@ -331,22 +333,22 @@ double ComputeRayAngle(v2_t p, v2_t q,
 	GetIntrinsics(cam2, K2);
 
 	double K1_inv[9], K2_inv[9];
-	matrix_invert(3, K1, K1_inv);
-	matrix_invert(3, K2, K2_inv);
+	dll_matrix_invert(3, K1, K1_inv);
+	dll_matrix_invert(3, K2, K2_inv);
 
 	double p3[3] = { Vx(p), Vy(p), 1.0 };
 	double q3[3] = { Vx(q), Vy(q), 1.0 };
 
 	double p3_norm[3], q3_norm[3];
-	matrix_product331(K1_inv, p3, p3_norm);
-	matrix_product331(K2_inv, q3, q3_norm);
+	dll_matrix_product331(K1_inv, p3, p3_norm);
+	dll_matrix_product331(K2_inv, q3, q3_norm);
 
-	v2_t p_norm = v2_new(p3_norm[0] / p3_norm[2], p3_norm[1] / p3_norm[2]);
-	v2_t q_norm = v2_new(q3_norm[0] / q3_norm[2], q3_norm[1] / q3_norm[2]);
+	v2_t p_norm = dll_v2_new(p3_norm[0] / p3_norm[2], p3_norm[1] / p3_norm[2]);
+	v2_t q_norm = dll_v2_new(q3_norm[0] / q3_norm[2], q3_norm[1] / q3_norm[2]);
 
 	double R1_inv[9], R2_inv[9];
-	matrix_transpose(3, 3, (double *) cam1.R, R1_inv);
-	matrix_transpose(3, 3, (double *) cam2.R, R2_inv);
+	dll_matrix_transpose(3, 3, (double *) cam1.R, R1_inv);
+	dll_matrix_transpose(3, 3, (double *) cam2.R, R2_inv);
 
 	double p_w[3], q_w[3];
 
@@ -355,22 +357,22 @@ double ComputeRayAngle(v2_t p, v2_t q,
 
 	double Rpv[3], Rqv[3];
 
-	matrix_product331(R1_inv, pv, Rpv);
-	matrix_product331(R2_inv, qv, Rqv);
+	dll_matrix_product331(R1_inv, pv, Rpv);
+	dll_matrix_product331(R2_inv, qv, Rqv);
 
-	matrix_sum(3, 1, 3, 1, Rpv, (double *) cam1.t, p_w);
-	matrix_sum(3, 1, 3, 1, Rqv, (double *) cam2.t, q_w);
+	dll_matrix_sum(3, 1, 3, 1, Rpv, (double *) cam1.t, p_w);
+	dll_matrix_sum(3, 1, 3, 1, Rqv, (double *) cam2.t, q_w);
 
 	/* Subtract out the camera center */
 	double p_vec[3], q_vec[3];
-	matrix_diff(3, 1, 3, 1, p_w, (double *) cam1.t, p_vec);
-	matrix_diff(3, 1, 3, 1, q_w, (double *) cam2.t, q_vec);
+	dll_matrix_diff(3, 1, 3, 1, p_w, (double *) cam1.t, p_vec);
+	dll_matrix_diff(3, 1, 3, 1, q_w, (double *) cam2.t, q_vec);
 
 	/* Compute the angle between the rays */
 	double dot;
-	matrix_product(1, 3, 3, 1, p_vec, q_vec, &dot);
+	dll_matrix_product(1, 3, 3, 1, p_vec, q_vec, &dot);
 
-	double mag = matrix_norm(3, 1, p_vec) * matrix_norm(3, 1, q_vec);
+	double mag = dll_matrix_norm(3, 1, p_vec) * dll_matrix_norm(3, 1, q_vec);
 
 	return acos(CLAMP(dot / mag, -1.0 + 1.0e-8, 1.0 - 1.0e-8));
 }
@@ -401,14 +403,14 @@ v3_t GeneratePointAtInfinity(vector<CImageDataBase*> imageData,
 
 	double K[9], Kinv[9];
 	GetIntrinsics(cameras[camera_idx], K);
-	matrix_invert(3, K, Kinv);
+	dll_matrix_invert(3, K, Kinv);
 
 	double ray[3];
-	matrix_product(3, 3, 3, 1, Kinv, p3, ray);
+	dll_matrix_product(3, 3, 3, 1, Kinv, p3, ray);
 
 	//We now have a ray, put it at infinity
 	double ray_world[3];
-	matrix_transpose_product(3, 3, 3, 1, cam->R, ray, ray_world);
+	dll_matrix_transpose_product(3, 3, 3, 1, cam->R, ray, ray_world);
 
 	double pos[3] = { 0.0, 0.0, 0.0 };
 	double pt_inf[3] = { 0.0, 0.0, 0.0 };
@@ -421,11 +423,11 @@ v3_t GeneratePointAtInfinity(vector<CImageDataBase*> imageData,
 	{
 		memcpy(pos, cam->t, 3 * sizeof(double));
 		double ray_extend[3];
-		matrix_scale(3, 1, ray, 100.0, ray_extend);
-		matrix_sum(3, 1, 3, 1, pos, ray, pt_inf);
+		dll_matrix_scale(3, 1, ray, 100.0, ray_extend);
+		dll_matrix_sum(3, 1, 3, 1, pos, ray, pt_inf);
 	}
 
-	return v3_new(pt_inf[0], pt_inf[1], pt_inf[2]);
+	return dll_v3_new(pt_inf[0], pt_inf[1], pt_inf[2]);
 }
 
 // Triangulate a subtrack
@@ -457,13 +459,13 @@ v3_t TriangulateNViews(const vector<CImageDataBase*> imageData,
 
 		double K[9], Kinv[9];
 		GetIntrinsics(cameras[camera_idx], K);
-		matrix_invert(3, K, Kinv);
+		dll_matrix_invert(3, K, Kinv);
 
 		double p_n[3];
-		matrix_product(3, 3, 3, 1, Kinv, p3, p_n);
+		dll_matrix_product(3, 3, 3, 1, Kinv, p3, p_n);
 
 		// EDIT!!!
-		pv[i] = v2_new(-p_n[0], -p_n[1]);
+		pv[i] = dll_v2_new(-p_n[0], -p_n[1]);
 		pv[i] = UndistortNormalizedPoint(pv[i], cameras[camera_idx]);
 
 		cam = cameras + camera_idx;
@@ -475,12 +477,12 @@ v3_t TriangulateNViews(const vector<CImageDataBase*> imageData,
 		}
 		else 
 		{
-			matrix_product(3, 3, 3, 1, cam->R, cam->t, ts + 3 * i);
-			matrix_scale(3, 1, ts + 3 * i, -1.0, ts + 3 * i);
+			dll_matrix_product(3, 3, 3, 1, cam->R, cam->t, ts + 3 * i);
+			dll_matrix_scale(3, 1, ts + 3 * i, -1.0, ts + 3 * i);
 		}
 	}
 
-	v3_t pt = triangulate_n(num_views, pv, Rs, ts, &error);
+	v3_t pt = dll_triangulate_n(num_views, pv, Rs, ts, &error);
 
 	error = 0.0;
 	for (int i = 0; i < num_views; i++)
@@ -492,7 +494,7 @@ v3_t TriangulateNViews(const vector<CImageDataBase*> imageData,
 		//Keypoint &key = GetKey(image_idx, key_idx);
 		FeatPoint &key = imageData[image_idx]->GetKeyPoint(key_idx);
 
-		v2_t pr = sfm_project_final(cameras + camera_idx, pt, 
+		v2_t pr = dll_sfm_project_final(cameras + camera_idx, pt, 
 			explicit_camera_centers ? 1 : 0,
 			estimate_distortion ? 1 : 0);
 
@@ -624,8 +626,8 @@ int BundleAdjustAddAllNewPoints(int num_points, int num_cameras,
 				FeatPoint &key1 = imageData[image_idx1]->GetKeyPoint(key_idx1);//GetKey(image_idx1, key_idx1);
 				FeatPoint &key2 = imageData[image_idx2]->GetKeyPoint(key_idx2);//GetKey(image_idx2, key_idx2);
 
-				v2_t p = v2_new(key1.cx, key1.cy);
-				v2_t q = v2_new(key2.cx, key2.cy);
+				v2_t p = dll_v2_new(key1.cx, key1.cy);
+				v2_t q = dll_v2_new(key2.cx, key2.cy);
 
 				/*
 				if (m_optimize_for_fisheye) 
@@ -718,7 +720,7 @@ int BundleAdjustAddAllNewPoints(int num_points, int num_cameras,
 		unsigned char r = 255; //GetKey(image_idx, key_idx).m_r;
 		unsigned char g = 0;   //GetKey(image_idx, key_idx).m_g;
 		unsigned char b = 0;   //GetKey(image_idx, key_idx).m_b;
-		colors[pt_count] = v3_new((double) r, (double) g, (double) b);
+		colors[pt_count] = dll_v3_new((double) r, (double) g, (double) b);
 
 		pt_views.push_back(new_tracks[i]);
 
@@ -917,13 +919,13 @@ vector<int> RefineCameraParameters( int num_points,
 	int round = 0;
 
 	// First refine with the focal length fixed 
-	camera_refine(num_points_curr, points_curr, projs_curr, camera, 0, 0);    
+	dll_camera_refine(num_points_curr, points_curr, projs_curr, camera, 0, 0);    
 
 	while (1)
 	{
 		//printf("[RefineCameraParameters] Calling with %d points\n", num_points_curr);
 
-		camera_refine(num_points_curr, points_curr, projs_curr, camera, 
+		dll_camera_refine(num_points_curr, points_curr, projs_curr, camera, 
 			adjust_focal ? 1 : 0, estimate_distortion ? 1 : 0);
 
 		if (!remove_outliers)
@@ -940,7 +942,7 @@ vector<int> RefineCameraParameters( int num_points,
 
 		for (int i = 0; i < num_points_curr; i++) 
 		{
-			v2_t pr = sfm_project_final(camera, points_curr[i], 1, estimate_distortion ? 1 : 0);
+			v2_t pr = dll_sfm_project_final(camera, points_curr[i], 1, estimate_distortion ? 1 : 0);
 
 			/*
 			if (optimize_for_fisheye)
@@ -962,8 +964,8 @@ vector<int> RefineCameraParameters( int num_points,
 		//printf("[RefineCameraParameters] Error: %0.3f\n", error / num_points_curr);
 
 		// Sort and histogram errors
-		double med = kth_element_copy(num_points_curr, 
-			iround(0.95 * num_points_curr),
+		double med = dll_kth_element_copy(num_points_curr, 
+			dll_iround(0.95 * num_points_curr),
 			errors);
 
 		// We will tolerate any match with projection error < 8.0
@@ -1097,12 +1099,12 @@ double RefinePoints(int num_points, v3_t *points, v2_t *projs,
 				double p3[3] = { fpt.cx, fpt.cy, 1.0 };
 				double K[9], Kinv[9];
 				GetIntrinsics(cameras[camera_idx], K);
-				matrix_invert(3, K, Kinv);
+				dll_matrix_invert(3, K, Kinv);
 
 				double p_n[3];
-				matrix_product(3, 3, 3, 1, Kinv, p3, p_n);
+				dll_matrix_product(3, 3, 3, 1, Kinv, p3, p_n);
 
-				pv[j] = v2_new(p_n[0], p_n[1]);
+				pv[j] = dll_v2_new(p_n[0], p_n[1]);
 
 				cam = cameras + camera_idx;
 			}
@@ -1111,27 +1113,27 @@ double RefinePoints(int num_points, v3_t *points, v2_t *projs,
 				double p3[3] = { Vx(projs[i]), Vy(projs[i]), 1.0 };
 				double K[9], Kinv[9];
 				GetIntrinsics(*camera_out, K);
-				matrix_invert(3, K, Kinv);
+				dll_matrix_invert(3, K, Kinv);
 
 				double p_n[3];
-				matrix_product(3, 3, 3, 1, Kinv, p3, p_n);
+				dll_matrix_product(3, 3, 3, 1, Kinv, p3, p_n);
 
-				pv[j] = v2_new(p_n[0], p_n[1]);
+				pv[j] = dll_v2_new(p_n[0], p_n[1]);
 				cam = camera_out;
 			}
 
 			memcpy(Rs + 9 * j, cam->R, 9 * sizeof(double));
 
-			matrix_product(3, 3, 3, 1, cam->R, cam->t, ts + 3 * j);
-			matrix_scale(3, 1, ts + 3 * j, -1.0, ts + 3 * j);
+			dll_matrix_product(3, 3, 3, 1, cam->R, cam->t, ts + 3 * j);
+			dll_matrix_scale(3, 1, ts + 3 * j, -1.0, ts + 3 * j);
 		}
 
 		// points[i] = triangulate_n(num_views, pv, Rs, ts, &error_curr);
 		double error_curr = 0.0;
-		points[i] = triangulate_n_refine(points[i], num_views, pv, Rs, ts, 
+		points[i] = dll_triangulate_n_refine(points[i], num_views, pv, Rs, ts, 
 			&error_curr);
 
-		v2_t pr = sfm_project_final(camera_out, points[i], 1,
+		v2_t pr = dll_sfm_project_final(camera_out, points[i], 1,
 			estimate_distortion ? 1 : 0);
 
 		double dx = Vx(pr) - Vx(projs[i]);
@@ -1283,19 +1285,31 @@ bool FindAndVerifyCamera(int num_points, v3_t *points_solve, v2_t *projs_solve,
 
 	if (num_points >= 9) 
 	{
-		r = find_projection_3x4_ransac(num_points, 
+		//for debug, print the 3D and 2D point, added by xiedonghai
+		FILE* fp = fopen("c:\\temp\\bundler_dlt.txt", "w");
+		for(int i=0; i<num_points; i++)
+		{
+			fprintf(fp, "%lf %lf %lf   %lf %lf \n", 
+				points_solve[i].p[0], points_solve[i].p[1], points_solve[i].p[2],
+				projs_solve[i].p[0], projs_solve[i].p[1]);
+		}
+		fclose(fp);
+		
+		r = dll_find_projection_3x4_ransac(num_points, 
 			points_solve, projs_solve, 
 			P, /* 2048 */ 4096 /* 100000 */, 
 			proj_estimation_threshold);
 	}
 
-	if (r == -1) {
+	if (r == -1) 
+	{
 		printf("[FindAndVerifyCamera] Couldn't find projection matrix\n");
 		return false;
 	}
 
 	/* If number of inliers is too low, fail */
-	if (r <= MIN_INLIERS_EST_PROJECTION) {
+	if (r <= MIN_INLIERS_EST_PROJECTION) 
+	{
 		printf("[FindAndVerifyCamera] Too few inliers to use "
 			"projection matrix\n");
 		return false;
@@ -1306,17 +1320,17 @@ bool FindAndVerifyCamera(int num_points, v3_t *points_solve, v2_t *projs_solve,
 	memcpy(KRinit + 3, P + 4, 3 * sizeof(double));
 	memcpy(KRinit + 6, P + 8, 3 * sizeof(double));
 
-	dgerqf_driver(3, 3, KRinit, Kinit, Rinit);	    
+	dll_dgerqf_driver(3, 3, KRinit, Kinit, Rinit);	    
 
 	/* We want our intrinsics to have a certain form */
 	FixIntrinsics(P, Kinit, Rinit, tinit);
-	matrix_scale(3, 3, Kinit, 1.0 / Kinit[8], Kinit);
+	dll_matrix_scale(3, 3, Kinit, 1.0 / Kinit[8], Kinit);
 
 	printf("[FindAndVerifyCamera] Estimated intrinsics:\n");
-	matrix_print(3, 3, Kinit);
+	dll_matrix_print(3, 3, Kinit);
 	printf("[FindAndVerifyCamera] Estimated extrinsics:\n");
-	matrix_print(3, 3, Rinit);
-	matrix_print(1, 3, tinit);
+	dll_matrix_print(3, 3, Rinit);
+	dll_matrix_print(1, 3, tinit);
 	fflush(stdout);
 
 	/* Check cheirality constraint */
@@ -1334,8 +1348,8 @@ bool FindAndVerifyCamera(int num_points, v3_t *points_solve, v2_t *projs_solve,
 			Vz(points_solve[j]), 1.0 };
 		double q[3], q2[3];
 
-		matrix_product(3, 4, 4, 1, Rigid, p, q);
-		matrix_product331(Kinit, q, q2);
+		dll_matrix_product(3, 4, 4, 1, Rigid, p, q);
+		dll_matrix_product331(Kinit, q, q2);
 
 		double pimg[2] = { -q2[0] / q2[2], -q2[1] / q2[2] };
 		double diff = 
@@ -1374,7 +1388,7 @@ bool FindAndVerifyCamera(int num_points, v3_t *points_solve, v2_t *projs_solve,
 
 	// #define COLIN_HACK
 #ifdef COLIN_HACK
-	matrix_ident(3, R);
+	dll_matrix_ident(3, R);
 	t[0] = t[1] = t[2] = 0.0;
 #endif
 
@@ -1464,7 +1478,7 @@ camera_params_t BundleInitializeImage( const vector<TrackInfo>& trackSeq,
 		*/
 		{   
 			FeatPoint keypt = pNewImageData->GetKeyPoint(key);
-			projs_solve[num_pts_solve] = v2_new(keypt.cx, keypt.cy); //v2_new( data.m_keys[key].m_x, data.m_keys[key].m_y);
+			projs_solve[num_pts_solve] = dll_v2_new(keypt.cx, keypt.cy); //v2_new( data.m_keys[key].m_x, data.m_keys[key].m_y);
 		}
 		idxs_solve[num_pts_solve] = pt;
 		keys_solve[num_pts_solve] = key;
@@ -1522,8 +1536,8 @@ camera_params_t BundleInitializeImage( const vector<TrackInfo>& trackSeq,
 	{
 		/* Set up the new camera */
 		memcpy(camera_new.R, Rinit, 9 * sizeof(double));
-		matrix_transpose_product(3, 3, 3, 1, Rinit, tinit, camera_new.t);
-		matrix_scale(3, 1, camera_new.t, -1.0, camera_new.t);
+		dll_matrix_transpose_product(3, 3, 3, 1, Rinit, tinit, camera_new.t);
+		dll_matrix_scale(3, 1, camera_new.t, -1.0, camera_new.t);
 		
 		/* Set up the new focal length */
 		
@@ -1736,21 +1750,21 @@ int RemoveBadPointsAndCameras(int num_points, int num_cameras,
 			int v1 = pt_views[i][j].first;
 
 			double r1[3];
-			matrix_diff(3, 1, 3, 1, pos, cameras[v1].t, r1);
-			double norm = matrix_norm(3, 1, r1);
-			matrix_scale(3, 1, r1, 1.0 / norm, r1);
+			dll_matrix_diff(3, 1, 3, 1, pos, cameras[v1].t, r1);
+			double norm = dll_matrix_norm(3, 1, r1);
+			dll_matrix_scale(3, 1, r1, 1.0 / norm, r1);
 
 			for (int k = j+1; k < num_views; k++) 
 			{
 				int v2 = pt_views[i][k].first;
 
 				double r2[3];
-				matrix_diff(3, 1, 3, 1, pos, cameras[v2].t, r2);
-				double norm = matrix_norm(3, 1, r2);
-				matrix_scale(3, 1, r2, 1.0 / norm, r2);
+				dll_matrix_diff(3, 1, 3, 1, pos, cameras[v2].t, r2);
+				double norm = dll_matrix_norm(3, 1, r2);
+				dll_matrix_scale(3, 1, r2, 1.0 / norm, r2);
 
 				double dot;
-				matrix_product(1, 3, 3, 1, r1, r2, &dot);
+				dll_matrix_product(1, 3, 3, 1, r1, r2, &dot);
 
 				double angle = 
 					acos(CLAMP(dot, -1.0 + 1.0e-8, 1.0 - 1.0e-8));
@@ -1895,7 +1909,7 @@ double runSFMApi( int num_pts, int num_cameras, int start_camera,
 
 		//clock_t start = clock();
 
-		run_sfm(nz_count, num_cameras, start_camera, vmask, projections, 
+		dll_run_sfm(nz_count, num_cameras, start_camera, vmask, projections, 
 			    fixed_focal?0:1, 0,
 			    estimate_distortion?1:0, 1,
 				init_camera_params, nz_pts, 
@@ -1992,7 +2006,7 @@ double runSFMApi( int num_pts, int num_cameras, int start_camera,
 					b[1] = Vy(nz_pts[remap[pt_idx]]);
 					b[2] = Vz(nz_pts[remap[pt_idx]]);
 
-					sfm_project_rd(&(init_camera_params[i]), K, 
+					dll_sfm_project_rd(&(init_camera_params[i]), K, 
 						init_camera_params[i].k,
 						init_camera_params[i].R, dt, b, pr, 
 						estimate_distortion, true);
@@ -2018,11 +2032,11 @@ double runSFMApi( int num_pts, int num_cameras, int start_camera,
 			}
 
 			//Estimate the median of the distances 
-			double med = kth_element_copy(num_pts_proj, 
-				iround(0.8 * num_pts_proj),
+			double med = dll_kth_element_copy(num_pts_proj, 
+				dll_iround(0.8 * num_pts_proj),
 				dists);
 
-			median_copy(num_pts_proj, dists);
+			dll_median_copy(num_pts_proj, dists);
 
 			double thresh = 1.2 * NUM_STDDEV * med;  // k * stddev
 			thresh = CLAMP(thresh, MIN_PROJ_ERROR_THRESHOLD, MAX_PROJ_ERROR_THRESHOLD);  
@@ -2382,7 +2396,7 @@ int DoSFM( vector<TrackInfo> trackSeq, vector<ImgFeature> imageFeatures, vector<
 		SetConstraints(pCameras+i, est_focal_length, undistort);
 	}
 
-	run_sfm(num_pts, 
+	dll_run_sfm(num_pts, 
 		num_cameras, 
 		ncons, 
 		vmask, 
@@ -2574,7 +2588,7 @@ int CSBA::RunSFM(vector<Point3DDouble> pt3, vector<ImageKeyVector> ptViews,
 		SetConstraints(pCameras+i, est_focal_length, undistort);
 	}
 
-	run_sfm(num_pts, 
+	dll_run_sfm(num_pts, 
 		    num_cameras, 
 			ncons, 
 			vmask, 
@@ -2671,8 +2685,9 @@ int CSBA::BundleAdjust(int numCameras, vector<CameraPara>& cameras, vector<CImag
 			index = i;
 		}
 	}
+
 	//for debug
-	//index = 0;
+	index = 0;
 	int leftImageId  = pairMatchs[index].lId;
 	int rightImageId = pairMatchs[index].rId;
 	vector<MatchPairIndex> mp = GetMatchList(leftImageId, rightImageId, imageData);
@@ -2801,7 +2816,7 @@ int CSBA::BundleAdjust(int numCameras, vector<CameraPara>& cameras, vector<CImag
 		else
 		{
 			// int nMatches = MIN(100, iround(0.75 /* 0.9 */ * max_matches));
-			int nMatches = iround(0.75 /* 0.9 */ * max_matches);
+			int nMatches = dll_iround(0.75 /* 0.9 */ * max_matches);
 			image_set = FindCamerasWithNMatches(nMatches,curr_num_cameras, 
 										added_order, imageData,
 										tracks,	pt_views);
@@ -2816,7 +2831,7 @@ int CSBA::BundleAdjust(int numCameras, vector<CameraPara>& cameras, vector<CImag
 		int image_count = 0;
 		for (int i = 0; i < num_added_images; i++) 
 		{
-			int next_idx = image_set[i].first;
+			int next_idx   = image_set[i].first;
 			int parent_idx = image_set[i].second;
 
 			added_order[curr_num_cameras + image_count] = next_idx;

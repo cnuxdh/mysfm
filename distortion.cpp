@@ -22,9 +22,11 @@
 
 #include "distortion.hpp"
 
-#include "matrix/matrix.h"
-#include "sfm.h"
-#include "vector.h"
+#include "baselib.h"
+
+//#include "matrix/matrix.h"
+//#include "sfm.h"
+//#include "vector.h"
 
 void InvertDistortion(int n_in, int n_out, double r0, double r1, 
                       double *k_in, double *k_out)
@@ -56,7 +58,7 @@ void InvertDistortion(int n_in, int n_out, double r0, double r1,
         b[i] = t;
     }
 
-    dgelsy_driver(A, b, k_out, num_eqns, num_vars, 1);
+    dll_dgelsy_driver(A, b, k_out, num_eqns, num_vars, 1);
 
 #if 0
     printf("[InvertDistortion] Output poly: ");
@@ -103,5 +105,5 @@ v2_t UndistortNormalizedPoint(v2_t p, camera_params_t c)
 
     double factor = a / r;
     
-    return v2_scale(factor, p);
+    return dll_v2_scale(factor, p);
 }

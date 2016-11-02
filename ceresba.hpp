@@ -21,6 +21,7 @@
 #include "ceres/rotation.h"
 #endif
 
+
 #include <vector>
 using namespace std;
 
@@ -34,12 +35,12 @@ using namespace std;
 // (i.e. it is assumed be located at the image center).
 
 #ifdef CERES_LIB
+
 struct SFMReprojectionError 
 {
 	SFMReprojectionError(double observed_x, double observed_y)
 		: observed_x(observed_x), observed_y(observed_y) {}
-
-
+	
 	template <typename T>
 	bool operator()(const T* const cameraIn,  //3 interior camera parameters
 					const T* const cameraOut, //6 outer camera parameters
@@ -109,7 +110,6 @@ struct SFMReprojectionError
 		residuals[0] = ix1 - T(observed_x);
 		residuals[1] = iy1 - T(observed_y);
 
-
 		//printf("rx: %lf , ry: %lf \n", residuals[0], residuals[1]);
 
 		return true;
@@ -126,6 +126,11 @@ struct SFMReprojectionError
 	double observed_x;
 	double observed_y;
 };
+
+
+
+
+
 
 int CeresBA( vector<TrackInfo> trackSeq, vector<ImgFeature> imageFeatures, 
 			/*vector<int> cameraIDOrder,*/	vector<CameraPara> &cameras);

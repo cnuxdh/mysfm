@@ -4,15 +4,17 @@
 #include "float.h"
 #include "math.h"
 
-
 #include "ba.hpp"
 #include "cali.hpp"
 #include "relativepose.hpp"
 #include "distortion.hpp"
 #include "bundlerio.hpp"
 
+
 //matrix
 #include "matrix/matrix.h"
+
+
 
 ///////////////////////////////////////////////////////////////////////////////////////
 //select the new image to insert into the bundle adjustment
@@ -36,6 +38,7 @@ int SelectNewImage(vector<int> cameraVisited,
 			int nImageId = tracks[nTrackId].views[j].first;
 			int nPtId = tracks[nTrackId].views[j].second;
 
+			//ignore the cameras already added
 			if( cameraVisited[nImageId] > 0 )
 				continue;
 
@@ -75,7 +78,7 @@ int UpdateBATracks( int newCameraIndex, vector<int> cameraVisited,
 		ik.first  = newCameraIndex;
 		ik.second = i; 
 
-		if(nNewTrackIndex>0) //corresponding to the new Track sequence
+		if(nNewTrackIndex>=0) //corresponding to the new Track sequence
 		{
 			trackSeqNew[nNewTrackIndex].views.push_back(ik);
 		}
@@ -83,6 +86,7 @@ int UpdateBATracks( int newCameraIndex, vector<int> cameraVisited,
 		{
 			TrackInfo newTrack;
 			newTrack.extra = nTrackIndex;
+
 
 			newTrack.views.push_back(ik);
 
@@ -100,6 +104,7 @@ int UpdateBATracks( int newCameraIndex, vector<int> cameraVisited,
 
 			if(newTrack.views.size()>1)
 			{
+				tracks[nTrackIndex].extra = trackSeqNew.size(); //added by xdh, 2016.10.31
 				trackSeqNew.push_back(newTrack);
 			}
 		}
@@ -151,21 +156,17 @@ int CaculateTrackSeqGrd(vector<ImgFeature>&  imageFeatures,
 		pTriangulate->Triangulate(pts, cams, gps, true, ferror);
 
 		tracks[i].derror = ferror;
-
-		/*if(ferror<4)
-		{
-			TrackInfo tp;
-			tp = tracks[i];
-			tp.grd = gps;
-
-			newTracks.push_back(tp);
-		}*/
+		tracks[i].grd = gps;
 	}
-
-	//tracks = newTracks;
 
 	return 0;
 }
+
+
+//adjust the camera parameters only, assuming the 3D points are right
+
+
+
 
 int CalculateNewCamParas(int nCameraId, 
 	vector<ImgFeature>&  imageFeatures,
@@ -173,13 +174,17 @@ int CalculateNewCamParas(int nCameraId,
 	vector<TrackInfo>& tracks,
 	CameraPara& cam )
 {
-
 	vector<Point3DDouble> pt3;
 	vector<Point2DDouble> pt2;
 
+	//collect the track corresponding to the new camera
 	for(int i=0; i<trackSeqNew.size(); i++)
 	{
-		int nTrackId = trackSeqNew[i].extra; //find the original track
+		int nTrackId = trackSeqNew[i].extra;              //find the original track
+
+		//ignore the track with large projection error
+		if( trackSeqNew[i].derror > 16 )
+			continue;
 
 		for(int j=0; j<tracks[nTrackId].views.size(); j++)
 		{
@@ -188,6 +193,7 @@ int CalculateNewCamParas(int nCameraId,
 
 			if(nImageId == nCameraId)
 			{
+
 				pt3.push_back( trackSeqNew[i].grd );
 
 				Point2DDouble p2;
@@ -198,10 +204,20 @@ int CalculateNewCamParas(int nCameraId,
 		}
 	}
 
+	//ransac DLT calculation
 	CPoseEstimationBase* pPE = new CDLTPose();
-	pPE->EstimatePose(pt3, pt2, cam);
-	
+	int r = pPE->EstimatePose(pt3, pt2, cam);
 	delete pPE;
+
+	//if successful, do bundle adjustment
+	if(r==0)
+	{
+
+	}
+	else
+	{
+		return -1;
+	}
 
 	return 0;
 }
@@ -288,6 +304,7 @@ int CeresBA( vector<TrackInfo> trackSeq, vector<ImgFeature> imageFeatures,
 	{   
 		int index = goodTrackIndex[i];
 		int nview = trackSeq[index].views.size();
+
 		for(int j=0; j<nview; j++)
 		{
 			int cameraID = trackSeq[index].views[j].first;
@@ -379,6 +396,7 @@ int CeresBA( vector<TrackInfo> trackSeq, vector<ImgFeature> imageFeatures,
 		trackSeq[index].grd.p[1] = grdPt[i*3+1];
 		trackSeq[index].grd.p[2] = grdPt[i*3+2];
 	}
+
 	return 0;
 }
 #endif
@@ -434,6 +452,7 @@ int CCeresBA::BundleAdjust(int numCameras,
 	vector<TrackInfo> trackSeq;  //current tracks for bundle adjustment
 	GetMatch(leftImageId, rightImageId, tracks, trackSeq);    
 
+
 	cameraVisited[leftImageId]  = 1;
 	cameraVisited[rightImageId] = 1;
 
@@ -483,19 +502,8 @@ int CCeresBA::BundleAdjust(int numCameras,
 	vector<int> cameraIDOrder;
 	cameraIDOrder.push_back(leftImageId);
 	cameraIDOrder.push_back(rightImageId);
-
-	//vector<TrackInfo> trackSeqNew;
 	for(int i=0; i<gpts.size(); i++)
 	{
-		/*
-		if( errorarray[i]<4 )
-		{
-			TrackInfo tp;
-			tp     = trackSeq[i];
-			tp.grd = gpts[i];
-			trackSeqNew.push_back(tp);
-		}
-		*/
 		trackSeq[i].grd = gpts[i];
 		trackSeq[i].derror = errorarray[i];
 	}
@@ -504,6 +512,10 @@ int CCeresBA::BundleAdjust(int numCameras,
 #ifdef CERES_LIB
 	CeresBA(trackSeq, imageFeatures, cameras);
 #endif	
+	
+	//update the track coordinates
+	CaculateTrackSeqGrd(imageFeatures, trackSeq, cameras, true);
+
 
 	//3. adding new images
 	while(1)
@@ -515,9 +527,11 @@ int CCeresBA::BundleAdjust(int numCameras,
 
 		//calculate the camera parameters of new selected
 		CalculateNewCamParas(newCameraIndex, imageFeatures, trackSeq, tracks, cameras[newCameraIndex]);
-
+		 
+		//update tracks according to the new image 
 		UpdateBATracks(newCameraIndex, cameraVisited, imageFeatures, tracks, trackSeq);
 
+		//update the track point 3D coordinate
 		CaculateTrackSeqGrd(imageFeatures, trackSeq, cameras, true);
 		
 		cameraVisited[newCameraIndex] = 1;
@@ -525,8 +539,37 @@ int CCeresBA::BundleAdjust(int numCameras,
 #ifdef CERES_LIB
 		CeresBA(trackSeq, imageFeatures, cameras);
 #endif	
-
 	}
+
+	//update the track coordinates
+	CaculateTrackSeqGrd(imageFeatures, trackSeq, cameras, true);
+	
+	//save the ba results: camera position, track points
+	vector<Point3DDouble> goodGrds;
+	printf("output the optimized track points.... \n");
+	for(int i=0; i<trackSeq.size(); i++)
+	{
+		if( trackSeq[i].derror < 4 )
+		{
+			goodGrds.push_back( trackSeq[i].grd );
+			for(int j=0; j<trackSeq[i].views.size(); j++)
+			{
+				printf("%d %d ", trackSeq[i].views[j].first, trackSeq[i].views[j].second);
+			}
+			printf("\n");
+		}
+	}
+	for(int i=0; i<cameras.size(); i++)
+	{
+		Point3DDouble cp;
+		cp.p[0] = cameras[i].t[0];
+		cp.p[1] = cameras[i].t[1];
+		cp.p[2] = cameras[i].t[2];
+		goodGrds.push_back( cp );
+	}
+
+	WritePMVSPly("c:\\temp\\ba.ply", goodGrds);
+
 
 	return 0;
 }

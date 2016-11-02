@@ -20,19 +20,19 @@
 //coredll
 #include "main.h"
 
-
+#include "baselib.h"
 
 
 //matrix
-#include "matrix/matrix.h"
+//#include "matrix/matrix.h"
 
 
 //imagelib
-#include "homography.h"
-#include "horn.h"
-#include "matrix.h"
-#include "tps.h"
-#include "vector.h"
+//#include "homography.h"
+//#include "horn.h"
+//#include "matrix.h"
+//#include "tps.h"
+//#include "vector.h"
 
 
 using namespace std;
@@ -61,7 +61,7 @@ static int CountInliers(const vector<stPtFeature> &k1,
 		p[2] = 1.0;
 
 		double q[3];
-		matrix_product(3, 3, 3, 1, M, p, q);
+		dll_matrix_product(3, 3, 3, 1, M, p, q);
 
 		double qx = q[0] / q[2];
 		double qy = q[1] / q[2];
@@ -107,7 +107,7 @@ static int LeastSquaresFit(const vector<stPtFeature> &k1,
 		r[2] = 1.0;	
 
 		double rp[3];
-		matrix_product(3, 3, 3, 1, M, l, rp);
+		dll_matrix_product(3, 3, 3, 1, M, l, rp);
 
 		rp[0] /= rp[2];
 		rp[1] /= rp[2];
@@ -142,14 +142,14 @@ static int LeastSquaresFit(const vector<stPtFeature> &k1,
 	case MotionRigid: 
 		{
 			double R[9], T[9], Tout[9], scale;
-			align_horn((int) inliers.size(), r_pts, l_pts, R, T, Tout, &scale, weight);
+			dll_align_horn((int) inliers.size(), r_pts, l_pts, R, T, Tout, &scale, weight);
 			memcpy(M, Tout, 9 * sizeof(double));
 			break;
 		}
 
 	case MotionHomography: 
 		{
-			align_homography((int) inliers.size(), r_pts, l_pts, M, 1);
+			dll_align_homography((int) inliers.size(), r_pts, l_pts, M, 1);
 			break;
 		}
 	}
@@ -171,7 +171,7 @@ static int LeastSquaresFit(const vector<stPtFeature> &k1,
 		r[2] = 1.0;	
 
 		double rp[3];
-		matrix_product(3, 3, 3, 1, M, l, rp);
+		dll_matrix_product(3, 3, 3, 1, M, l, rp);
 
 		rp[0] /= rp[2];
 		rp[1] /= rp[2];
@@ -277,14 +277,14 @@ vector<int> EstimateTransform(const vector<stPtFeature> &k1,
 		case MotionRigid: 
 			{
 				double R[9], T[9], Tout[9], scale;
-				align_horn(min_matches, r_pts, l_pts, R, T, Tout, &scale, weight);
+				dll_align_horn(min_matches, r_pts, l_pts, R, T, Tout, &scale, weight);
 				memcpy(Mcurr, Tout, 9 * sizeof(double));
 				break;
 			}
 
 		case MotionHomography: 
 			{
-				align_homography(min_matches, r_pts, l_pts, Mcurr, 1);
+				dll_align_homography(min_matches, r_pts, l_pts, Mcurr, 1);
 				break;
 			}
 		}

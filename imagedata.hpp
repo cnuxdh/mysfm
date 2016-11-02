@@ -98,7 +98,7 @@ private:
 	ImgFeature   m_imageFeature;
 	char         m_strFileName[256];
 	vector<int>  m_visible_points;  //the track id to each feature point
-  vector<int>  m_visible_keys;    //the point id to each feature point
+    vector<int>  m_visible_keys;    //the point id to each feature point
 
 	//resized height and width
 	int          m_ht;
