@@ -293,6 +293,39 @@ DLL_EXPORT int WritePMVSPly(char* filename, const vector<Point3DDouble>& gpts)
 	return 0;
 }
 
+DLL_EXPORT int WritePMVSPly(char* filename, const vector<Point3DDouble>& gpts, 
+	const vector<Point3DDouble>& colors)
+{
+
+	FILE* fp = fopen(filename, "w");
+	fprintf(fp, "ply \n");
+	fprintf(fp, "format ascii 1.0 \n");
+	fprintf(fp, "element vertex %d \n", gpts.size());
+	fprintf(fp, "property float x \n");
+	fprintf(fp, "property float y \n");
+	fprintf(fp, "property float z \n");
+	fprintf(fp, "property float nx \n");
+	fprintf(fp, "property float ny \n");
+	fprintf(fp, "property float nz \n");
+	fprintf(fp, "property uchar diffuse_red \n");
+	fprintf(fp, "property uchar diffuse_green \n");
+	fprintf(fp, "property uchar diffuse_blue \n");
+	fprintf(fp, "end_header \n");
+
+	for(int i=0; i<gpts.size(); i++)
+	{
+		fprintf(fp, "%lf %lf %lf  %lf %lf %lf %d %d %d \n",
+			gpts[i].p[0],  gpts[i].p[1], gpts[i].p[2],
+			1.0,1.0,1.0, int(colors[i].p[0]), int(colors[i].p[1]) , int(colors[i].p[2]));
+	}
+
+	fclose(fp);
+
+
+	return 0;
+}
+
+
 int ReadPMVSPly(char* filename, stTrack** tracks, int* nTrack)
 {
 	char sline[256];

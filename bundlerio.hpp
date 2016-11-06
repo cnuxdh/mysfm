@@ -36,7 +36,8 @@ DLL_EXPORT int WritePMVSPly(char* filename,
 
 DLL_EXPORT int WritePMVSPly(char* filename, const vector<Point3DDouble>& gpts);
 
-
+DLL_EXPORT int WritePMVSPly(char* filename, const vector<Point3DDouble>& gpts, 
+	const vector<Point3DDouble>& colors);
 
 
 //////////////////////////////////////////////////////////////////////////

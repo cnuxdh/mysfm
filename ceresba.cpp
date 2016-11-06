@@ -265,27 +265,43 @@ int CalculateNewCamParas(int nCameraId,
 int CeresBA( vector<TrackInfo> trackSeq, vector<ImgFeature> imageFeatures, 
 			 /*vector<int> cameraIDOrder,*/	vector<CameraPara> &cameras)
 {
-	//int  num_pts = trackSeq.size();
 	int  num_cameras = cameras.size(); 
 
-	//collect camera parameters
+	//insert intrinsic camera parameters
 	double* pInteriorParams = new double[3];          //focal length, k1, k2
 	pInteriorParams[0] = cameras[0].focus;
 	pInteriorParams[1] = 0;
 	pInteriorParams[2] = 0;	
 	
-	double* pOuterParams = new double[num_cameras*6]; //omiga, phi, kapa, t0,t1,t2
+	//insert extrinsic camera parameters
+	double* pOuterParams = new double[num_cameras*6]; //axis-angle vector, t0,t1,t2
 	for(int i=0; i<num_cameras; i++)
-	{
+	{		
 		double aa[3];
 		rot2aa(cameras[i].R, aa);
 		pOuterParams[i*6]   = aa[0];
 		pOuterParams[i*6+1] = aa[1];
 		pOuterParams[i*6+2] = aa[2];
+		
+		/*
+		pOuterParams[i*6]   = cameras[i].ax;
+		pOuterParams[i*6+1] = cameras[i].ay;
+		pOuterParams[i*6+2] = cameras[i].az;
+		*/
 
-		pOuterParams[i*6+3] = cameras[i].t[0];
-		pOuterParams[i*6+4] = cameras[i].t[1];
-		pOuterParams[i*6+5] = cameras[i].t[2];
+		double iR[9];
+		memcpy(iR, cameras[i].R, sizeof(double)*9);
+		invers_matrix(iR, 3);
+		double it[3];
+		mult(iR, cameras[i].t, it, 3, 3, 1);
+
+		pOuterParams[i*6+3] = -it[0];
+		pOuterParams[i*6+4] = -it[1];
+		pOuterParams[i*6+5] = -it[2];
+		
+		//pOuterParams[i*6+3] = cameras[i].t[0];
+		//pOuterParams[i*6+4] = cameras[i].t[1];
+		//pOuterParams[i*6+5] = cameras[i].t[2];
 	}
 	
 	//find the reasonable tracks 
@@ -297,7 +313,7 @@ int CeresBA( vector<TrackInfo> trackSeq, vector<ImgFeature> imageFeatures,
 	}
 	int num_pts = goodTrackIndex.size();
 
-	//collect ground points
+	//insert ground point parameters
 	double* grdPt = new double[num_pts*3]; //(double*)malloc( _pts*3*sizeof(double) );
 	for(int i=0; i<num_pts; i++)
 	{
@@ -323,7 +339,6 @@ int CeresBA( vector<TrackInfo> trackSeq, vector<ImgFeature> imageFeatures,
 
 	double* projections = new double[nProjection*2]; //(double*)malloc(nProjection*2*sizeof(double));
 	int ip = 0;
-	//for(int i=0; i<trackSeq.size(); i++)
 	for(int i=0; i<goodTrackIndex.size(); i++)
 	{   
 		int index = goodTrackIndex[i];
@@ -355,6 +370,8 @@ int CeresBA( vector<TrackInfo> trackSeq, vector<ImgFeature> imageFeatures,
 		ceres::CostFunction* cost_function =
 			SFMReprojectionError::Create(projections[2 * i + 0], projections[2 * i + 1]);
 
+		//printf("%lf %lf \n", projections[2 * i + 0], projections[2 * i + 1] );
+
 		int cameraId = vecCamIndex[i];
 		int trackId  = vecTrackIndex[i];
 		
@@ -372,9 +389,13 @@ int CeresBA( vector<TrackInfo> trackSeq, vector<ImgFeature> imageFeatures,
 	options.linear_solver_type = ceres::DENSE_SCHUR;
 	options.minimizer_progress_to_stdout = true;
 
+	cout<<"NumParameterBlocks: "<<problem.NumParameterBlocks()<<"\n";
+	cout<<"NumResidualBlocks: "<<problem.NumResidualBlocks()<<"\n";
+	cout<<"NumParameters: "<<problem.NumParameters()<<"\n";
+
 	ceres::Solver::Summary summary;
 	ceres::Solve(options, &problem, &summary);
-	std::cout << summary.FullReport() << "\n";
+	//std::cout << summary.FullReport() << "\n";
 
 	std::cout<<"optimized results: "<<"\n";
 
@@ -386,15 +407,18 @@ int CeresBA( vector<TrackInfo> trackSeq, vector<ImgFeature> imageFeatures,
 	printf("Extrisic parameters ...\n");
 	for(int i=0; i<num_cameras; i++)
 	{
+		/*
 		for(int j=0; j<6; j++)
 		{
 			std::cout<<pOuterParams[i*6+j]<<"   ";
 		}
+		*/
 		
 		cameras[i].focus = pInteriorParams[0];
 		cameras[i].k1    = pInteriorParams[1];
 		cameras[i].k2    = pInteriorParams[2];
 		
+		//from axis-angle to rotation matrix
 		double aa[3];
 		aa[0] = pOuterParams[i*6];
 		aa[1] = pOuterParams[i*6+1];
@@ -409,10 +433,37 @@ int CeresBA( vector<TrackInfo> trackSeq, vector<ImgFeature> imageFeatures,
 		cameras[i].ax = ea[0];
 		cameras[i].ay = ea[1];
 		cameras[i].az = ea[2];
+		
+		cout<<"Angle: "<< cameras[i].ax <<" "<< cameras[i].ay<<" " << cameras[i].az << "\n"; 
 
-		cameras[i].t[0] = pOuterParams[i*6+3];
-		cameras[i].t[1] = pOuterParams[i*6+4];
-		cameras[i].t[2] = pOuterParams[i*6+5];
+		/*
+		double ax,ay,az;
+		ax = pOuterParams[i*6];
+		ay = pOuterParams[i*6+1];
+		az = pOuterParams[i*6+2];
+		GenerateRMatrixDirect(ax,ay,az,cameras[i].R);
+		double ea[3];
+		rot2eular(cameras[i].R, ea);
+		cameras[i].ax = ea[0];
+		cameras[i].ay = ea[1];
+		cameras[i].ay = ea[2];
+		*/
+
+		//from RX+T to RX-T
+		double iR[9];
+		memcpy(iR, R, sizeof(double)*9);
+		invers_matrix(iR, 3);
+		double it[3];
+		it[0] = pOuterParams[i*6+3];
+		it[1] = pOuterParams[i*6+4];
+		it[2] = pOuterParams[i*6+5];
+		double et[3];
+		mult(iR, it, et, 3, 3, 1);
+		cameras[i].t[0] = -et[0];
+		cameras[i].t[1] = -et[1];
+		cameras[i].t[2] = -et[2];
+
+		cout<<"Translation: "<<cameras[i].t[0]<<" "<<cameras[i].t[1]<<" "<<cameras[i].t[2]<<"\n";
 
 		std::cout<<endl;
 	}
@@ -432,7 +483,6 @@ int CeresBA( vector<TrackInfo> trackSeq, vector<ImgFeature> imageFeatures,
 
 int CeresBA( vector<Point3DDouble>& grdPts, vector<Point2DDouble>& imgPts, CameraPara& camera )
 {
-
 	double  pInteriorParams[3];
 	double  pOuterParams[6];
 
@@ -455,9 +505,19 @@ int CeresBA( vector<Point3DDouble>& grdPts, vector<Point2DDouble>& imgPts, Camer
 	pOuterParams[1] = aa[1];
 	pOuterParams[2] = aa[2];
 
-	pOuterParams[3] = camera.t[0]; 
-	pOuterParams[4] = camera.t[1];
-	pOuterParams[5] = camera.t[2];
+	double iR[9];
+	memcpy(iR, camera.R, sizeof(double)*9);
+	invers_matrix(iR, 3);
+	double it[3];
+	mult(iR, camera.t, it, 3, 3, 1);
+
+	pOuterParams[3] = -it[0];
+	pOuterParams[4] = -it[1];
+	pOuterParams[5] = -it[2];
+
+	//pOuterParams[3] = camera.t[0]; 
+	//pOuterParams[4] = camera.t[1];
+	//pOuterParams[5] = camera.t[2];
 	
 	printf("3D Points: %d \n", grdPts.size());
 
@@ -483,7 +543,7 @@ int CeresBA( vector<Point3DDouble>& grdPts, vector<Point2DDouble>& imgPts, Camer
 
 	ceres::Solver::Summary summary;
 	ceres::Solve(options, &problem, &summary);
-	std::cout << summary.FullReport() << "\n";
+	//std::cout << summary.FullReport() << "\n";
 
 	std::cout<<"optimized results: "<<"\n";
 	printf("Inner parameters... \n");
@@ -503,8 +563,8 @@ int CeresBA( vector<Point3DDouble>& grdPts, vector<Point2DDouble>& imgPts, Camer
 	camera.k1    = pInteriorParams[1];
 	camera.k2    = pInteriorParams[2];
 	
-	aa[3];
-	aa[0] = pOuterParams[0] ;
+	//aa[3];
+	aa[0] = pOuterParams[0];
 	aa[1] = pOuterParams[1];
 	aa[2] = pOuterParams[2];
 	double Rt[9];
@@ -519,11 +579,24 @@ int CeresBA( vector<Point3DDouble>& grdPts, vector<Point2DDouble>& imgPts, Camer
 	camera.ay = ea[1];
 	camera.az = ea[2];
 
-	camera.t[0] = pOuterParams[3];
-	camera.t[1] = pOuterParams[4];
-	camera.t[2] = pOuterParams[5];
 
-	
+	//double iR[9];
+	memcpy(iR, R, sizeof(double)*9);
+	invers_matrix(iR, 3);
+	//double it[3];
+	it[0] = pOuterParams[3];
+	it[1] = pOuterParams[4];
+	it[2] = pOuterParams[5];
+	double et[3];
+	mult(iR, it, et, 3, 3, 1);
+	camera.t[0] = -et[0];
+	camera.t[1] = -et[1];
+	camera.t[2] = -et[2];
+
+	//camera.t[0] = pOuterParams[3];
+	//camera.t[1] = pOuterParams[4];
+	//camera.t[2] = pOuterParams[5];
+		
 	std::cout<<endl;
 
 	return 0;
@@ -634,12 +707,19 @@ int CCeresBA::BundleAdjust(int numCameras,
 	vector<int> cameraIDOrder;
 	cameraIDOrder.push_back(leftImageId);
 	cameraIDOrder.push_back(rightImageId);
+	vector<Point3DDouble> goodPts;
 	for(int i=0; i<gpts.size(); i++)
 	{
 		trackSeq[i].grd = gpts[i];
 		trackSeq[i].derror = errorarray[i];
+
+		if( errorarray[i]<4 )
+			goodPts.push_back( gpts[i] );
 	}
-	WritePMVSPly("c:\\temp\\pair.ply", gpts);
+
+
+	WritePMVSPly("c:\\temp\\pair.ply", goodPts);
+
 
 #ifdef CERES_LIB
 	CeresBA(trackSeq, imageFeatures, cameras);
@@ -679,13 +759,20 @@ int CCeresBA::BundleAdjust(int numCameras,
 		
 	//save the ba results: camera position, track points
 	vector<Point3DDouble> goodGrds;
+	vector<Point3DDouble> colors;
 	printf("output the optimized track points.... \n");
 	for(int i=0; i<trackSeq.size(); i++)
 	{
-		if( trackSeq[i].derror < 4 )
+		if( trackSeq[i].derror<4 )
 		{
 			goodGrds.push_back( trackSeq[i].grd );
-			
+
+			Point3DDouble ptColor;
+			ptColor.p[0] = 255;
+			ptColor.p[1] = 0;
+			ptColor.p[2] = 0;
+			colors.push_back(ptColor);
+
 			/*for(int j=0; j<trackSeq[i].views.size(); j++)
 			{
 				printf("%d %d ", trackSeq[i].views[j].first, trackSeq[i].views[j].second);
@@ -699,10 +786,17 @@ int CCeresBA::BundleAdjust(int numCameras,
 		cp.p[0] = cameras[i].t[0];
 		cp.p[1] = cameras[i].t[1];
 		cp.p[2] = cameras[i].t[2];
+
+		Point3DDouble camColor;
+		camColor.p[0] = 0;
+		camColor.p[1] = 255;
+		camColor.p[2] = 0;
+		colors.push_back(camColor);
+
 		goodGrds.push_back( cp );
 	}
 
-	WritePMVSPly("c:\\temp\\ba.ply", goodGrds);
+	WritePMVSPly("c:\\temp\\ba.ply", goodGrds, colors);
 	
 	return 0;
 }

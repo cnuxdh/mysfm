@@ -39,6 +39,57 @@ using namespace std;
 
 #ifdef CERES_LIB
 
+
+struct SFMReprojectionErrorEularAngle 
+{
+	SFMReprojectionErrorEularAngle(double observed_x, double observed_y)
+		: observed_x(observed_x), observed_y(observed_y) {}
+
+	template <typename T>
+	bool operator()(const T* const cameraIn,  //3 interior camera parameters
+		const T* const cameraOut, //6 outer camera parameters
+		const T* const point,     //3 parameters for ground point
+		T* residuals) const       //2 output residual parameters
+	{
+		T focal = cameraIn[0];
+		T k1    = cameraIn[1];
+		T k2    = cameraIn[2];
+
+		T ax, ay, az;
+		ax = cameraOut[0];
+		ay = cameraOut[1];
+		az = cameraOut[2];
+		T R[9];
+		GenerateRMatrixDirect(ax, ay, az, R);
+
+		T t[3];
+		t[0] = cameraOut[3];
+		t[1] = cameraOut[4];
+		t[2] = cameraOut[5];
+				
+		T ix1,iy1;
+		GrdToImgWithDistort(point[0], point[1], point[2], &ix1, &iy1, R, t, focal, T(0), T(0), k1, k2);
+
+		residuals[0] = ix1 - T(observed_x);
+		residuals[1] = iy1 - T(observed_y);
+
+		return true;
+	}
+
+	// Factory to hide the construction of the CostFunction object from
+	// the client code.
+	static ceres::CostFunction* Create(const double observed_x,
+		const double observed_y) {
+			return (new ceres::AutoDiffCostFunction<SFMReprojectionErrorEularAngle, 2, 3, 6, 3>(
+				new SFMReprojectionErrorEularAngle(observed_x, observed_y)));
+	}
+
+	double observed_x;
+	double observed_y;
+};
+
+
+
 struct SFMReprojectionError 
 {
 	SFMReprojectionError(double observed_x, double observed_y)
@@ -64,6 +115,10 @@ struct SFMReprojectionError
 		t[1] = cameraOut[4];
 		t[2] = cameraOut[5];
 
+		T p[3];
+		ceres::AngleAxisRotatePoint(aa, point, p);
+
+		/*
 		T Rt[9];
 		aa2rot(aa, Rt);		
 		T R[9];
@@ -74,14 +129,23 @@ struct SFMReprojectionError
 				R[j*3+i] = Rt[i*3 + j];
 			}
 		}
+		*/
+		
+		p[0] += t[0];
+		p[1] += t[1];
+		p[2] += t[2];
 
-		T ix1,iy1;
-		GrdToImgWithDistort(point[0], point[1], point[2], &ix1, &iy1, R, t, focal, T(0), T(0), k1, k2);
+		T sx = p[0] / p[2] * (-focal);
+		T sy = p[1] / p[2] * (-focal);
+
+		T dx = sx;
+		T dy = sy;
+		Undistort(sx, sy, dx, dy, k1, k2);
 		
-		residuals[0] = ix1 - T(observed_x);
-		residuals[1] = iy1 - T(observed_y);
+		residuals[0] = dx - T(observed_x);
+		residuals[1] = dy - T(observed_y);
 		
-		printf("residual: %lf %lf \n", residuals[0], residuals[1]);
+		//printf("residual: %lf %lf \n", residuals[0], residuals[1]);
 
 		return true;
 	}
@@ -110,6 +174,7 @@ struct RefineCameraError
 					const T* const cameraOut, //6 outer camera parameters
 					T* residuals) const       //2 output residual parameters
 	{
+		/*
 		T focal = cameraIn[0];
 		T k1    = cameraIn[1];
 		T k2    = cameraIn[2];
@@ -139,6 +204,44 @@ struct RefineCameraError
 		
 		residuals[0] = ix1 - T(observed_x);
 		residuals[1] = iy1 - T(observed_y);
+		*/
+
+		T focal = cameraIn[0];
+		T k1    = cameraIn[1];
+		T k2    = cameraIn[2];
+
+		T aa[3];
+		aa[0] = cameraOut[0];
+		aa[1] = cameraOut[1];
+		aa[2] = cameraOut[2];
+
+		T t[3];
+		t[0] = cameraOut[3];
+		t[1] = cameraOut[4];
+		t[2] = cameraOut[5];
+
+		T point[3];
+		point[0] = T(gx);
+		point[1] = T(gy);
+		point[2] = T(gz);
+
+		//RX + T
+		T p[3];
+		ceres::AngleAxisRotatePoint(aa, point, p);
+
+		p[0] += t[0];
+		p[1] += t[1];
+		p[2] += t[2];
+
+		T sx = p[0] / p[2] * (-focal);
+		T sy = p[1] / p[2] * (-focal);
+
+		T dx = sx;
+		T dy = sy;
+		Undistort(sx, sy, dx, dy, k1, k2);
+		
+		residuals[0] = dx - T(observed_x);
+		residuals[1] = dy - T(observed_y);
 		
 		return true;
 	}

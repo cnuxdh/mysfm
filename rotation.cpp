@@ -63,11 +63,3 @@ void rot2aa(double *R, double *aa)
 }
 
 
-int  rot2eular(double* R, double* ea)
-{
-	ea[0] = atan2( R[5], R[8] ) / PI * 180;  //x:pitch
-	ea[1] = asin( -R[2] ) / PI * 180;        //y:roll
-	ea[2] = atan2( R[1], R[0]) / PI * 180;   //z:yaw
-
-	return 0;
-}

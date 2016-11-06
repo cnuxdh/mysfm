@@ -3,17 +3,20 @@
 #define ROTATION_HPP
 
 
-
-//void aa2rot(double const * x, double * R);
+// rotation to axis angle vector format
 void rot2aa(double *R, double *aa);
 
 
+// go from a vector representing a rotation in 
+// axis-angle format to a 3x3 rotation matrix 
+// in column major form
 template<typename T>
 void aa2rot(const T* x, T * R)
 {
-	const T epsilon = T(1e-18);
+	const T epsilon = T(1e-6);
+
 	T theta = sqrt(x[0]*x[0]+x[1]*x[1]+x[2]*x[2]);
-	// dblas::norm2(3,const_cast<double *>(x));
+	
 	T wx = x[0]/(theta+epsilon);
 	T wy = x[1]/(theta+epsilon);
 	T wz = x[2]/(theta+epsilon);
@@ -35,7 +38,15 @@ void aa2rot(const T* x, T * R)
 
 
 //calculate the Eular angle from rotation matrix
-int  rot2eular(double* R, double* ea);
+template<typename T>
+int  rot2eular(T* R, T* ea)
+{
+	ea[0] = atan2( R[5], R[8] ) / PI * T(180.0);  //x:pitch
+	ea[1] = asin( -R[2] ) / PI * T(180.0);        //y:roll
+	ea[2] = atan2( R[1], R[0]) / PI * T(180.0);   //z:yaw
+
+	return 0;
+}
 
 
 
