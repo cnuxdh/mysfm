@@ -9,10 +9,16 @@
 #include "relativepose.hpp"
 #include "distortion.hpp"
 #include "bundlerio.hpp"
+#include "rotation.hpp"
 
 
-//matrix
+
+//matrix lib
 #include "matrix/matrix.h"
+
+
+//corelib matrix
+#include "Matrix.h"
 
 
 
@@ -200,17 +206,27 @@ int CalculateNewCamParas(int nCameraId,
 	//ransac DLT calculation
 	CPoseEstimationBase* pPE = new CDLTPose();
 	int r = pPE->EstimatePose(pt3, pt2, cam);
-	delete pPE;
+	
 
 	//if successful, do bundle adjustment
 	if(r==0)
 	{
 		printf("\n optimization for DLT results: \n");
 
+		vector<int> inliers = pPE->GetInliers();
+		vector<int> inliers_weak = pPE->GetWeakInliers();
+				
 		//remove the wrong projections
 		vector<Point3DDouble> inlierPt3;
 		vector<Point2DDouble> inlierPt2;
-		for(int i=0; i<pt3.size(); i++)
+		
+		for(int i=0; i<inliers_weak.size(); i++)
+		{
+			inlierPt3.push_back( pt3[inliers_weak[i]] );
+			inlierPt2.push_back( pt2[inliers_weak[i]] );
+		}
+
+		/*for(int i=0; i<pt3.size(); i++)
 		{
 			Point2DDouble projPt;
 			GrdToImg(pt3[i], projPt, cam);
@@ -224,9 +240,14 @@ int CalculateNewCamParas(int nCameraId,
 				inlierPt3.push_back(pt3[i]);
 				inlierPt2.push_back(pt2[i]);
 			}
-		}		
+		}*/		
 
 		CeresBA(inlierPt3, inlierPt2, cam);
+		
+		//CeresBA(pt3, pt2, cam);
+
+		delete pPE;
+
 		printf("\n");
 	}
 	else
@@ -256,30 +277,17 @@ int CeresBA( vector<TrackInfo> trackSeq, vector<ImgFeature> imageFeatures,
 	double* pOuterParams = new double[num_cameras*6]; //omiga, phi, kapa, t0,t1,t2
 	for(int i=0; i<num_cameras; i++)
 	{
-		pOuterParams[i*6]   = cameras[i].ax;
-		pOuterParams[i*6+1] = cameras[i].ay;
-		pOuterParams[i*6+2] = cameras[i].az;
+		double aa[3];
+		rot2aa(cameras[i].R, aa);
+		pOuterParams[i*6]   = aa[0];
+		pOuterParams[i*6+1] = aa[1];
+		pOuterParams[i*6+2] = aa[2];
+
 		pOuterParams[i*6+3] = cameras[i].t[0];
 		pOuterParams[i*6+4] = cameras[i].t[1];
 		pOuterParams[i*6+5] = cameras[i].t[2];
 	}
 	
-
-	/*
-	double* pOuterParams = new double[num_cameras*9]; //omiga, phi, kapa, t0,t1,t2
-	for(int i=0; i<num_cameras; i++)
-	{
-		pOuterParams[i*9]   = cameras[i].focus;
-		pOuterParams[i*9+1] = 0;
-		pOuterParams[i*9+2] = 0;
-		pOuterParams[i*9+3] = cameras[i].ax;
-		pOuterParams[i*9+4] = cameras[i].ay;
-		pOuterParams[i*9+5] = cameras[i].az;
-		pOuterParams[i*9+6] = cameras[i].t[0];
-		pOuterParams[i*9+7] = cameras[i].t[1];
-		pOuterParams[i*9+8] = cameras[i].t[2];
-	}*/
-
 	//find the reasonable tracks 
 	vector<int> goodTrackIndex;
 	for(int i=0; i<trackSeq.size(); i++)
@@ -340,8 +348,6 @@ int CeresBA( vector<TrackInfo> trackSeq, vector<ImgFeature> imageFeatures,
 
 	//google::InitGoogleLogging(NULL);
 
-	//nProjection = nProjection - 1;
-
 	ceres::Problem problem;
 	//invoke ceres functions, each time adding one projection
 	for(int i=0; i<nProjection; i++)
@@ -372,12 +378,12 @@ int CeresBA( vector<TrackInfo> trackSeq, vector<ImgFeature> imageFeatures,
 
 	std::cout<<"optimized results: "<<"\n";
 
-	printf("Inner parameters... \n");
+	printf("Intrisic parameters... \n");
 	for(int i=0; i<3; i++)
 		std::cout<<pInteriorParams[i]<<"  ";
 	std::cout<<endl;
 	
-	printf("Ounter parameters ...\n");
+	printf("Extrisic parameters ...\n");
 	for(int i=0; i<num_cameras; i++)
 	{
 		for(int j=0; j<6; j++)
@@ -389,17 +395,24 @@ int CeresBA( vector<TrackInfo> trackSeq, vector<ImgFeature> imageFeatures,
 		cameras[i].k1    = pInteriorParams[1];
 		cameras[i].k2    = pInteriorParams[2];
 		
-		cameras[i].ax   = pOuterParams[i*6] ;
-		cameras[i].ay   = pOuterParams[i*6+1];
-		cameras[i].az   = pOuterParams[i*6+2];
+		double aa[3];
+		aa[0] = pOuterParams[i*6];
+		aa[1] = pOuterParams[i*6+1];
+		aa[2] = pOuterParams[i*6+2];
+		double Rt[9];
+		aa2rot(aa, Rt);
+		double R[9];
+		transpose(Rt, R, 3, 3);
+		memcpy(cameras[i].R, R, sizeof(double)*9);
+		double ea[3];
+		rot2eular(R, ea);
+		cameras[i].ax = ea[0];
+		cameras[i].ay = ea[1];
+		cameras[i].az = ea[2];
+
 		cameras[i].t[0] = pOuterParams[i*6+3];
 		cameras[i].t[1] = pOuterParams[i*6+4];
 		cameras[i].t[2] = pOuterParams[i*6+5];
-
-		//update the rotation matrix
-		double R[9];
-		GenerateRMatrixDirect(cameras[i].ax, cameras[i].ay, cameras[i].az, R);
-		memcpy(cameras[i].R, R, sizeof(double)*9);
 
 		std::cout<<endl;
 	}
@@ -429,13 +442,25 @@ int CeresBA( vector<Point3DDouble>& grdPts, vector<Point2DDouble>& imgPts, Camer
 	pInteriorParams[1] = camera.k1;
 	pInteriorParams[2] = camera.k2;
 
+	/*
 	pOuterParams[0] = camera.ax;
-	pOuterParams[1] = camera.ay;
+	pOuterParams[1] = camera.ay;	
 	pOuterParams[2] = camera.az;
-	pOuterParams[3] = camera.t[0];
+    */
+
+	//calculate the axis-angle vector
+	double aa[3];
+	rot2aa(camera.R, aa);
+	pOuterParams[0] = aa[0];
+	pOuterParams[1] = aa[1];
+	pOuterParams[2] = aa[2];
+
+	pOuterParams[3] = camera.t[0]; 
 	pOuterParams[4] = camera.t[1];
 	pOuterParams[5] = camera.t[2];
-		
+	
+	printf("3D Points: %d \n", grdPts.size());
+
 	ceres::Problem problem;
 	//invoke ceres functions, each time adding one projection
 	for(int i=0; i<nProjection; i++)
@@ -477,18 +502,28 @@ int CeresBA( vector<Point3DDouble>& grdPts, vector<Point2DDouble>& imgPts, Camer
 	camera.focus = pInteriorParams[0];
 	camera.k1    = pInteriorParams[1];
 	camera.k2    = pInteriorParams[2];
-	camera.ax   = pOuterParams[0] ;
-	camera.ay   = pOuterParams[1];
-	camera.az   = pOuterParams[2];
+	
+	aa[3];
+	aa[0] = pOuterParams[0] ;
+	aa[1] = pOuterParams[1];
+	aa[2] = pOuterParams[2];
+	double Rt[9];
+	aa2rot(aa, Rt);
+	double R[9];
+	transpose(Rt, R, 3, 3);
+	memcpy(camera.R, R, sizeof(double)*9);
+	//calculate the Eular angle
+	double ea[3];
+	rot2eular(R, ea);
+	camera.ax = ea[0];
+	camera.ay = ea[1];
+	camera.az = ea[2];
+
 	camera.t[0] = pOuterParams[3];
 	camera.t[1] = pOuterParams[4];
 	camera.t[2] = pOuterParams[5];
 
-	//update the rotation matrix
-	double R[9];
-	GenerateRMatrixDirect(camera.ax, camera.ay, camera.az, R);
-	memcpy(camera.R, R, sizeof(double)*9);
-
+	
 	std::cout<<endl;
 
 	return 0;
@@ -584,6 +619,7 @@ int CCeresBA::BundleAdjust(int numCameras,
 		}
 	}
 
+	printf("initialized pair: %d - %d : \n", leftImageId, rightImageId);
 	CRelativePoseBase* pRP = new CEstimatePose5Point();
 	pRP->EstimatePose(lpts, rpts, cameras[leftImageId], cameras[rightImageId] );   
 
@@ -609,10 +645,9 @@ int CCeresBA::BundleAdjust(int numCameras,
 	CeresBA(trackSeq, imageFeatures, cameras);
 #endif	
 	
-	//update the track coordinates
+	//update the track coordinates and calculate the error
 	CaculateTrackSeqGrd(imageFeatures, trackSeq, cameras, true);
-
-
+	
 	//3. adding new images
 	while(1)
 	{
@@ -620,6 +655,8 @@ int CCeresBA::BundleAdjust(int numCameras,
 
 		if(newCameraIndex<0)
 			break;
+
+		printf("adding image: %d \n", newCameraIndex);
 
 		//calculate the camera parameters of new selected
 		CalculateNewCamParas(newCameraIndex, imageFeatures, trackSeq, tracks, cameras[newCameraIndex]);
@@ -636,11 +673,10 @@ int CCeresBA::BundleAdjust(int numCameras,
 		printf("BA for all cameras... \n");
 		CeresBA(trackSeq, imageFeatures, cameras);
 #endif	
+		//update the track coordinates and calculate the error
+		CaculateTrackSeqGrd(imageFeatures, trackSeq, cameras, true);
 	}
-
-	//update the track coordinates
-	CaculateTrackSeqGrd(imageFeatures, trackSeq, cameras, true);
-	
+		
 	//save the ba results: camera position, track points
 	vector<Point3DDouble> goodGrds;
 	printf("output the optimized track points.... \n");
@@ -649,11 +685,12 @@ int CCeresBA::BundleAdjust(int numCameras,
 		if( trackSeq[i].derror < 4 )
 		{
 			goodGrds.push_back( trackSeq[i].grd );
-			for(int j=0; j<trackSeq[i].views.size(); j++)
+			
+			/*for(int j=0; j<trackSeq[i].views.size(); j++)
 			{
 				printf("%d %d ", trackSeq[i].views[j].first, trackSeq[i].views[j].second);
 			}
-			printf("\n");
+			printf("\n");*/
 		}
 	}
 	for(int i=0; i<cameras.size(); i++)
@@ -666,7 +703,6 @@ int CCeresBA::BundleAdjust(int numCameras,
 	}
 
 	WritePMVSPly("c:\\temp\\ba.ply", goodGrds);
-
-
+	
 	return 0;
 }

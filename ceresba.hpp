@@ -7,6 +7,7 @@
 #include "export.hpp"
 #include "defines.hpp"
 #include "imagedata.hpp"
+#include "rotation.hpp"
 
 #include "sfm.h"
 //
@@ -21,6 +22,8 @@
 #include "ceres/rotation.h"
 #endif
 
+//corelib matrix
+#include "Matrix.h"
 
 #include <vector>
 using namespace std;
@@ -51,17 +54,26 @@ struct SFMReprojectionError
 		T k1    = cameraIn[1];
 		T k2    = cameraIn[2];
 
-		T omiga  = cameraOut[0];
-		T phi    = cameraOut[1];
-		T kapa   = cameraOut[2];
+		T aa[3];
+		aa[0] = cameraOut[0];
+		aa[1] = cameraOut[1];
+		aa[2] = cameraOut[2];
+
 		T t[3];
 		t[0] = cameraOut[3];
 		t[1] = cameraOut[4];
 		t[2] = cameraOut[5];
 
-		//int ht, wd;
+		T Rt[9];
+		aa2rot(aa, Rt);		
 		T R[9];
-		GenerateRMatrixDirect(omiga, phi, kapa, R);
+		for(int j=0; j<3; j++)
+		{
+			for(int i=0; i<3; i++)
+			{
+				R[j*3+i] = Rt[i*3 + j];
+			}
+		}
 
 		T ix1,iy1;
 		GrdToImgWithDistort(point[0], point[1], point[2], &ix1, &iy1, R, t, focal, T(0), T(0), k1, k2);
@@ -69,52 +81,11 @@ struct SFMReprojectionError
 		residuals[0] = ix1 - T(observed_x);
 		residuals[1] = iy1 - T(observed_y);
 		
-		//printf("rx: %lf , ry: %lf \n", residuals[0], residuals[1]);
+		printf("residual: %lf %lf \n", residuals[0], residuals[1]);
 
 		return true;
 	}
 	
-
-	/*
-	template <typename T>
-	bool operator()(const T* const cameraParas, //9 parameters: 3 inner, 6 outer
-		const T* const point,     //3 parameters for ground point
-		T* residuals) const       //2 output residual parameters
-	{
-		T focal = cameraParas[0];
-		T k1    = cameraParas[1];
-		T k2    = cameraParas[2];
-
-		T omiga  = cameraParas[3];
-		T phi    = cameraParas[4];
-		T kapa   = cameraParas[5];
-		T t[3];
-		t[0] = cameraParas[6];
-		t[1] = cameraParas[7];
-		t[2] = cameraParas[8];
-
-		//printf("focal length: %lf \n", focal);
-
-		//int ht, wd;
-		T R[9];
-		GenerateRMatrixDirect(omiga, phi, kapa, R);
-
-		T ix1,iy1;
-		GrdToImgWithDistort(point[0], point[1], point[2], &ix1, &iy1, R, t, focal, T(0), T(0), k1, k2);
-
-		//double dx = ix1;
-		//double dy = iy1;
-		//cout<<ix1<<" "<<iy1<<"\n";
-		//printf("ix: %ld  iy:%lf \n", ix1, iy1);
-
-		residuals[0] = ix1 - T(observed_x);
-		residuals[1] = iy1 - T(observed_y);
-
-		//printf("rx: %lf , ry: %lf \n", residuals[0], residuals[1]);
-
-		return true;
-	}*/
-
 	// Factory to hide the construction of the CostFunction object from
 	// the client code.
 	static ceres::CostFunction* Create(const double observed_x,
@@ -143,18 +114,26 @@ struct RefineCameraError
 		T k1    = cameraIn[1];
 		T k2    = cameraIn[2];
 
-		T omiga  = cameraOut[0];
-		T phi    = cameraOut[1];
-		T kapa   = cameraOut[2];
+		T aa[3];
+		aa[0] = cameraOut[0];
+		aa[1] = cameraOut[1];
+		aa[2] = cameraOut[2];
+
 		T t[3];
 		t[0] = cameraOut[3];
 		t[1] = cameraOut[4];
 		t[2] = cameraOut[5];
-
-		//int ht, wd;
+				
+		T Rt[9];
+		aa2rot(aa, Rt);		
 		T R[9];
-		GenerateRMatrixDirect(omiga, phi, kapa, R);
-
+		for(int j=0; j<3; j++)
+		{
+			for(int i=0; i<3; i++)
+			{
+				R[j*3+i] = Rt[i*3 + j];
+			}
+		}
 		T ix1,iy1;
 		GrdToImgWithDistortFixedPt(gx, gy, gz, &ix1, &iy1, R, t, focal, T(0), T(0), k1, k2);
 		

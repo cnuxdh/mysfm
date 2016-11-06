@@ -879,10 +879,15 @@ int CDLTPose::EstimatePose(vector<Point3DDouble> pt3, vector<Point2DDouble> pt2,
 	  Rinit[3], Rinit[4], Rinit[5], tinit[1],
 	  Rinit[6], Rinit[7], Rinit[8], tinit[2] };
 
-	std::vector<int> inliers;
-	std::vector<int> inliers_weak;
+	//std::vector<int> inliers;
+	//std::vector<int> inliers_weak;
 	std::vector<int> outliers;
-	int *idxs_solve = (int*)malloc( sizeof(int)*num_points );
+
+	//int *idxs_solve = (int*)malloc( sizeof(int)*num_points );
+
+	inliers.clear();
+	inliers_weak.clear();
+	outliers.clear();
 
 	int num_behind = 0;
 	for (int j = 0; j < num_points; j++) 
@@ -914,7 +919,7 @@ int CDLTPose::EstimatePose(vector<Point3DDouble> pt3, vector<Point2DDouble> pt2,
 		else 
 		{
 			printf("[FindAndVerifyCamera] Removing point [%d] "
-				"(reproj. error = %0.3f)\n", idxs_solve[j], diff);
+				"(reproj. error = %0.3f)\n", j, diff);
 			outliers.push_back(j);
 		}
 
@@ -923,7 +928,7 @@ int CDLTPose::EstimatePose(vector<Point3DDouble> pt3, vector<Point2DDouble> pt2,
 			num_behind++;  /* Cheirality constraint violated */
 	}
 
-	free(idxs_solve);
+	//free(idxs_solve);
 	free(points_solve);
 	free(projs_solve);
 
@@ -968,13 +973,23 @@ int CDLTPose::EstimatePose(vector<Point3DDouble> pt3, vector<Point2DDouble> pt2,
 	cam.focus = (cam.K[0]+cam.K[4])*0.5;
 	
 	//calculate the rotation angle
-	cam.ax = atan( cam.R[5]/cam.R[8] )/PI*180; 
+	cam.ax = atan2( cam.R[5], cam.R[8] )/PI*180; //atan( cam.R[5]/cam.R[8] )/PI*180; 
 	cam.ay = asin( -cam.R[2] )/PI*180;
-	cam.az = atan( cam.R[1]/cam.R[0])/PI*180;
+	cam.az = atan2(cam.R[1], cam.R[0]) /PI*180;  //atan( cam.R[1]/cam.R[0])/PI*180;
 
 	printf("Rotation Angle about x,y,z: %lf %lf %lf \n", cam.ax, cam.ay, cam.az);
 
+
 	return res;
+}
+
+vector<int> CDLTPose::GetInliers()
+{
+	return inliers;
+}
+vector<int> CDLTPose::GetWeakInliers()
+{
+	return inliers_weak;
 }
 
 //////////////////////////////////////////////////////////////////////////

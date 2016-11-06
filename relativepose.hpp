@@ -49,6 +49,12 @@ public:
 	virtual ~CPoseEstimationBase(){}
 	virtual int EstimatePose(vector<Point3DDouble> pt3, vector<Point2DDouble> pt2, double* K, double* R, double* t){return 0;}
 	virtual int EstimatePose(vector<Point3DDouble> pt3, vector<Point2DDouble> pt2, CameraPara& cam){return 0;}
+	
+	virtual vector<int> GetInliers()
+	{ vector<int> a; return a;  };
+	virtual vector<int> GetWeakInliers()
+	{ vector<int> a; return a;  };
+
 };
 
 
@@ -59,6 +65,13 @@ public:
 	~CDLTPose();
 	int EstimatePose(vector<Point3DDouble> pt3, vector<Point2DDouble> pt2, double* K, double* R, double* t);
 	int EstimatePose(vector<Point3DDouble> pt3, vector<Point2DDouble> pt2, CameraPara& cam);
+
+	vector<int> GetInliers();
+	vector<int> GetWeakInliers();
+
+private:
+	std::vector<int> inliers;
+	std::vector<int> inliers_weak;
 };
 /////////////////////////////////////////////////////////////////////////
 
