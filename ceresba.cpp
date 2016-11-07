@@ -241,6 +241,8 @@ int CalculateNewCamParas(int nCameraId,
 	vector<Point3DDouble> pt3;
 	vector<Point2DDouble> pt2;
 
+
+
 	//collect the track corresponding to the new camera
 	for(int i=0; i<trackSeqNew.size(); i++)
 	{
@@ -809,8 +811,15 @@ int CCeresBA::BundleAdjust(int numCameras,
 		printf("adding image: %d \n", newCameraIndex);
 
 		//calculate the camera parameters of new selected
-		CalculateNewCamParas(newCameraIndex, imageFeatures, trackSeq, tracks, cameras[newCameraIndex]);
-		 
+		int res = CalculateNewCamParas(newCameraIndex, imageFeatures, trackSeq, tracks, cameras[newCameraIndex]);
+		
+		//DLT pose estimation failed
+		if( res < 0 )
+		{
+			cameraVisited[newCameraIndex] = 1;
+			continue;
+		}
+
 		//update tracks according to the new image 
 		UpdateBATracks(newCameraIndex, cameraVisited, imageFeatures, tracks, trackSeq);
 
@@ -826,7 +835,6 @@ int CCeresBA::BundleAdjust(int numCameras,
 		//update the track coordinates and calculate the error
 		CaculateTrackSeqGrd(imageFeatures, trackSeq, cameras, true);
 
-		//CeresBA(trackSeq, imageFeatures, cameras);
 	}
 		
 	//save the ba results: camera position, track points
