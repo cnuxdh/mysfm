@@ -1318,6 +1318,7 @@ void GetMatch(int imgId1, int imgId2, vector<TrackInfo>& tracks, vector<TrackInf
 		int nFind = 0;
 		int nViews = tracks[i].views.size();	
 		TrackInfo oneTrack;
+
 		for(int j=0; j<nViews; j++)
 		{
 			ImageKey key = tracks[i].views[j]; //key for image point
@@ -1344,6 +1345,7 @@ void GetMatch(int imgId1, int imgId2, vector<TrackInfo>& tracks, vector<TrackInf
 				oneTrack.views.push_back(key);
 			}
 		}
+
 		if(nFind==2)
 		{
 			//save the new track index in the original tracks
@@ -1351,6 +1353,7 @@ void GetMatch(int imgId1, int imgId2, vector<TrackInfo>& tracks, vector<TrackInf
 			tracks[i].extra = currentTrackIndex;
 
 			oneTrack.extra = i; //save the new track point index
+			oneTrack.valid = 1; //initialized as 1
 			trackSeq.push_back(oneTrack);
 		}
 	}

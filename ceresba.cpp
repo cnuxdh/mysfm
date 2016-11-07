@@ -11,10 +11,11 @@
 #include "bundlerio.hpp"
 #include "rotation.hpp"
 
-
+//baselib
+#include "baselib.h"
 
 //matrix lib
-#include "matrix/matrix.h"
+//#include "matrix/matrix.h"
 
 
 //corelib matrix
@@ -92,8 +93,7 @@ int UpdateBATracks( int newCameraIndex, vector<int> cameraVisited,
 		{
 			TrackInfo newTrack;
 			newTrack.extra = nTrackIndex;
-
-
+			newTrack.valid = 1;
 			newTrack.views.push_back(ik);
 
 			for(int k=0; k<tracks[nTrackIndex].views.size(); k++)
@@ -161,8 +161,72 @@ int CaculateTrackSeqGrd(vector<ImgFeature>&  imageFeatures,
 
 		pTriangulate->Triangulate(pts, cams, gps, true, ferror);
 
+		//ferror is the projection error of all points average in one image
 		tracks[i].derror = ferror;
-		tracks[i].grd = gps;
+		tracks[i].grd    = gps;
+
+		/*
+		if( gps.p[2]>0 )
+		{
+			printf("%lf \n", gps.p[2]);
+		}*/
+
+		//calculate the angle between the track point and camera center
+		double maxangle = 0;
+		for (int j = 0; j < num_views; j++) 
+		{
+			int camera_idx = tracks[i].views[j].first;
+
+			Point3DDouble camCenter;
+			camCenter.p[0] = cameras[camera_idx].t[0];
+			camCenter.p[1] = cameras[camera_idx].t[1];
+			camCenter.p[2] = cameras[camera_idx].t[2];
+
+			Point3DDouble v1;
+			v1.p[0] = gps.p[0] - camCenter.p[0];
+			v1.p[1] = gps.p[1] - camCenter.p[1];
+			v1.p[2] = gps.p[2] - camCenter.p[2];
+
+			double norm = dll_matrix_norm(3, 1, v1.p);
+			v1.p[0] /= norm;
+			v1.p[1] /= norm;
+			v1.p[2] /= norm;
+
+			for (int k = j+1; k < num_views; k++) 
+			{
+				int camera_idx = tracks[i].views[k].first;
+
+				Point3DDouble camCenter;
+				camCenter.p[0] = cameras[camera_idx].t[0];
+				camCenter.p[1] = cameras[camera_idx].t[1];
+				camCenter.p[2] = cameras[camera_idx].t[2];
+
+				Point3DDouble v2;
+				v2.p[0] = gps.p[0] - camCenter.p[0];
+				v2.p[1] = gps.p[1] - camCenter.p[1];
+				v2.p[2] = gps.p[2] - camCenter.p[2];
+
+				double norm = dll_matrix_norm(3, 1, v2.p);
+				v2.p[0] /= norm;
+				v2.p[1] /= norm;
+				v2.p[2] /= norm;
+
+				double dotvalue = v1.p[0]*v2.p[0] + v1.p[1]*v2.p[1] + v1.p[2]*v2.p[2]; 
+				double angle = acos(dotvalue);
+				if(angle>maxangle)
+					maxangle = angle;
+			}
+		}
+
+		//when the max angle is less than the threshold, then do not use it in the optimization
+		maxangle = maxangle / PI * 180;
+		if(maxangle<5)
+		{
+			tracks[i].valid = 0;
+			//printf("invald point: %lf %lf %lf   error:%lf \n", 
+			//	tracks[i].grd.p[0], tracks[i].grd.p[1], tracks[i].grd.p[2],
+			//	tracks[i].derror);
+		}
 	}
 
 	return 0;
@@ -308,6 +372,10 @@ int CeresBA( vector<TrackInfo> trackSeq, vector<ImgFeature> imageFeatures,
 	vector<int> goodTrackIndex;
 	for(int i=0; i<trackSeq.size(); i++)
 	{
+		//the track is invalid according to the 
+		if(trackSeq[i].valid<1)
+			continue;
+
 		if(trackSeq[i].derror<4)
 			goodTrackIndex.push_back(i);
 	}
@@ -476,6 +544,8 @@ int CeresBA( vector<TrackInfo> trackSeq, vector<ImgFeature> imageFeatures,
 		trackSeq[index].grd.p[1] = grdPt[i*3+1];
 		trackSeq[index].grd.p[2] = grdPt[i*3+2];
 	}
+
+
 
 	return 0;
 }
@@ -716,8 +786,7 @@ int CCeresBA::BundleAdjust(int numCameras,
 		if( errorarray[i]<4 )
 			goodPts.push_back( gpts[i] );
 	}
-
-
+	
 	WritePMVSPly("c:\\temp\\pair.ply", goodPts);
 
 
@@ -728,6 +797,7 @@ int CCeresBA::BundleAdjust(int numCameras,
 	//update the track coordinates and calculate the error
 	CaculateTrackSeqGrd(imageFeatures, trackSeq, cameras, true);
 	
+
 	//3. adding new images
 	while(1)
 	{
@@ -755,6 +825,8 @@ int CCeresBA::BundleAdjust(int numCameras,
 #endif	
 		//update the track coordinates and calculate the error
 		CaculateTrackSeqGrd(imageFeatures, trackSeq, cameras, true);
+
+		//CeresBA(trackSeq, imageFeatures, cameras);
 	}
 		
 	//save the ba results: camera position, track points
@@ -763,6 +835,9 @@ int CCeresBA::BundleAdjust(int numCameras,
 	printf("output the optimized track points.... \n");
 	for(int i=0; i<trackSeq.size(); i++)
 	{
+		if( trackSeq[i].valid<1 )
+			continue;
+
 		if( trackSeq[i].derror<4 )
 		{
 			goodGrds.push_back( trackSeq[i].grd );
