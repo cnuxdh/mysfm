@@ -240,9 +240,7 @@ int CalculateNewCamParas(int nCameraId,
 {
 	vector<Point3DDouble> pt3;
 	vector<Point2DDouble> pt2;
-
-
-
+	
 	//collect the track corresponding to the new camera
 	for(int i=0; i<trackSeqNew.size(); i++)
 	{
@@ -273,7 +271,6 @@ int CalculateNewCamParas(int nCameraId,
 	CPoseEstimationBase* pPE = new CDLTPose();
 	int r = pPE->EstimatePose(pt3, pt2, cam);
 	
-
 	//if successful, do bundle adjustment
 	if(r==0)
 	{
@@ -292,26 +289,8 @@ int CalculateNewCamParas(int nCameraId,
 			inlierPt2.push_back( pt2[inliers_weak[i]] );
 		}
 
-		/*for(int i=0; i<pt3.size(); i++)
-		{
-			Point2DDouble projPt;
-			GrdToImg(pt3[i], projPt, cam);
-
-			double dx = projPt.p[0] - pt2[i].p[0];
-			double dy = projPt.p[1] - pt2[i].p[1];
-			double projError = sqrt(dx*dx + dy*dy);
-
-			if(projError<16)
-			{
-				inlierPt3.push_back(pt3[i]);
-				inlierPt2.push_back(pt2[i]);
-			}
-		}*/		
-
 		CeresBA(inlierPt3, inlierPt2, cam);
 		
-		//CeresBA(pt3, pt2, cam);
-
 		delete pPE;
 
 		printf("\n");
