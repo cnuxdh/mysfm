@@ -413,7 +413,7 @@ inputs:
 outputs:
   cam1,cam2:           camera structure
 */
-int CEstimatePose5Point::EstimatePose( PairMatchRes pairMatches, ImgFeature lImageFeat, ImgFeature rImageFeat, 
+int CEstimatePose5Point::EstimatePose( PairMatchRes pairMatches, ImgFeature& lImageFeat, ImgFeature& rImageFeat, 
 									   CameraPara& cam1, CameraPara& cam2 )
 {
 	//sfm interface
@@ -1313,7 +1313,7 @@ int CalculateEssentialMatrix1(double* R, double* T, double* F)
 }
 
 
-
+/*
 int GrdToImg(Point3DDouble grdpt, Point2DDouble& imgpt, CameraPara cam)
 {
 	//int ht, wd;
@@ -1343,4 +1343,4 @@ int GrdToImg(Point3DDouble grdpt, Point2DDouble& imgpt, CameraPara cam)
 	imgpt.p[1] = iy1;
 
 	return 0;
-}
+}*/

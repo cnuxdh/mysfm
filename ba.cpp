@@ -8,6 +8,7 @@
 #include "relativepose.hpp"
 #include "distortion.hpp"
 #include "bundlerio.hpp"
+#include "badata.hpp"
 
 //matrix
 //#include "matrix/matrix.h"

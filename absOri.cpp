@@ -1,5 +1,6 @@
 
 #include "absOri.hpp"
+#include "baselib.h"
 
 
 
@@ -60,7 +61,7 @@ int RotationAlign(vector<POINT3D> srcPts, vector<POINT3D> dstPts, double* rotati
 		gp[2] = dstPts[j].z;
 
 		double mc[9];
-		matrix_product(3, 1, 1, 3, gp, fp, mc);
+		dll_matrix_product(3, 1, 1, 3, gp, fp, mc);
 		for(int k=0; k<9; k++)
 			sumC[k] += mc[k];    
 	}
@@ -68,8 +69,8 @@ int RotationAlign(vector<POINT3D> srcPts, vector<POINT3D> dstPts, double* rotati
 	double U[9];
 	double S[3];
 	double VT[9];
-	dgesvd_driver(3, 3, sumC, U, S, VT);
-	matrix_product(3, 3, 3, 3, U, VT, rotationMatrix );
+	dll_dgesvd_driver(3, 3, sumC, U, S, VT);
+	dll_matrix_product(3, 3, 3, 3, U, VT, rotationMatrix );
 	
 	return 0;
 }
@@ -166,7 +167,7 @@ int AbsOriP3( vector<POINT3D> freePts, vector<POINT3D> grdPts,
 		gp[2] = grdPts[j].z;
 
 		double mc[9];
-		matrix_product(3, 1, 1, 3, gp, fp, mc);
+		dll_matrix_product(3, 1, 1, 3, gp, fp, mc);
 		for(int k=0; k<9; k++)
 			sumC[k] += mc[k];    
 	}
@@ -174,8 +175,8 @@ int AbsOriP3( vector<POINT3D> freePts, vector<POINT3D> grdPts,
 	double U[9];
 	double S[3];
 	double VT[9];
-	dgesvd_driver(3, 3, sumC, U, S, VT);
-	matrix_product(3, 3, 3, 3, U, VT, absPosParams.R );
+	dll_dgesvd_driver(3, 3, sumC, U, S, VT);
+	dll_matrix_product(3, 3, 3, 3, U, VT, absPosParams.R );
 
 	//calculate the T
 	double gpc[3]; //center of the ground points
@@ -183,7 +184,7 @@ int AbsOriP3( vector<POINT3D> freePts, vector<POINT3D> grdPts,
 	gpc[0]=grdCenterPt.x;	gpc[1]=grdCenterPt.y;	gpc[2]=grdCenterPt.z;
 	fpc[0]=freeCenterPt.x;	fpc[1]=freeCenterPt.y;	fpc[2]=freeCenterPt.z;	
 	double tc[3];
-	matrix_product(3, 3, 3, 1, absPosParams.R, fpc, tc);
+	dll_matrix_product(3, 3, 3, 1, absPosParams.R, fpc, tc);
 	for(int i=0; i<3; i++)
 		absPosParams.T[i] = gpc[i] - absPosParams.scale*tc[i];
 	
@@ -276,8 +277,8 @@ double AbsOriOrthogonal(stAbsPOS& absPosParams, vector<stPOS>& camParas, vector<
 		double t1[3];
 		double R1[9];
 		
-		matrix_invert(3, camParas[ci].R, R1);
-		matrix_product(3, 3, 3, 1, R1, camParas[ci].T, t1);
+		dll_matrix_invert(3, camParas[ci].R, R1);
+		dll_matrix_product(3, 3, 3, 1, R1, camParas[ci].T, t1);
 
 		camParas[ci].xs = -t1[0]; 
 		camParas[ci].ys = -t1[1]; 
@@ -341,7 +342,7 @@ double AbsOriOrthogonal(stAbsPOS& absPosParams, vector<stPOS>& camParas, vector<
 			fP[2] = camParas[ci].zs;
 			
 			double tp[3];
-			matrix_product(3, 3, 3, 1, absPara.R, fP, tp);
+			dll_matrix_product(3, 3, 3, 1, absPara.R, fP, tp);
 			for(int k=0; k<3; k++)
 				fP[k] = absPara.scale*tp[k] + absPara.T[k];
 
@@ -369,7 +370,7 @@ double AbsOriOrthogonal(stAbsPOS& absPosParams, vector<stPOS>& camParas, vector<
 
 	//transform each camera parameters from current coordinate to new coordinate
 	double Rg[9];
-	matrix_invert(3, absPosParams.R, Rg);
+	dll_matrix_invert(3, absPosParams.R, Rg);
 	double Tg[3];
 	memcpy(Tg, absPosParams.T, 3*sizeof(double) );
 
@@ -382,11 +383,11 @@ double AbsOriOrthogonal(stAbsPOS& absPosParams, vector<stPOS>& camParas, vector<
 
 		//new R
 		double newR[9];
-		matrix_product(3, 3, 3, 3, camParas[ci].R, Rg, newR);
+		dll_matrix_product(3, 3, 3, 3, camParas[ci].R, Rg, newR);
 
 		//new T
 		double newT[3];
-		matrix_product(3, 3, 3, 1, newR, Tg, newT);
+		dll_matrix_product(3, 3, 3, 1, newR, Tg, newT);
 		for(int k=0; k<3; k++)
 			newT[k] = absPosParams.scale*camParas[ci].T[k] - newT[k];
 
@@ -402,8 +403,8 @@ double AbsOriOrthogonal(stAbsPOS& absPosParams, vector<stPOS>& camParas, vector<
 		//convert form RX+T to R( X - (-inv(R)*T) )
 		double t1[3];
 		double R1[9];
-		matrix_invert(3, camParas[ci].R, R1);
-		matrix_product(3, 3, 3, 1, R1, camParas[ci].T, t1);
+		dll_matrix_invert(3, camParas[ci].R, R1);
+		dll_matrix_product(3, 3, 3, 1, R1, camParas[ci].T, t1);
 
 		camParas[ci].xs = -t1[0]; 
 		camParas[ci].ys = -t1[1]; 
@@ -443,7 +444,7 @@ double AbsOriOrthogonal(stAbsPOS& absPosParams, vector<stPOS>& camParas, vector<
 		fP[2] = tracks[i].z;
 
 		double tp[3];
-		matrix_product(3, 3, 3, 1, absPosParams.R, fP, tp);
+		dll_matrix_product(3, 3, 3, 1, absPosParams.R, fP, tp);
 		for(int k=0; k<3; k++)
 			fP[k] = absPosParams.scale*tp[k] + absPosParams.T[k];
 

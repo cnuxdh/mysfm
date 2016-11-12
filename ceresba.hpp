@@ -163,6 +163,10 @@ struct SFMReprojectionError
 };
 
 
+
+
+
+
 //when the coordinates of track points are fixed, only optimize the camera intrinsic parameters 
 struct RefineCameraError 
 {
@@ -259,11 +263,80 @@ struct RefineCameraError
 };
 
 
+
+//when the coordinates of track points and camera focal length are fixed, 
+//only optimize the camera extrinsic parameters 
+struct RefineCameraFixedFocalLen 
+{
+	RefineCameraFixedFocalLen(double observed_x, double observed_y, double focal_len, double gx, double gy, double gz)
+		: observed_x(observed_x), observed_y(observed_y), focal_len(focal_len), gx(gx), gy(gy), gz(gz) {}
+	
+	template <typename T>
+	bool operator()(const T* const cameraOut, //6 extrinsic camera parameters
+					T* residuals) const       //2 output residual parameters
+	{
+		T focal = T(focal_len);
+
+		T aa[3];
+		aa[0] = cameraOut[0];
+		aa[1] = cameraOut[1];
+		aa[2] = cameraOut[2];
+
+		T t[3];
+		t[0] = cameraOut[3];
+		t[1] = cameraOut[4];
+		t[2] = cameraOut[5];
+
+		T point[3];
+		point[0] = T(gx);
+		point[1] = T(gy);
+		point[2] = T(gz);
+
+		//RX + T
+		T p[3];
+		ceres::AngleAxisRotatePoint(aa, point, p);
+
+		p[0] += t[0];
+		p[1] += t[1];
+		p[2] += t[2];
+
+		T sx = p[0] / p[2] * (-focal);
+		T sy = p[1] / p[2] * (-focal);
+
+		T dx = sx;
+		T dy = sy;
+		//Undistort(sx, sy, dx, dy, k1, k2);
+		
+		residuals[0] = dx - T(observed_x);
+		residuals[1] = dy - T(observed_y);
+		
+		return true;
+	}
+	// Factory to hide the construction of the CostFunction object from
+	// the client code.
+	static ceres::CostFunction* Create(const double observed_x,	const double observed_y, 
+		const double focal_len, const double gx, const double gy, const double gz) {
+			return (new ceres::AutoDiffCostFunction<RefineCameraFixedFocalLen, 2, 6>(
+				new RefineCameraFixedFocalLen(observed_x, observed_y, focal_len, gx, gy, gz) ) );
+	}
+
+	double observed_x;
+	double observed_y;
+	double gx,gy,gz;
+	double focal_len;
+};
+
+int GrdToImg(Point3DDouble gp, Point2DDouble& ip, CameraPara cam);
+
+
 //bundle adjustment for multiple cameras
 int CeresBA( vector<TrackInfo> trackSeq, vector<ImgFeature> imageFeatures, vector<CameraPara> &cameras);
 
 //bundle adjustment for camera parameters only
-int CeresBA( vector<Point3DDouble>& grdPts, vector<Point2DDouble>& imgPts, CameraPara& camera );
+int CeresBA( vector<Point3DDouble>& grdPts, vector<Point2DDouble>& imgPts, CameraPara& camera, 
+			 bool bIsFixedFocalLen );
+
+
 
 class DLL_EXPORT CCeresBA: public CBABase
 {

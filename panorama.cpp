@@ -13,6 +13,7 @@
 #include "panorama.hpp"
 #include "absOri.hpp"
 #include "defines.hpp"
+#include "baselib.h"
 //#include "relativepose.hpp"
 
 
@@ -252,8 +253,8 @@ int PanoToPlanes( int nImageIndex, char* srcFile, double anglestep,
           Rpg[6], Rpg[7], Rpg[8], Tpg[2] };
     
     double P[12];
-    matrix_product(3, 3, 3, 4, K, Ptmp, P);
-    matrix_scale(3, 4, P, -1.0, P);
+    dll_matrix_product(3, 3, 3, 4, K, Ptmp, P);
+    dll_matrix_scale(3, 4, P, -1.0, P);
 
 		FILE* f = fopen(projFile, "w");
     fprintf(f, "CONTOUR\n");
@@ -309,7 +310,7 @@ int SphereTo3D_center(double x, double y, double radius, double& gx, double& gy,
 
 
 //convert spherical image coordinate to 3D points
-//x,y: image col and row
+//x,y: image col and row, original point is the top-left corner of the image
 int SphereTo3D(double x, double y, double radius, double& gx, double& gy, double& gz)
 {
 	
@@ -706,8 +707,8 @@ DLL_EXPORT int GeneratePanoEpipolarImageHeading(double* R, double* T, char* left
 		}
 	}
 
-	cvSaveImage("d:\\epipolarLeftHeading.jpg",  pEpipolarLeft);
-	cvSaveImage("d:\\epipolarRightHeading.jpg", pEpipolarRight);
+	cvSaveImage("c:\\epipolarLeftHeading.jpg",  pEpipolarLeft);
+	cvSaveImage("c:\\epipolarRightHeading.jpg", pEpipolarRight);
 
 	cvReleaseImage(&pLeftImage);
 	cvReleaseImage(&pRightImage);
@@ -870,8 +871,8 @@ DLL_EXPORT int GeneratePanoEpipolarImage(double* R, double* T, char* leftFile, c
 		}
 	}
 
-	cvSaveImage("d:\\epipolarLeft.jpg", pEpipolarLeft);
-	cvSaveImage("d:\\epipolarRight.jpg", pEpipolarRight);
+	cvSaveImage("c:\\epipolarLeft.jpg", pEpipolarLeft);
+	cvSaveImage("c:\\epipolarRight.jpg", pEpipolarRight);
 
 	cvReleaseImage(&pLeftImage);
 	cvReleaseImage(&pRightImage);

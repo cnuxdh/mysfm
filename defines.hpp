@@ -68,7 +68,7 @@ typedef struct stPtFeature
 
 
 
-
+/*
 //feature pts in one image
 typedef struct stImgFeature
 {
@@ -76,7 +76,7 @@ typedef struct stImgFeature
 	int ht,wd;
 	vector<stPtFeature> featPts;
 }ImgFeature;
-
+*/
 
 //match pair
 typedef struct stMatchPair
@@ -119,15 +119,15 @@ typedef struct stPairMatchRes
 //define one track
 typedef std::pair<int,int>    ImageKey;         //the projection  of a track on one image, <imageId, featureID>
 typedef std::vector<ImageKey> ImageKeyVector;   //all projections of a track 
-typedef struct stTrackInfo
-{
-	int id;
-	int extra;              //save extra information
-	int valid;              //1:valid , 0:invalid 
-	double derror;    
-	Point3DDouble  grd;
-	ImageKeyVector views;
-}TrackInfo;
+//typedef struct stTrackInfo
+//{
+//	int id;
+//	int extra;              //save extra information (such as the index of image feature point)
+//	int valid;              //1:valid , 0:invalid 
+//	double derror;    
+//	Point3DDouble  grd;
+//	ImageKeyVector views;
+//}TrackInfo;
 
 
 //interior parameters

@@ -3,7 +3,11 @@
 #ifndef  CV_FEATURES_H
 #define  CV_FEATURES_H
 
+
+
 #include "defines.hpp"
+#include "badata.hpp"
+
 
 //the maximal image height for feature detection
 #define DETECT_IMAGE_HT 360

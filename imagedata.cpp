@@ -158,10 +158,12 @@ int CImageFeature::GetPointTrackIdx(int ptIndex)
 	return m_imageFeature.featPts[ptIndex].trackIdx;
 }
 
+/*
 ImgFeature& CImageFeature::GetImageFeature()
 {
 	return m_imageFeature;
 }
+*/
 
 int    CImageFeature::IsHasInitFocus()
 {

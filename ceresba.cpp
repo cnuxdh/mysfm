@@ -10,6 +10,8 @@
 #include "distortion.hpp"
 #include "bundlerio.hpp"
 #include "rotation.hpp"
+#include "badata.hpp"
+
 
 //baselib
 #include "baselib.h"
@@ -24,6 +26,9 @@
 
 
 ///////////////////////////////////////////////////////////////////////////////////////
+
+
+
 //select the new image to insert into the bundle adjustment
 int SelectNewImage(vector<int> cameraVisited,
 	vector<TrackInfo>& tracks, 
@@ -231,78 +236,6 @@ int CaculateTrackSeqGrd(vector<ImgFeature>&  imageFeatures,
 
 	return 0;
 }
-
-int CalculateNewCamParas(int nCameraId, 
-	vector<ImgFeature>&  imageFeatures,
-	vector<TrackInfo>& trackSeqNew, 
-	vector<TrackInfo>& tracks,
-	CameraPara& cam )
-{
-	vector<Point3DDouble> pt3;
-	vector<Point2DDouble> pt2;
-	
-	//collect the track corresponding to the new camera
-	for(int i=0; i<trackSeqNew.size(); i++)
-	{
-		int nTrackId = trackSeqNew[i].extra;              //find the original track
-
-		//ignore the track with large projection error
-		if( trackSeqNew[i].derror > 16 )
-			continue;
-
-		for(int j=0; j<tracks[nTrackId].views.size(); j++)
-		{
-			int nImageId = tracks[nTrackId].views[j].first;
-			int nPtId = tracks[nTrackId].views[j].second;
-
-			if(nImageId == nCameraId)
-			{
-				pt3.push_back( trackSeqNew[i].grd );
-
-				Point2DDouble p2;
-				p2.p[0] = imageFeatures[nImageId].featPts[nPtId].cx;
-				p2.p[1] = imageFeatures[nImageId].featPts[nPtId].cy;
-				pt2.push_back(p2);
-			}
-		}
-	}
-
-	//ransac DLT calculation
-	CPoseEstimationBase* pPE = new CDLTPose();
-	int r = pPE->EstimatePose(pt3, pt2, cam);
-	
-	//if successful, do bundle adjustment
-	if(r==0)
-	{
-		printf("\n optimization for DLT results: \n");
-
-		vector<int> inliers = pPE->GetInliers();
-		vector<int> inliers_weak = pPE->GetWeakInliers();
-				
-		//remove the wrong projections
-		vector<Point3DDouble> inlierPt3;
-		vector<Point2DDouble> inlierPt2;
-		
-		for(int i=0; i<inliers_weak.size(); i++)
-		{
-			inlierPt3.push_back( pt3[inliers_weak[i]] );
-			inlierPt2.push_back( pt2[inliers_weak[i]] );
-		}
-
-		CeresBA(inlierPt3, inlierPt2, cam);
-		
-		delete pPE;
-
-		printf("\n");
-	}
-	else
-	{
-		return -1;
-	}
-
-	return 0;
-}
-
 
 
 #ifdef CERES_LIB
@@ -526,13 +459,12 @@ int CeresBA( vector<TrackInfo> trackSeq, vector<ImgFeature> imageFeatures,
 		trackSeq[index].grd.p[2] = grdPt[i*3+2];
 	}
 
-
-
 	return 0;
 }
 
 
-int CeresBA( vector<Point3DDouble>& grdPts, vector<Point2DDouble>& imgPts, CameraPara& camera )
+int CeresBA( vector<Point3DDouble>& grdPts, vector<Point2DDouble>& imgPts, CameraPara& camera, 
+	bool bIsFixedFocalLen )
 {
 	double  pInteriorParams[3];
 	double  pOuterParams[6];
@@ -566,25 +498,35 @@ int CeresBA( vector<Point3DDouble>& grdPts, vector<Point2DDouble>& imgPts, Camer
 	pOuterParams[4] = -it[1];
 	pOuterParams[5] = -it[2];
 
-	//pOuterParams[3] = camera.t[0]; 
-	//pOuterParams[4] = camera.t[1];
-	//pOuterParams[5] = camera.t[2];
-	
 	printf("3D Points: %d \n", grdPts.size());
 
 	ceres::Problem problem;
 	//invoke ceres functions, each time adding one projection
 	for(int i=0; i<nProjection; i++)
 	{
-		ceres::CostFunction* cost_function =
-			RefineCameraError::Create( imgPts[i].p[0] , imgPts[i].p[1], 
-			grdPts[i].p[0], grdPts[i].p[1], grdPts[i].p[2]);
+		if(bIsFixedFocalLen)
+		{
+			ceres::CostFunction* cost_function =
+				RefineCameraFixedFocalLen::Create( imgPts[i].p[0] , imgPts[i].p[1], 
+				camera.focus, grdPts[i].p[0], grdPts[i].p[1], grdPts[i].p[2]);
 
-		problem.AddResidualBlock(cost_function,
-			NULL /* squared loss */,
-			pInteriorParams,   //inner camera parameters: 3
-			pOuterParams       //outer camera parameters: 6
+			problem.AddResidualBlock(cost_function,
+				NULL /* squared loss */,
+				pOuterParams       //camera extrinsic parameters: 6
+				);
+		}
+		else
+		{
+			ceres::CostFunction* cost_function =
+				RefineCameraError::Create( imgPts[i].p[0] , imgPts[i].p[1], 
+				grdPts[i].p[0], grdPts[i].p[1], grdPts[i].p[2]);
+
+			problem.AddResidualBlock(cost_function,
+				NULL /* squared loss */,
+				pInteriorParams,   //inner camera parameters: 3
+				pOuterParams       //outer camera parameters: 6
 			);			   
+		}
 	}
 
 	//save the optimized results
@@ -629,8 +571,7 @@ int CeresBA( vector<Point3DDouble>& grdPts, vector<Point2DDouble>& imgPts, Camer
 	camera.ax = ea[0];
 	camera.ay = ea[1];
 	camera.az = ea[2];
-
-
+	
 	//double iR[9];
 	memcpy(iR, R, sizeof(double)*9);
 	invers_matrix(iR, 3);
@@ -644,19 +585,232 @@ int CeresBA( vector<Point3DDouble>& grdPts, vector<Point2DDouble>& imgPts, Camer
 	camera.t[1] = -et[1];
 	camera.t[2] = -et[2];
 
-	//camera.t[0] = pOuterParams[3];
-	//camera.t[1] = pOuterParams[4];
-	//camera.t[2] = pOuterParams[5];
+	return 0;
+}
+
+#endif
+////////////////////////////////////////////////////////////////////////////
+
+/* calculate the projection error of each image point included in current track sequence,
+   and judge if the point is a wrong point.if the point is a bad point, then erase it
+   from the corresponding track. Do this one image after image, the threshold is from 
+   the statistics of one image.
+*/
+int FindProjectionOutliersByImagePt(vector<TrackInfo>& trackSeq, vector<ImgFeature>& imageFeatures, 
+	vector<int> cameraIDOrder, vector<TrackInfo>& tracks, vector<CameraPara>& cameras)
+{
+	for(int i=0; i<cameraIDOrder.size(); i++)
+	{
+		int imageId  = cameraIDOrder[i];
+		int nFeatNum = imageFeatures[imageId].GetFeatPtSum(); //imageFeatures[imageId].featPts.size();
+
+		for(int j=0; j<nFeatNum; j++)
+		{
+			int trackId    = imageFeatures[imageId].GetTrackIndex(j); //imageFeatures[imageId].featPts[j].extra;
+			if(trackId<0)
+				continue;
+
+			int curTrackId = tracks[trackId].GetRemapTrackId(); 
+			if(curTrackId<0)
+				continue;
+
+			int nViews = trackSeq[curTrackId].GetImageKeySum();
+			for(int k=0; k<nViews; k++)
+			{
+				ImageKey ik = trackSeq[curTrackId].GetImageKey(k);
+				int imageId = ik.first;
+				int ptId = ik.second;
+
+				Point3DDouble gp = trackSeq[curTrackId].GetGround();
+				Point2DDouble ip = imageFeatures[imageId].GetCenteredPt(ptId);
+
+				Point2DDouble tp;
+				GrdToImg(gp, tp, cameras[imageId]);
+
+				double dx = ip.p[0] - tp.p[0];
+				double dy = ip.p[1] - ip.p[1];
+				double err = sqrt(dx*dx+dy*dy);
+			}
+		}
+	}
+	return 0;
+}
+
+
+/*  judge the total projection error of each track, if the error is large, 
+    then discard the track directly.    
+*/
+int FindProjectionOutliersByTrack(vector<TrackInfo>& trackSeq, vector<ImgFeature>& imageFeatures, 
+	vector<int> cameraIDOrder, vector<TrackInfo>& tracks, vector<CameraPara>& cameras)
+{
+	
+	for(int i=0; i<trackSeq.size(); i++)
+	{
+
+
+	}
+
+	return 0;
+}
+
+//refine the camera parameters and track points 
+int RefineAllParameters(vector<TrackInfo> trackSeq, vector<ImgFeature>& imageFeatures, 
+	vector<int> cameraIDOrder, vector<TrackInfo>& tracks, vector<CameraPara> &cameras)
+{
+	while(1)
+	{
+		//1. optimization 
+		CeresBA(trackSeq, imageFeatures, cameras);
 		
-	std::cout<<endl;
+		//2. find the wrong feature point projections
+		
+
+		//3. remove the wrong feature point projections
+
+
+		//4. evaluate the optimization
+
+	}
+
+	//5. remove the bad cameras
+
+
+	return 0;
+}
+
+//refine only the camera parameters iterately after DLT 
+int RefineCamera( vector<Point3DDouble>& grdPts, vector<Point2DDouble>& imgPts, CameraPara& camera)
+{
+	//1. optimization with fixed camera focal length
+	CeresBA(grdPts, imgPts, camera, false);
+
+	while(1)
+	{
+		//2. optimization for all camera parameters 
+		CeresBA(grdPts, imgPts, camera, true);
+
+		
+		//3. calculate the errors
+
+
+		//4. evaluate the optimization
+		
+	}
+
+	return 0;
+}
+
+//calculate the camera intrinsic and extrinsic parameters of camera
+int CalculateNewCamParas(int nCameraId, 
+	vector<ImgFeature>&  imageFeatures,
+	vector<TrackInfo>& trackSeqNew, 
+	vector<TrackInfo>& tracks,
+	CameraPara& cam )
+{
+	vector<Point3DDouble> pt3;
+	vector<Point2DDouble> pt2;
+
+	//collect the track corresponding to the new camera
+	for(int i=0; i<trackSeqNew.size(); i++)
+	{
+		int nTrackId = trackSeqNew[i].extra;              //find the original track
+
+		//ignore the track with large projection error
+		if( trackSeqNew[i].derror > 16 )
+			continue;
+
+		for(int j=0; j<tracks[nTrackId].views.size(); j++)
+		{
+			int nImageId = tracks[nTrackId].views[j].first;
+			int nPtId = tracks[nTrackId].views[j].second;
+
+			if(nImageId == nCameraId)
+			{
+				pt3.push_back( trackSeqNew[i].grd );
+
+				Point2DDouble p2;
+				p2.p[0] = imageFeatures[nImageId].featPts[nPtId].cx;
+				p2.p[1] = imageFeatures[nImageId].featPts[nPtId].cy;
+				pt2.push_back(p2);
+			}
+		}
+	}
+
+	//ransac DLT calculation
+	CPoseEstimationBase* pPE = new CDLTPose();
+	int r = pPE->EstimatePose(pt3, pt2, cam);
+
+	//if successful, do bundle adjustment
+	if(r==0)
+	{
+		printf("\n optimization for DLT results: \n");
+
+		vector<int> inliers = pPE->GetInliers();
+		vector<int> inliers_weak = pPE->GetWeakInliers();
+
+		//remove the wrong projections
+		vector<Point3DDouble> inlierPt3;
+		vector<Point2DDouble> inlierPt2;
+
+		for(int i=0; i<inliers_weak.size(); i++)
+		{
+			inlierPt3.push_back( pt3[inliers_weak[i]] );
+			inlierPt2.push_back( pt2[inliers_weak[i]] );
+		}
+
+		//CeresBA(inlierPt3, inlierPt2, cam, false);
+		RefineCamera(inlierPt3, inlierPt2, cam);
+
+		delete pPE;
+
+		printf("\n");
+	}
+	else
+	{
+		return -1;
+	}
 
 	return 0;
 }
 
 
-#endif
+//model: R(X-T), from ground point to image
+int GrdToImg(Point3DDouble gp, Point2DDouble& ip, CameraPara cam)
+{
+	const double epsilon = 1e-18;
+	double p[3];
+	double res[3];
 
+	double f = cam.focus;
+	double k1 = cam.k1;
+	double k2 = cam.k2;
 
+	p[0] = gp.p[0] - cam.t[0];
+	p[1] = gp.p[1] - cam.t[1];
+	p[2] = gp.p[2] - cam.t[2];
+
+	mult(cam.R, p, res, 3, 3, 1);
+
+	//res[0] = R[0]*p[0]+R[1]*p[1]+R[2]*p[2];
+	//res[1] = R[3]*p[0]+R[4]*p[1]+R[5]*p[2];
+	//res[2] = R[6]*p[0]+R[7]*p[1]+R[8]*p[2];
+
+	double x0 = 0;
+	double y0 = 0;
+	double cx =  res[0]/(res[2]+epsilon)*(-f) + x0;
+	double cy =  res[1]/(res[2]+epsilon)*(-f) + y0;
+
+	double dx = cx;
+	double dy = cy;
+	Undistort(cx, cy, dx, dy, k1, k2);
+
+	ip.p[0] = dx;
+	ip.p[1] = dy;
+
+	return 0;
+}
+
+/////////////////////////////////////////////////////////////////////////////
 CCeresBA::CCeresBA()
 {
 }
@@ -778,7 +932,6 @@ int CCeresBA::BundleAdjust(int numCameras,
 	//update the track coordinates and calculate the error
 	CaculateTrackSeqGrd(imageFeatures, trackSeq, cameras, true);
 	
-
 	//3. adding new images
 	while(1)
 	{
@@ -809,7 +962,8 @@ int CCeresBA::BundleAdjust(int numCameras,
 
 #ifdef CERES_LIB
 		printf("BA for all cameras... \n");
-		CeresBA(trackSeq, imageFeatures, cameras);
+		//CeresBA(trackSeq, imageFeatures, cameras);
+		RefineAllParameters(trackSeq, imageFeatures, cameraIDOrder, tracks, cameras);
 #endif	
 		//update the track coordinates and calculate the error
 		CaculateTrackSeqGrd(imageFeatures, trackSeq, cameras, true);

@@ -24,7 +24,7 @@ class DLL_EXPORT CRelativePoseBase
 public:
 	CRelativePoseBase(){}
 	virtual ~CRelativePoseBase(){}
-	virtual int EstimatePose( PairMatchRes pairMatches, ImgFeature lImageFeat, ImgFeature rImageFeat, CameraPara& cam1, CameraPara& cam2 ){return 0;}
+	virtual int EstimatePose( PairMatchRes pairMatches, ImgFeature& lImageFeat, ImgFeature& rImageFeat, CameraPara& cam1, CameraPara& cam2 ){return 0;}
 	virtual int EstimatePose( vector<Point2DDouble> lPts, vector<Point2DDouble> rPts, CameraPara& cam1, CameraPara& cam2 ){return 0;}
 };
 
@@ -33,7 +33,7 @@ class DLL_EXPORT CEstimatePose5Point: public CRelativePoseBase
 public:
 	CEstimatePose5Point();
 	~CEstimatePose5Point();
-	int EstimatePose( PairMatchRes pairMatches, ImgFeature lImageFeat, ImgFeature rImageFeat, CameraPara& cam1, CameraPara& cam2 );
+	int EstimatePose( PairMatchRes pairMatches, ImgFeature& lImageFeat, ImgFeature& rImageFeat, CameraPara& cam1, CameraPara& cam2 );
 	int EstimatePose( vector<Point2DDouble> lPts, vector<Point2DDouble> rPts, CameraPara& cam1, CameraPara& cam2 );
 };
 
@@ -84,7 +84,7 @@ private:
    output:
 		imgpt: normalized point, origin is the center of image
 */
-int GrdToImg(Point3DDouble grdpt, Point2DDouble& imgpt, CameraPara cam);
+//int GrdToImg(Point3DDouble grdpt, Point2DDouble& imgpt, CameraPara cam);
 
 
 
