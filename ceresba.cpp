@@ -594,7 +594,7 @@ int CeresBA( vector<Point3DDouble>& grdPts, vector<Point2DDouble>& imgPts, Camer
 /* calculate the projection error of each image point included in current track sequence,
    and judge if the point is a wrong point.if the point is a bad point, then erase it
    from the corresponding track. Do this one image after image, the threshold is from 
-   the statistics of one image.
+   the statistics of projection errors distributed in one image.
 */
 int FindProjectionOutliersByImagePt(vector<TrackInfo>& trackSeq, vector<ImgFeature>& imageFeatures, 
 	vector<int> cameraIDOrder, vector<TrackInfo>& tracks, vector<CameraPara>& cameras)
@@ -637,20 +637,54 @@ int FindProjectionOutliersByImagePt(vector<TrackInfo>& trackSeq, vector<ImgFeatu
 }
 
 
-/*  judge the total projection error of each track, if the error is large, 
-    then discard the track directly.    
+/*  calculate the total projection error of each track, if the error is large, 
+    then discard the track directly.   
+	return value: the number of bad tracks
 */
 int FindProjectionOutliersByTrack(vector<TrackInfo>& trackSeq, vector<ImgFeature>& imageFeatures, 
-	vector<int> cameraIDOrder, vector<TrackInfo>& tracks, vector<CameraPara>& cameras)
-{
-	
+	vector<int> cameraIDOrder, vector<TrackInfo>& tracks, vector<CameraPara>& cameras, 
+	double threshold)
+{	
+	vector<TrackInfo> newTracks;
+	int nBadTracks = 0;
 	for(int i=0; i<trackSeq.size(); i++)
 	{
+		int nview = trackSeq[i].GetImageKeySum();
+		Point3DDouble gp = trackSeq[i].GetGround();
 
+		double totalError = 0;
+		vector<double> errors;
+		int nInliers = 0;
+		for(int k=0; k<nview; k++)
+		{
+			ImageKey ik = trackSeq[i].GetImageKey(k);
+			int imageId = ik.first;
+			int ptId = ik.second;
+			Point2DDouble ip = imageFeatures[imageId].GetCenteredPt(ptId);
 
+			Point2DDouble projPt;
+
+			GrdToImg(gp, projPt, cameras[imageId]);
+
+			double dx = ip.p[0] - projPt.p[0];
+			double dy = ip.p[1] - projPt.p[1];
+			double err = sqrt(dx*dx+dy*dy);
+			totalError += err;
+			errors.push_back(err);
+
+			if(err<threshold)
+				nInliers++;
+		}
+		
+		if(nInliers>=2)
+			newTracks.push_back(trackSeq[i]);
+		else
+			nBadTracks ++;
 	}
-
-	return 0;
+	
+	trackSeq = newTracks;
+	
+	return nBadTracks;
 }
 
 //refine the camera parameters and track points 
@@ -662,23 +696,24 @@ int RefineAllParameters(vector<TrackInfo> trackSeq, vector<ImgFeature>& imageFea
 		//1. optimization 
 		CeresBA(trackSeq, imageFeatures, cameras);
 		
-		//2. find the wrong feature point projections
-		
-
-		//3. remove the wrong feature point projections
+		//2. find the wrong feature point projections and remove them
 
 
-		//4. evaluate the optimization
+		//3. evaluate the optimization
 
 	}
 
-	//5. remove the bad cameras
+	//remove the bad cameras
+
 
 
 	return 0;
 }
 
 //refine only the camera parameters iterately after DLT 
+//return value: 
+//  0-camera is good and can be added into bundle adjustment
+//  1-camera is bad 
 int RefineCamera( vector<Point3DDouble>& grdPts, vector<Point2DDouble>& imgPts, CameraPara& camera)
 {
 	//1. optimization with fixed camera focal length
@@ -688,14 +723,15 @@ int RefineCamera( vector<Point3DDouble>& grdPts, vector<Point2DDouble>& imgPts, 
 	{
 		//2. optimization for all camera parameters 
 		CeresBA(grdPts, imgPts, camera, true);
-
-		
+				
 		//3. calculate the errors
-
+		
 
 		//4. evaluate the optimization
+
 		
 	}
+
 
 	return 0;
 }
@@ -739,14 +775,14 @@ int CalculateNewCamParas(int nCameraId,
 	//ransac DLT calculation
 	CPoseEstimationBase* pPE = new CDLTPose();
 	int r = pPE->EstimatePose(pt3, pt2, cam);
-
+	vector<int> inliers = pPE->GetInliers();
+	vector<int> inliers_weak = pPE->GetWeakInliers();
+	delete pPE;
+	
 	//if successful, do bundle adjustment
 	if(r==0)
 	{
 		printf("\n optimization for DLT results: \n");
-
-		vector<int> inliers = pPE->GetInliers();
-		vector<int> inliers_weak = pPE->GetWeakInliers();
 
 		//remove the wrong projections
 		vector<Point3DDouble> inlierPt3;
@@ -758,10 +794,8 @@ int CalculateNewCamParas(int nCameraId,
 			inlierPt2.push_back( pt2[inliers_weak[i]] );
 		}
 
-		//CeresBA(inlierPt3, inlierPt2, cam, false);
-		RefineCamera(inlierPt3, inlierPt2, cam);
-
-		delete pPE;
+		int res = RefineCamera(inlierPt3, inlierPt2, cam);
+		
 
 		printf("\n");
 	}
