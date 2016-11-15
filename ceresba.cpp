@@ -1011,17 +1011,20 @@ int CCeresBA::BundleAdjust(int numCameras,
 		if(newCameraIndex<0)
 			break;
 
-		printf("adding image: %d \n", newCameraIndex);
 
 		//calculate the camera parameters of new selected
+		printf("\n\n\n Calculate the new image camera parameters..... \n");
 		int res = CalculateNewCamParas(newCameraIndex, imageFeatures, trackSeq, tracks, cameras[newCameraIndex]);
 		
 		//DLT pose estimation failed
 		if( res < 0 )
 		{
 			cameraVisited[newCameraIndex] = 1;
+			printf("\n discard camera: %d \n", newCameraIndex);
 			continue;
 		}
+
+		printf("\n\n\n adding image %d and BA all  \n", newCameraIndex);
 
 		//update tracks according to the new image 
 		UpdateBATracks(newCameraIndex, cameraVisited, imageFeatures, tracks, trackSeq);
@@ -1035,7 +1038,7 @@ int CCeresBA::BundleAdjust(int numCameras,
 
 
 #ifdef CERES_LIB
-		printf("BA for all cameras... \n");
+		//printf("\n BA for all cameras... \n");
 		//CeresBA(trackSeq, imageFeatures, cameras);
 		RefineAllParameters(trackSeq, imageFeatures, cameraIDOrder, tracks, cameras);
 #endif	
@@ -1092,10 +1095,11 @@ int CCeresBA::BundleAdjust(int numCameras,
 
 	//output the camera parameters
 	printf("\n Final results: \n");
+	printf("Camera Number: %d \n", cameraIDOrder.size());
 	for(int i=0; i<cameraIDOrder.size(); i++)
 	{
 		int camId = cameraIDOrder[i];
-		printf("camera: %d \n", camId);
+		printf("camera: %d ", camId);
 		printf(" focal: %lf  ", cameras[camId].focus);
 		printf(" angle: %lf %lf %lf  ", cameras[camId].ax, cameras[camId].ay, cameras[camId].az);
 		printf(" position: %lf %lf %lf \n", cameras[camId].t[0], cameras[camId].t[1], cameras[camId].t[2]);
