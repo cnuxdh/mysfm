@@ -358,6 +358,137 @@ void FeatureConvert(PtFeature srcFeat, Key_Point& dstFeat)
 }
 
 
+vector<int> EstimateFMatrix(  const vector<Point2DDouble>& pl, 
+							  const vector<Point2DDouble>& pr,
+							  int num_trials, 
+							  double threshold)
+{
+	bool essential = false;
+
+	int num_pts = (int) pl.size();
+
+	/* num_pts should be greater than a threshold */
+	if (num_pts < 16) 
+	{
+		std::vector<int> inliers;
+		return inliers;
+	}
+
+	v3_t *k1_pts = new v3_t[num_pts];
+	v3_t *k2_pts = new v3_t[num_pts];
+
+	v3_t *k1_pts_in = new v3_t[num_pts];
+	v3_t *k2_pts_in = new v3_t[num_pts];
+
+	for (int i = 0; i < pl.size(); i++) 
+	{
+		k1_pts[i] = dll_v3_new(pl[i].p[0], pl[i].p[1], 1.0);
+		k2_pts[i] = dll_v3_new(pr[i].p[0], pr[i].p[1], 1.0);
+	}
+
+	double F[9];
+	dll_estimate_fmatrix_ransac_matches(num_pts, k2_pts, k1_pts, 
+		num_trials, threshold, 0.95,
+		(essential ? 1 : 0), F);
+
+	/* Find the inliers */
+	std::vector<int> inliers;
+
+	for (int i = 0; i < num_pts; i++) 
+	{
+		double dist = dll_fmatrix_compute_residual(F, k2_pts[i], k1_pts[i]);
+		if (dist < threshold) 
+		{
+			inliers.push_back(i);
+		}
+	}
+
+	/* Re-estimate using inliers */
+	int num_inliers = (int) inliers.size();
+
+	for (int i = 0; i < num_inliers; i++) 
+	{
+		k1_pts_in[i] = k1_pts[inliers[i]]; // v3_new(k1[idx1]->m_x, k1[idx1]->m_y, 1.0);
+		k2_pts_in[i] = k2_pts[inliers[i]]; // v3_new(k2[idx2]->m_x, k2[idx2]->m_y, 1.0);
+	}
+
+	// printf("[1] num_inliers = %d\n", num_inliers);
+
+#if 0
+	double F0[9];
+	double e1[3], e2[3];
+	estimate_fmatrix_linear(num_inliers, k2_pts_in, k1_pts_in, F0, e1, e2);
+
+	inliers.clear();
+	for (int i = 0; i < num_pts; i++) {
+		double dist = fmatrix_compute_residual(F0, k2_pts[i], k1_pts[i]);
+		if (dist < threshold) {
+			inliers.push_back(i);
+		}
+	}
+	num_inliers = inliers.size();
+	// printf("[2] num_inliers = %d\n", num_inliers);
+
+	// matrix_print(3, 3, F0);
+#else
+	double F0[9];
+	memcpy(F0, F, sizeof(double) * 9);
+#endif
+
+	if (!essential) 
+	{
+		/* Refine using NLLS */
+		for (int i = 0; i < num_inliers; i++) 
+		{
+			k1_pts_in[i] = k1_pts[inliers[i]];
+			k2_pts_in[i] = k2_pts[inliers[i]];
+		}
+
+		dll_refine_fmatrix_nonlinear_matches(num_inliers, k2_pts_in, k1_pts_in, 
+			F0, F);
+	}
+	else 
+	{
+		memcpy(F, F0, sizeof(double) * 9);
+	}
+
+#if 0
+	if (essential) 
+	{
+		/* Compute the SVD of F */
+		double U[9], S[3], VT[9];
+		dgesvd_driver(3, 3, F, U, S, VT);
+		double E0[9] = { 1.0, 0.0, 0.0,
+			0.0, 1.0, 0.0,
+			0.0, 0.0, 0.0 };
+
+		double tmp[9];
+		matrix_product(3, 3, 3, 3, U, E0, tmp);
+		matrix_product(3, 3, 3, 3, tmp, VT, F);
+	}
+#endif
+
+	inliers.clear();
+	for (int i = 0; i < num_pts; i++) 
+	{
+		double dist = dll_fmatrix_compute_residual(F, k2_pts[i], k1_pts[i]);
+		if (dist < threshold) 
+		{
+			inliers.push_back(i);
+		}
+	}
+	num_inliers = (int) inliers.size();
+
+	delete [] k1_pts;
+	delete [] k2_pts;
+	delete [] k1_pts_in;
+	delete [] k2_pts_in;
+
+	return inliers;
+
+}
+
+
 CRationMatch::CRationMatch()
 {
 
@@ -788,6 +919,7 @@ int CSiftMatch::Match(ImgFeature& lImage, ImgFeature& rImage, PairMatchRes& pair
 	
 
 	//wrong match removal based on Homography
+	/*
 	if(1)
 	{
 		double dH[9];
@@ -804,8 +936,40 @@ int CSiftMatch::Match(ImgFeature& lImage, ImgFeature& rImage, PairMatchRes& pair
 			rightMatch.push_back( pairMatch.matchs[ inliers[i] ] );
 		}
 		pairMatch.matchs = rightMatch;
+	}*/
+
+	if(1)
+	{
+		vector<Point2DDouble> lpts;
+		vector<Point2DDouble> rpts;
+		for(int i=0; i<pairMatch.matchs.size(); i++)
+		{
+			int lid = pairMatch.matchs[i].l;
+			int rid = pairMatch.matchs[i].r;
+
+			Point2DDouble lp,rp;
+			lp.p[0] = lImage.featPts[lid].x;
+			lp.p[1] = lImage.featPts[lid].y;
+			
+			rp.p[0] = rImage.featPts[rid].x;
+			rp.p[1] = rImage.featPts[rid].y;
+
+			lpts.push_back(lp);
+			rpts.push_back(rp);
+		}
+
+		vector<int> inliers = EstimateFMatrix(lpts, rpts, 256, 8);
+
+		vector<MatchPairIndex> inlierMatch;
+		for(int i=0; i<inliers.size(); i++)
+		{
+			inlierMatch.push_back( pairMatch.matchs[ inliers[i] ] );
+		}
+		pairMatch.matchs = inlierMatch;
 	}
 
+
+	
 	free(lKey);
 	free(rKey);
 
