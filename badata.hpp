@@ -13,9 +13,9 @@
 #define BADATA_HPP
 
 #include "defines.hpp"
+#include "export.hpp"
 
-
-class ImgFeature
+ class DLL_EXPORT ImgFeature
 {
 public:
 	ImgFeature();
@@ -44,7 +44,7 @@ public:
 };
 
 
-class TrackInfo
+class DLL_EXPORT TrackInfo
 {
 public:
 	TrackInfo();
@@ -73,10 +73,6 @@ public:
 	Point3DDouble  grd;
 	ImageKeyVector views;
 };
-
-
-
-
 
 
 #endif

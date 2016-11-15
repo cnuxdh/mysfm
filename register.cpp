@@ -118,7 +118,7 @@ static int LeastSquaresFit(const vector<stPtFeature> &k1,
 		error += dx * dx + dy * dy;
 	}
 
-	printf("[LeastSquaresFit] Residual error (before) is %0.3e\n", error);    
+	//printf("[LeastSquaresFit] Residual error (before) is %0.3e\n", error);    
 
 
 	for (int i=0; i < (int) inliers.size(); i++) 
@@ -182,7 +182,7 @@ static int LeastSquaresFit(const vector<stPtFeature> &k1,
 		error += dx * dx + dy * dy;
 	}
 
-	printf("[LeastSquaresFit] Residual error (after) is %0.3e\n", error);    
+	//printf("[LeastSquaresFit] Residual error (after) is %0.3e\n", error);    
 
 	delete [] r_pts;
 	delete [] l_pts;
@@ -739,8 +739,7 @@ int CSiftMatch::Match(ImgFeature& lImage, ImgFeature& rImage, PairMatchRes& pair
 {
 	#ifdef _WIN32
 	//unsigned long t1 = timeGetTime();
-	#endif
-	
+	#endif	
 	
 	//feature convert
 	unsigned char* lKey = NULL;
@@ -787,6 +786,7 @@ int CSiftMatch::Match(ImgFeature& lImage, ImgFeature& rImage, PairMatchRes& pair
 		pairMatch.matchs.push_back(mid);
 	}	
 	
+
 	//wrong match removal based on Homography
 	if(1)
 	{
