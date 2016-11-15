@@ -89,7 +89,7 @@ struct SFMReprojectionErrorEularAngle
 };
 
 
-
+// model: RX + T
 struct SFMReprojectionError 
 {
 	SFMReprojectionError(double observed_x, double observed_y)

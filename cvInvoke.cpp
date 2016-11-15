@@ -78,23 +78,26 @@ int MatchImageFiles(vector<ImgFeature>& imgFeatures, vector<PairMatchRes>& match
 	printf("[MatchImageFiles] ... \n");
 
 	int nImageNum = imgFeatures.size();
-
+		
 	CMatchBase* pMatch = new CKNNMatch();
 
 	for(int i=0; i<nImageNum; i++)
 		for(int j=i+1; j<nImageNum; j++)
 		{
+
 			PairMatchRes mr;
 			mr.lId = i;
 			mr.rId = j;
 
 			pMatch->Match(imgFeatures[i], imgFeatures[j], mr);
 
-			printf("%d-%d  %d %lf \n", i, j, mr.matchs.size(), mr.inlierRatio );
+			//printf("%d-%d  %d %lf \n", i, j, mr.matchs.size(), mr.inlierRatio );
+			printf("%d-%d  %d  \n", i, j, mr.matchs.size() );
 			
 			matchRes.push_back(mr);
+			
 		}
-
+	
 	delete pMatch;
 
 	return 0;

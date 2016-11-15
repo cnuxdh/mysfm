@@ -379,7 +379,7 @@ int CeresBA( vector<TrackInfo> trackSeq, vector<ImgFeature> imageFeatures,
 	ceres::Solve(options, &problem, &summary);
 	//std::cout << summary.FullReport() << "\n";
 
-	std::cout<<"optimized results: "<<"\n";
+	std::cout<<"\n"<<" all cameras optimized results: "<<"\n";
 
 	printf("Intrisic parameters... \n");
 	for(int i=0; i<3; i++)
@@ -649,7 +649,7 @@ int FindProjectionOutliersByTrack(vector<TrackInfo>& trackSeq, vector<ImgFeature
 	int nBadTracks = 0;
 	for(int i=0; i<trackSeq.size(); i++)
 	{
-		int nview = trackSeq[i].GetImageKeySum();
+		int nview        = trackSeq[i].GetImageKeySum();
 		Point3DDouble gp = trackSeq[i].GetGround();
 
 		double totalError = 0;
@@ -659,11 +659,11 @@ int FindProjectionOutliersByTrack(vector<TrackInfo>& trackSeq, vector<ImgFeature
 		{
 			ImageKey ik = trackSeq[i].GetImageKey(k);
 			int imageId = ik.first;
-			int ptId = ik.second;
+			int ptId    = ik.second;
+
 			Point2DDouble ip = imageFeatures[imageId].GetCenteredPt(ptId);
 
 			Point2DDouble projPt;
-
 			GrdToImg(gp, projPt, cameras[imageId]);
 
 			double dx = ip.p[0] - projPt.p[0];
@@ -696,19 +696,51 @@ int RefineAllParameters(vector<TrackInfo> trackSeq, vector<ImgFeature>& imageFea
 		//1. optimization 
 		CeresBA(trackSeq, imageFeatures, cameras);
 		
-		//2. find the wrong feature point projections and remove them
+		CaculateTrackSeqGrd(imageFeatures, trackSeq, cameras, true);
 
+		//2. find the wrong feature point projections and remove them
+		int nBadTrack = FindProjectionOutliersByTrack(trackSeq, imageFeatures, cameraIDOrder,
+			tracks, cameras, 8);
 
 		//3. evaluate the optimization
-
+		if(nBadTrack<16)
+			break;
 	}
 
 	//remove the bad cameras
 
-
-
 	return 0;
 }
+
+int FindGoodPoints(vector<Point3DDouble>& grdPts, vector<Point2DDouble>& imgPts, CameraPara& camera,
+					double projThreshold)
+{
+	int nInliers = 0;
+	vector<Point3DDouble> newGrdPts;
+	vector<Point2DDouble> newImgPts;
+	for(int i=0; i<grdPts.size(); i++)
+	{
+		Point2DDouble projPt;
+		GrdToImg(grdPts[i], projPt, camera);
+
+		double dx = imgPts[i].p[0] - projPt.p[0];
+		double dy = imgPts[i].p[1] - projPt.p[1];
+		double err = sqrt(dx*dx+dy*dy);
+
+		if(err<projThreshold)
+		{
+			newGrdPts.push_back(grdPts[i]);
+			newImgPts.push_back(imgPts[i]);
+			nInliers++;
+		}
+	}
+
+	grdPts = newGrdPts;
+	imgPts = newImgPts;
+
+	return nInliers;
+}
+
 
 //refine only the camera parameters iterately after DLT 
 //return value: 
@@ -717,23 +749,26 @@ int RefineAllParameters(vector<TrackInfo> trackSeq, vector<ImgFeature>& imageFea
 int RefineCamera( vector<Point3DDouble>& grdPts, vector<Point2DDouble>& imgPts, CameraPara& camera)
 {
 	//1. optimization with fixed camera focal length
-	CeresBA(grdPts, imgPts, camera, false);
+	CeresBA(grdPts, imgPts, camera, true);
 
+	int nCurrentInliers = FindGoodPoints(grdPts, imgPts, camera, 8);
+	int nNewInliers = nCurrentInliers;
 	while(1)
 	{
 		//2. optimization for all camera parameters 
-		CeresBA(grdPts, imgPts, camera, true);
+		CeresBA(grdPts, imgPts, camera, false);
 				
 		//3. calculate the errors
-		
+		nNewInliers = FindGoodPoints(grdPts, imgPts, camera, 8);
 
 		//4. evaluate the optimization
+		if(nCurrentInliers==nNewInliers)
+			break;
 
-		
+		nCurrentInliers = nNewInliers;
 	}
-
-
-	return 0;
+	
+	return nNewInliers;
 }
 
 //calculate the camera intrinsic and extrinsic parameters of camera
@@ -794,10 +829,12 @@ int CalculateNewCamParas(int nCameraId,
 			inlierPt2.push_back( pt2[inliers_weak[i]] );
 		}
 
-		int res = RefineCamera(inlierPt3, inlierPt2, cam);
+		int nInliers = RefineCamera(inlierPt3, inlierPt2, cam);
 		
+		if(nInliers<6)
+			return -1;
 
-		printf("\n");
+		//printf("\n");
 	}
 	else
 	{
@@ -994,6 +1031,9 @@ int CCeresBA::BundleAdjust(int numCameras,
 		
 		cameraVisited[newCameraIndex] = 1;
 
+		cameraIDOrder.push_back(newCameraIndex);
+
+
 #ifdef CERES_LIB
 		printf("BA for all cameras... \n");
 		//CeresBA(trackSeq, imageFeatures, cameras);
@@ -1001,7 +1041,6 @@ int CCeresBA::BundleAdjust(int numCameras,
 #endif	
 		//update the track coordinates and calculate the error
 		CaculateTrackSeqGrd(imageFeatures, trackSeq, cameras, true);
-
 	}
 		
 	//save the ba results: camera position, track points
@@ -1030,12 +1069,14 @@ int CCeresBA::BundleAdjust(int numCameras,
 			printf("\n");*/
 		}
 	}
-	for(int i=0; i<cameras.size(); i++)
+	for(int i=0; i<cameraIDOrder.size(); i++)
 	{
+		int id = cameraIDOrder[i];
+
 		Point3DDouble cp;
-		cp.p[0] = cameras[i].t[0];
-		cp.p[1] = cameras[i].t[1];
-		cp.p[2] = cameras[i].t[2];
+		cp.p[0] = cameras[id].t[0];
+		cp.p[1] = cameras[id].t[1];
+		cp.p[2] = cameras[id].t[2];
 
 		Point3DDouble camColor;
 		camColor.p[0] = 0;
@@ -1047,6 +1088,18 @@ int CCeresBA::BundleAdjust(int numCameras,
 	}
 
 	WritePMVSPly("c:\\temp\\ba.ply", goodGrds, colors);
+	
+
+	//output the camera parameters
+	printf("\n Final results: \n");
+	for(int i=0; i<cameraIDOrder.size(); i++)
+	{
+		int camId = cameraIDOrder[i];
+		printf("camera: %d \n", camId);
+		printf(" focal: %lf  ", cameras[camId].focus);
+		printf(" angle: %lf %lf %lf  ", cameras[camId].ax, cameras[camId].ay, cameras[camId].az);
+		printf(" position: %lf %lf %lf \n", cameras[camId].t[0], cameras[camId].t[1], cameras[camId].t[2]);
+	}
 	
 	return 0;
 }

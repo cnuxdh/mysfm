@@ -595,9 +595,12 @@ int CKNNMatch::Match(ImgFeature& lImage, ImgFeature& rImage, vector<MatchPairInd
 		mid.r = goodMatch.matpoint[i].id2;
 		matchRes.push_back(mid);
 	}
+
+
 	delete[] goodMatch.matpoint;
-   
-	delete[] matchSet.matpoint;
+   	delete[] matchSet.matpoint;
+	free(lPts);
+	free(rPts);	
 
 #ifdef _WIN32
 	//int64 t2 = getTickCount();
@@ -648,10 +651,12 @@ int CKNNMatch::Match(ImgFeature& lImage, ImgFeature& rImage, PairMatchRes& pairM
 	matchSet.mat_key_num = nMatch;
 	matchSet.matpoint = pMatch;
 		
-	
+	/*
 	MatchPoints goodMatch = del_gross_error(matchSet, lImage.wd, lImage.ht);
+
 	//inlier ratio
 	pairMatch.inlierRatio =  (double)(goodMatch.mat_key_num)/(double)(matchSet.mat_key_num);
+	
 	//save result
 	for(i=0; i<goodMatch.mat_key_num; i++)
 	{
@@ -661,9 +666,9 @@ int CKNNMatch::Match(ImgFeature& lImage, ImgFeature& rImage, PairMatchRes& pairM
 		pairMatch.matchs.push_back(mid);
 	}
 	delete[] goodMatch.matpoint;
+	*/
 	
-
-
+	
 	for(i=0; i<matchSet.mat_key_num; i++)
 	{
 		MatchPairIndex mid;
@@ -671,8 +676,11 @@ int CKNNMatch::Match(ImgFeature& lImage, ImgFeature& rImage, PairMatchRes& pairM
 		mid.r = matchSet.matpoint[i].id2;
 		pairMatch.matchs.push_back(mid);
 	}
+	
 
 	delete[] matchSet.matpoint;
+	free(lPts);
+	free(rPts);
 
 #ifdef _WIN32
 	//unsigned long t2 = timeGetTime();
