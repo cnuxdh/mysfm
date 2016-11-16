@@ -175,6 +175,11 @@ vector<int> EstimateTransform(const vector<stPtFeature> &k1,
 
 
 
+DLL_EXPORT vector<int> EstimateFMatrix(  const vector<Point2DDouble>& pl, 
+											const vector<Point2DDouble>& pr,
+											int num_trials, 
+											double threshold,
+											double* F=NULL);
 
 
 

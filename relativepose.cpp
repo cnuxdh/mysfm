@@ -530,8 +530,10 @@ int CEstimatePose5Point::EstimatePose( vector<Point2DDouble> lPts, vector<Point2
 		memcpy(cam2.t,nt,sizeof(double)*3);
 	}	
    
+	/*
 	//print results
 #ifdef _DEBUG
+	
 	FILE* fp = fopen("c:\\temp\\myRelativePose.txt", "w");
 	fprintf(fp, "%d %d \n", 0, 1);
 	fprintf(fp, "focus: %lf \n", cam2.focus);
@@ -550,6 +552,7 @@ int CEstimatePose5Point::EstimatePose( vector<Point2DDouble> lPts, vector<Point2
 	fprintf(fp, "\n");
 	fclose(fp);
 #endif
+	*/
 
 	//output
 	printf("Focus: %lf \n", cam2.focus);

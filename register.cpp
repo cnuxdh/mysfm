@@ -361,7 +361,8 @@ void FeatureConvert(PtFeature srcFeat, Key_Point& dstFeat)
 vector<int> EstimateFMatrix(  const vector<Point2DDouble>& pl, 
 							  const vector<Point2DDouble>& pr,
 							  int num_trials, 
-							  double threshold)
+							  double threshold,
+							  double* fm)
 {
 	bool essential = false;
 
@@ -386,10 +387,11 @@ vector<int> EstimateFMatrix(  const vector<Point2DDouble>& pl,
 		k2_pts[i] = dll_v3_new(pr[i].p[0], pr[i].p[1], 1.0);
 	}
 
-	double F[9];
+	//double Fm[9];
+
+	double F[9];	
 	dll_estimate_fmatrix_ransac_matches(num_pts, k2_pts, k1_pts, 
-		num_trials, threshold, 0.95,
-		(essential ? 1 : 0), F);
+		num_trials, threshold, 0.95, (essential ? 1 : 0), F);
 
 	/* Find the inliers */
 	std::vector<int> inliers;
@@ -484,8 +486,15 @@ vector<int> EstimateFMatrix(  const vector<Point2DDouble>& pl,
 	delete [] k1_pts_in;
 	delete [] k2_pts_in;
 
-	return inliers;
 
+	if(fm!=NULL)
+	{
+		//memcpy(fm, F, sizeof(9*sizeof(double)));
+		for(int i=0; i<9; i++)
+			fm[i] = F[i];
+	}
+
+	return inliers;
 }
 
 
@@ -916,6 +925,7 @@ int CSiftMatch::Match(ImgFeature& lImage, ImgFeature& rImage, PairMatchRes& pair
 		mid.r = rKeyIds[i];
 		pairMatch.matchs.push_back(mid);
 	}	
+	printf("direct matching number : %d \n", pairMatch.matchs.size());
 	
 
 	//wrong match removal based on Homography
@@ -957,18 +967,17 @@ int CSiftMatch::Match(ImgFeature& lImage, ImgFeature& rImage, PairMatchRes& pair
 			lpts.push_back(lp);
 			rpts.push_back(rp);
 		}
-
-		vector<int> inliers = EstimateFMatrix(lpts, rpts, 256, 8);
+		
+		vector<int> inliers = EstimateFMatrix(lpts, rpts, 512, 48);
 
 		vector<MatchPairIndex> inlierMatch;
 		for(int i=0; i<inliers.size(); i++)
 		{
 			inlierMatch.push_back( pairMatch.matchs[ inliers[i] ] );
 		}
+
 		pairMatch.matchs = inlierMatch;
 	}
-
-
 	
 	free(lKey);
 	free(rKey);
