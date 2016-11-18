@@ -881,6 +881,59 @@ int GrdToImg(Point3DDouble gp, Point2DDouble& ip, CameraPara cam)
 	return 0;
 }
 
+int SaveTracksToPly(char* filepath, const vector<TrackInfo>& trackSeq,
+					vector<int> cameraIDOrder, const vector<CameraPara>& cameras)
+{	
+	//save the ba results: camera position, track points
+	vector<Point3DDouble> goodGrds;
+	vector<Point3DDouble> colors;
+	printf("output the optimized track points.... \n");
+	for(int i=0; i<trackSeq.size(); i++)
+	{
+		if( trackSeq[i].valid<1 )
+			continue;
+
+		if( trackSeq[i].derror<4 )
+		{
+			goodGrds.push_back( trackSeq[i].grd );
+
+			Point3DDouble ptColor;
+			ptColor.p[0] = 255;
+			ptColor.p[1] = 0;
+			ptColor.p[2] = 0;
+			colors.push_back(ptColor);
+
+			/*for(int j=0; j<trackSeq[i].views.size(); j++)
+			{
+				printf("%d %d ", trackSeq[i].views[j].first, trackSeq[i].views[j].second);
+			}
+			printf("\n");*/
+		}
+	}
+	for(int i=0; i<cameraIDOrder.size(); i++)
+	{
+		int id = cameraIDOrder[i];
+
+		Point3DDouble cp;
+		cp.p[0] = cameras[id].t[0];
+		cp.p[1] = cameras[id].t[1];
+		cp.p[2] = cameras[id].t[2];
+
+		Point3DDouble camColor;
+		camColor.p[0] = 0;
+		camColor.p[1] = 255;
+		camColor.p[2] = 0;
+		colors.push_back(camColor);
+
+		goodGrds.push_back( cp );
+	}
+
+	WritePMVSPly(filepath, goodGrds, colors);
+	
+	return 0;
+}
+
+
 /////////////////////////////////////////////////////////////////////////////
 CCeresBA::CCeresBA()
 {
@@ -993,7 +1046,7 @@ int CCeresBA::BundleAdjust(int numCameras,
 			goodPts.push_back( gpts[i] );
 	}
 	
-	WritePMVSPly("c:\\temp\\pair.ply", goodPts);
+	//WritePMVSPly("c:\\temp\\pair.ply", goodPts);
 
 
 #ifdef CERES_LIB
@@ -1003,6 +1056,8 @@ int CCeresBA::BundleAdjust(int numCameras,
 	//update the track coordinates and calculate the error
 	CaculateTrackSeqGrd(imageFeatures, trackSeq, cameras, true);
 	
+	SaveTracksToPly("c:\\temp\\pair.ply", trackSeq, cameraIDOrder, cameras);
+
 	//3. adding new images
 	while(1)
 	{
@@ -1026,13 +1081,16 @@ int CCeresBA::BundleAdjust(int numCameras,
 
 		printf("\n\n\n adding image %d and BA all  \n", newCameraIndex);
 
-		//update tracks according to the new image 
+		//adding the image points of new image into the current tracks 
 		UpdateBATracks(newCameraIndex, cameraVisited, imageFeatures, tracks, trackSeq);
+
 
 		//update the track point 3D coordinate
 		CaculateTrackSeqGrd(imageFeatures, trackSeq, cameras, true);
 		
+
 		cameraVisited[newCameraIndex] = 1;
+
 
 		cameraIDOrder.push_back(newCameraIndex);
 
@@ -1045,53 +1103,8 @@ int CCeresBA::BundleAdjust(int numCameras,
 		//update the track coordinates and calculate the error
 		CaculateTrackSeqGrd(imageFeatures, trackSeq, cameras, true);
 	}
-		
-	//save the ba results: camera position, track points
-	vector<Point3DDouble> goodGrds;
-	vector<Point3DDouble> colors;
-	printf("output the optimized track points.... \n");
-	for(int i=0; i<trackSeq.size(); i++)
-	{
-		if( trackSeq[i].valid<1 )
-			continue;
-
-		if( trackSeq[i].derror<4 )
-		{
-			goodGrds.push_back( trackSeq[i].grd );
-
-			Point3DDouble ptColor;
-			ptColor.p[0] = 255;
-			ptColor.p[1] = 0;
-			ptColor.p[2] = 0;
-			colors.push_back(ptColor);
-
-			/*for(int j=0; j<trackSeq[i].views.size(); j++)
-			{
-				printf("%d %d ", trackSeq[i].views[j].first, trackSeq[i].views[j].second);
-			}
-			printf("\n");*/
-		}
-	}
-	for(int i=0; i<cameraIDOrder.size(); i++)
-	{
-		int id = cameraIDOrder[i];
-
-		Point3DDouble cp;
-		cp.p[0] = cameras[id].t[0];
-		cp.p[1] = cameras[id].t[1];
-		cp.p[2] = cameras[id].t[2];
-
-		Point3DDouble camColor;
-		camColor.p[0] = 0;
-		camColor.p[1] = 255;
-		camColor.p[2] = 0;
-		colors.push_back(camColor);
-
-		goodGrds.push_back( cp );
-	}
-
-	WritePMVSPly("c:\\temp\\ba.ply", goodGrds, colors);
 	
+	SaveTracksToPly("c:\\temp\\final-ba.ply", trackSeq, cameraIDOrder, cameras);
 
 	//output the camera parameters
 	printf("\n Final results: \n");

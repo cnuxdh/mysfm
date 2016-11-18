@@ -717,7 +717,13 @@ void CTriangulateCV::Triangulate(vector<Point2DDouble> pts,
 		double cx = pts[i].p[0];
 		double cy = pts[i].p[1];
 
-		double p3[3] = { cx, cy, 1.0 };
+		//undistort the image points, added by xiedonghai, 2016.11.18
+		double dx,dy;
+		double k1 = cams[i].k1;
+		double k2 = cams[i].k2;
+		Undistort(cx, cy, dx, dy, k1, k2);
+
+		double p3[3] = { dx, dy, 1.0 };
 
 		double K[9], Kinv[9];
 		GetIntrinsics(cameras[i], K);
