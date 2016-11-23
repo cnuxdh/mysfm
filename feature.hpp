@@ -4,13 +4,12 @@
 #define  CV_FEATURES_H
 
 
-
 #include "defines.hpp"
 #include "badata.hpp"
 
 
 //the maximal image height for feature detection
-#define DETECT_IMAGE_HT 360
+#define DETECT_IMAGE_HT 420
 
 //get the image dimension after scale
 void GetResizeDimension(int srcHt, int srcWd, int& dstHt, int& dstWd);
@@ -18,7 +17,7 @@ void GetResizeDimension(int srcHt, int srcWd, int& dstHt, int& dstWd);
 
 //////////////////////////////////////////////////////////////////////////
 // feature detection interface 
-class CFeatureBase
+class DLL_EXPORT CFeatureBase
 {
 public:
 	CFeatureBase(){}
@@ -34,7 +33,7 @@ public:
 
 
 //feature I/O base class
-class CFeatureIO
+class DLL_EXPORT CFeatureIO
 {
 public:
 	CFeatureIO(){}

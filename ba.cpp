@@ -879,6 +879,7 @@ vector<ImagePair> FindCamerasWithNMatches(int match_threshold,
 			int tr = tracks[j];
 			if (trackSeq[tr].extra < 0)
 				continue;
+			
 			/* This tracks corresponds to a point */
 			int pt = trackSeq[tr].extra;
 			if ((int) pt_views[pt].size() == 0)
@@ -2155,6 +2156,7 @@ double runSFMApi( int num_pts, int num_cameras, int start_camera,
 
 					// Sanity check
 					int extra = (imageData[added_order[v]]->GetKeyPoint(k)).extra;
+
 					if (  extra != idx)
 						printf("Error!  Entry for (%d,%d) "
 						"should be %d, but is %d\n",

@@ -12,11 +12,11 @@ using namespace std;
 
 
 
-int DetectFileFeaturePts(char** filenames, int nFile, char* outpath);
+int DLL_EXPORT DetectFileFeaturePts(char** filenames, int nFile, char* outpath);
 
-int DetectFileFeaturePts(char** filenames, int nFile, vector<ImgFeature>& imgFeatures);
+int DLL_EXPORT DetectFileFeaturePts(char** filenames, int nFile, vector<ImgFeature>& imgFeatures);
 
-int MatchImageFiles(vector<ImgFeature>& imgFeatures, vector<PairMatchRes>& matchRes);
+int DLL_EXPORT MatchImageFiles(vector<ImgFeature>& imgFeatures, vector<PairMatchRes>& matchRes);
 
 
 

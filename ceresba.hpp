@@ -16,11 +16,12 @@
 #include "ba.hpp"
 
 
-#ifdef CERES_LIB
+//#ifdef CERES_LIB
 //ceres lib
 #include "ceres/ceres.h"
 #include "ceres/rotation.h"
-#endif
+//#endif
+
 
 //corelib matrix
 #include "Matrix.h"
@@ -37,7 +38,7 @@ using namespace std;
 // focal length and 2 for radial distortion. The principal point is not modeled
 // (i.e. it is assumed be located at the image center).
 
-#ifdef CERES_LIB
+//#ifdef CERES_LIB
 
 
 struct SFMReprojectionErrorEularAngle 
@@ -367,4 +368,4 @@ private:
 #endif
 
 
-#endif
+//#endif

@@ -10,7 +10,6 @@
 //sfm-driver
 #include "sfm.h"
 
-
 void FixIntrinsics(double *P, double *K, double *R, double *t); 
 void GetIntrinsics(const camera_params_t &camera, double *K); 
 bool CheckCheirality(v3_t p, const camera_params_t &camera);

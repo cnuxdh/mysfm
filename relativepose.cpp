@@ -511,7 +511,7 @@ int CEstimatePose5Point::EstimatePose( vector<Point2DDouble> lPts, vector<Point2
 	memcpy(cam1.R, R0, sizeof(double)*9);
 	memcpy(cam1.t, t0, sizeof(double)*3);
 
-	int num_inliers =  EstimatePose5Point(lPts, rPts, 512, 0.25*9,  K1, K2, R, t);
+	int num_inliers =  EstimatePose5Point(lPts, rPts, 512, 4,  K1, K2, R, t);
 	printf("number of inliers : %d \n", num_inliers);
 
 	//decompose the three angles around x,y,z axis

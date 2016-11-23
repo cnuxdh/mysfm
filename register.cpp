@@ -977,6 +977,7 @@ int CSiftMatch::Match(ImgFeature& lImage, ImgFeature& rImage, PairMatchRes& pair
 		}
 
 		pairMatch.matchs = inlierMatch;
+		pairMatch.inlierRatio = (double)(inlierMatch.size()) / double(lpts.size()); 
 	}
 	
 	free(lKey);
