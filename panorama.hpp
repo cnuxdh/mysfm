@@ -50,15 +50,17 @@ output:
 	 
 */
 DLL_EXPORT int PanoToPlane(char* srcImageFile, char* outImageFile, 
-				double vangle, double hangle, double* direction, double focalLenRatio, 
-				double& focalLen, int& outHt, int& outWd,
-				double* pR);
+						double  vangle, double hangle, double* direction, double focalLenRatio, 
+						double& focalLen, int& outHt, int& outWd,
+						double* pR);
 
+DLL_EXPORT int PanoToPlanes(char* srcFile, double anglestep, double vangle, 
+	double hangle, double fratio, char* outpath);
 
 //panoram image is projected to several images
 int PanoToPlanes(int nImageIndex, char* srcFile, double anglestep,
-									double vangle, double hangle, double fratio,
-									double* R, double* T, vector<CameraPara>& camParas);
+				double vangle, double hangle, double fratio,
+				double* R, double* T, vector<CameraPara>& camParas);
 
 
 

@@ -2149,8 +2149,8 @@ double runSFMApi( int num_pts, int num_cameras, int start_camera,
 
 				for (int j = 0; j < num_views; j++) 
 				{
-					int v = pt_views[idx][j].first;
-					int k = pt_views[idx][j].second;
+					int v = pt_views[idx][j].first;   //camera index
+					int k = pt_views[idx][j].second;  //feature index
 
 					vmask[idx * num_cameras + v] = 0;
 
@@ -2158,10 +2158,8 @@ double runSFMApi( int num_pts, int num_cameras, int start_camera,
 					int extra = (imageData[added_order[v]]->GetKeyPoint(k)).extra;
 
 					if (  extra != idx)
-						printf("Error!  Entry for (%d,%d) "
-						"should be %d, but is %d\n",
-						added_order[v], k,
-						idx, extra);
+						printf("Error!  Entry for (%d,%d) " "should be %d, but is %d\n",
+									added_order[v], k, idx, extra);
 
 					//GetKey(added_order[v], k).m_extra = -2;
 					imageData[added_order[v]]->SetFeatExtra(k,-2);
@@ -2188,8 +2186,10 @@ double runSFMApi( int num_pts, int num_cameras, int start_camera,
 				init_pts[i] = nz_pts[remap[i]];
 			}
 		}
+
 		if (!remove_outliers) 
 			break;
+
 	} while (num_outliers > 0);
 
 	delete [] remap;

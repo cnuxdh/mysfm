@@ -968,7 +968,7 @@ int CSiftMatch::Match(ImgFeature& lImage, ImgFeature& rImage, PairMatchRes& pair
 			rpts.push_back(rp);
 		}
 		
-		vector<int> inliers = EstimateFMatrix(lpts, rpts, 512, 48);
+		vector<int> inliers = EstimateFMatrix(lpts, rpts, 512, 16);
 
 		vector<MatchPairIndex> inlierMatch;
 		for(int i=0; i<inliers.size(); i++)

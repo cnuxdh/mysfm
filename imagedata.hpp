@@ -43,11 +43,11 @@ public:
 	virtual int SetTrackIdx(int ptIndex, int idx){return 0;}
 	virtual int GetPointTrackIdx(int ptIndex){return 0;}
 
-	//virtual ImgFeature& GetImageFeature()
-	//{
-	//	ImgFeature features;
-	//	return features;
-	//}
+	virtual ImgFeature& GetImageFeature()
+	{
+		ImgFeature features;
+		return features;
+	}
 
 	virtual vector<int> GetPtSeq()
 	{
@@ -82,7 +82,7 @@ public:
 	FeatPoint GetKeyPoint(int index);
 	//int  GetExtra();
 	void SetFeatExtra(int index, int extra);
-	//ImgFeature& GetImageFeature();
+	ImgFeature& GetImageFeature();
 
 	//for track
 	//int AddTrackIdx(int idx);  //save the track index into the vector

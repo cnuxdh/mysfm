@@ -79,7 +79,7 @@ int MatchImageFiles(vector<ImgFeature>& imgFeatures, vector<PairMatchRes>& match
 
 	int nImageNum = imgFeatures.size();
 		
-	CMatchBase* pMatch = new CSiftMatch();//new CKNNMatch();
+	CMatchBase* pMatch = new CSiftMatch();  //new CKNNMatch();
 
 	for(int i=0; i<nImageNum; i++)
 		for(int j=i+1; j<nImageNum; j++)

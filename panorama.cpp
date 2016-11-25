@@ -21,8 +21,9 @@
 #include "corelib/matrix.h"
 
 
+
 //matrix lib
-#include "matrix/matrix.h"
+//#include "matrix/matrix.h"
 
 
 
@@ -54,6 +55,7 @@ int PanoToPlane(char* srcImageFile, char* outImageFile,
 	//first method: R.xT = direction
 	//CalculateAlignRotation1(xT, direction, R);
 	//second method: orthogonal Procrustes algorithm
+
   POINT3D zp;
   zp.x = direction[0];
   zp.y = direction[1];
@@ -98,9 +100,7 @@ int PanoToPlane(char* srcImageFile, char* outImageFile,
 	int projHt = projFocus*tan(vangle*radianAngle*0.5)*2;
 	int projWd = projFocus*tan(hangle*radianAngle*0.5)*2;
 	
-	
-
-	
+		
 	printf("proj width:%d   height:%d \n", projWd, projHt);
 	
 	//image reprojection
@@ -167,6 +167,46 @@ int PanoToPlane(char* srcImageFile, char* outImageFile,
 	outWd = projWd;
 	
 	printf("pano to plane projection Finished! \n");
+
+	return 0;
+}
+
+
+int PanoToPlanes(char* srcFile, double anglestep, double vangle, 
+	             double hangle, double fratio, char* outpath)
+{
+	char title[256];
+	strcpy(title, srcFile);
+	strcpy(title+strlen(title)-4, "\0");
+	
+	//projection from panorama to plane 
+	int nAngleStep  = anglestep;
+	int nProjectNum = 360 / nAngleStep;
+	for(int i=0; i<nProjectNum; i++)
+	{
+		double lat = 90 / 180.0 * PI; //from top to bottom: 0-180
+		double lon = i*nAngleStep / 180.0 * PI; //from left to right: 0-360
+
+		//calculate the direction according to (lon,lat), must be the opposite
+		double direction[3];
+		direction[0] = -sin(lon)*sin(lat);  //x
+		direction[1] = -cos(lon)*sin(lat);  //y
+		direction[2] = -cos(lat);           //z
+
+		printf("direction: %lf %lf %lf \n", direction[0], direction[1], direction[2]);
+
+		char outfile[256];
+		//sprintf(outfile, "%s_%d_%d.jpg", title, int(lat/PI*180+0.5), int(lon/PI*180+0.5));
+		sprintf(outfile, "%s-%.2d.jpg", title, i);
+		printf("plane file: %s \n", outfile);
+		
+		double Rp[9]; //rotation matrix for plane 
+		//generate the plane projection image and save it
+		double focalLen;
+		int outHt, outWd;
+		PanoToPlane( srcFile, outfile, vangle, hangle, direction, fratio, 
+			focalLen, outHt, outWd, Rp);
+	}
 
 	return 0;
 }

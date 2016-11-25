@@ -25,7 +25,7 @@ public:
 	int GetFeatPtSum(){return featPts.size();}
 
 	//get the track index connecting with the feature point
-	int GetTrackIndex(int ptIndex){return featPts[ptIndex].extra;}
+	int GetPtTrackIndex(int ptIndex){return featPts[ptIndex].extra;}
 	void SetTrackIndex(int ptIndex, int nTrackIndex){ featPts[ptIndex].extra = nTrackIndex;}
 
 	//get the centered x,y of feaure point
@@ -64,6 +64,7 @@ public:
 	
 	double GetProjectionError(){return derror;}
 
+	void   Clear(){views.clear();}
 
 public:
 	int id;
