@@ -33,7 +33,7 @@
    cameraIDOrder: 
    cameras:       
 */
-int RunBA( vector<TrackInfo> trackSeq, vector<ImgFeature> imageFeatures, 
+int RunBA( vector<TrackInfo>& trackSeq, vector<ImgFeature>& imageFeatures, 
 		   vector<int> cameraIDOrder, vector<CameraPara> &cameras)
 {
 	int nBACameras = cameraIDOrder.size(); //the cameras attending the BA
@@ -76,7 +76,10 @@ int RunBA( vector<TrackInfo> trackSeq, vector<ImgFeature> imageFeatures,
 	int num_pts = trackSeq.size();
 	double* grdPt = new double[num_pts*3]; //(double*)malloc( _pts*3*sizeof(double) );
 	for(int i=0; i<num_pts; i++)
-	{
+	{   
+		//if( trackSeq[i].GetImageKeySum() == 0 )
+		//	continue;
+
 		Point3DDouble gp = trackSeq[i].GetGround();
 		grdPt[i*3]   = gp.p[0];
 		grdPt[i*3+1] = gp.p[1];
@@ -233,6 +236,7 @@ int RemoveOutlierPts( vector<TrackInfo>& tracks, vector<TrackInfo>& trackSeq,
 	int numCam = cameraIDOrder.size();
 
 	vector<int> outliers; //save the index of outliers for ground point
+	vector<int> inliers; 
 	for(int i=0; i<numCam; i++)
 	{
 		int camId   = cameraIDOrder[i];
@@ -246,9 +250,13 @@ int RemoveOutlierPts( vector<TrackInfo>& tracks, vector<TrackInfo>& trackSeq,
 			if(nTrackId<0)
 				continue;
 			
-			//the projection point has not been added to the currect track seq
+			//the projection point has not been added to the current track seq
 			int nCurrentTrack = tracks[nTrackId].GetRemapTrackId();
 			if(nCurrentTrack<0)
+				continue;
+
+			//the track has been discarded
+			if( trackSeq[nCurrentTrack].GetImageKeySum()==0 )
 				continue;
 
 			Point3DDouble gp = trackSeq[nCurrentTrack].GetGround();
@@ -286,6 +294,12 @@ int RemoveOutlierPts( vector<TrackInfo>& tracks, vector<TrackInfo>& trackSeq,
 				continue;
 		
 			int nCurrentTrack = tracks[nTrackId].GetRemapTrackId();
+			if(nCurrentTrack<0)
+				continue;
+
+			//the track has been discarded
+			if( trackSeq[nCurrentTrack].GetImageKeySum()==0 )
+				continue;
 
 			if(dists[nIndex]>thresh)
 			{					
@@ -298,6 +312,9 @@ int RemoveOutlierPts( vector<TrackInfo>& tracks, vector<TrackInfo>& trackSeq,
 				if(!bFound)
 				{
 					outliers.push_back(nCurrentTrack);
+
+					//cut the connection between track and projection point
+					imageFeatures[camId].SetTrackIndex(k, -1); 
 				}
 			}
 			nIndex ++;
@@ -305,12 +322,29 @@ int RemoveOutlierPts( vector<TrackInfo>& tracks, vector<TrackInfo>& trackSeq,
 	}
 
 	//remove outliers
+	//vector<int> outlierMask;
+	//outlierMask.resize( trackSeq.size(), 0);
+	
 	for(int i=0; i<outliers.size(); i++)
 	{
+		//outlierMask[ outliers[i] ] = 1;
 		trackSeq[ outliers[i] ].Clear();
 	}
 
-	return 0;
+	/*
+	vector<TrackInfo> goodTracks;
+	for(int i=0; i<trackSeq.size(); i++)
+	{
+		if(outlierMask[i]>0)
+			continue;
+		goodTracks.push_back(trackSeq[i]);
+	}
+	trackSeq = goodTracks;
+	*/
+
+	printf("remove %d outliers \n", outliers.size());
+
+	return outliers.size();
 }
 
 /*
@@ -384,6 +418,16 @@ int RemoveBadPoints(vector<TrackInfo>& trackSeq,
 		maxangle = maxangle / PI * 180;
 		if(maxangle<5)
 		{
+			//cut the connections between the track and projection points
+			int num_views = (int) trackSeq[i].GetImageKeySum();
+			for(int ki=0; ki<num_views; ki++)
+			{
+				ImageKey ik = trackSeq[i].GetImageKey(ki);
+				int camId = ik.first;
+				int ptId  = ik.second;
+				imageFeatures[camId].SetTrackIndex(ptId, -1);
+			}
+
 			trackSeq[i].Clear();
 			num_pruned ++;
 		}
@@ -441,60 +485,6 @@ int SelectNewImage(vector<int> cameraVisited,
 	return newCamera;
 }
 
-//update the current track sequence
-int UpdateBATracks( int newCameraIndex, vector<int> cameraVisited,
-	vector<ImgFeature>&  imageFeatures, 
-	vector<TrackInfo>& tracks, 
-	vector<TrackInfo>& trackSeqNew)
-{
-	int nFeatPtNum = imageFeatures[newCameraIndex].featPts.size();
-	for(int i=0; i<nFeatPtNum; i++)
-	{
-		int nTrackIndex = imageFeatures[newCameraIndex].featPts[i].extra;
-
-		if(nTrackIndex<0)
-			continue;
-
-		int nNewTrackIndex = tracks[nTrackIndex].extra;
-
-		ImageKey ik;
-		ik.first  = newCameraIndex;
-		ik.second = i; 
-
-		if(nNewTrackIndex>=0) //corresponding to the new Track sequence
-		{
-			trackSeqNew[nNewTrackIndex].views.push_back(ik);
-		}
-		else //adding a new track into the new Track sequence
-		{
-			TrackInfo newTrack;
-			newTrack.extra = nTrackIndex;
-			newTrack.valid = 1;
-			newTrack.views.push_back(ik);
-
-			for(int k=0; k<tracks[nTrackIndex].views.size(); k++)
-			{
-				int imageId = tracks[nTrackIndex].views[k].first;
-				int nPtId = tracks[nTrackIndex].views[k].second;
-				if( cameraVisited[imageId]>0)
-				{
-					ik.first = imageId;
-					ik.second = nPtId;
-					newTrack.views.push_back(ik);
-				}
-			}
-
-			if(newTrack.views.size()>1)
-			{
-				tracks[nTrackIndex].extra = trackSeqNew.size(); //added by xdh, 2016.10.31
-				trackSeqNew.push_back(newTrack);
-			}
-		}
-	}		
-
-	return 0;
-}
-
 //calculate the ground point of track seq
 int CaculateTrackSeqGrd(vector<ImgFeature>&  imageFeatures, 
 	vector<TrackInfo>&   tracks, 
@@ -509,7 +499,10 @@ int CaculateTrackSeqGrd(vector<ImgFeature>&  imageFeatures,
 	{
 		bool estimate_distortion = true;
 
-		int num_views = (int) tracks[i].views.size();
+		int num_views = tracks[i].GetImageKeySum(); //(int) tracks[i].views.size();
+
+		if(num_views<2)
+			continue;
 
 		vector<Point2DDouble> pts;
 		vector<CameraPara> cams;
@@ -541,12 +534,15 @@ int CaculateTrackSeqGrd(vector<ImgFeature>&  imageFeatures,
 		tracks[i].derror = ferror;
 		tracks[i].grd    = gps;
 
+
+
 		/*
 		if( gps.p[2]>0 )
 		{
 			printf("%lf \n", gps.p[2]);
 		}*/
 
+		/*
 		//calculate the angle between the track point and camera center
 		double maxangle = 0;
 		for (int j = 0; j < num_views; j++) 
@@ -603,7 +599,71 @@ int CaculateTrackSeqGrd(vector<ImgFeature>&  imageFeatures,
 			//	tracks[i].grd.p[0], tracks[i].grd.p[1], tracks[i].grd.p[2],
 			//	tracks[i].derror);
 		}
+		*/
 	}
+
+	return 0;
+}
+
+//update the current track sequence
+int UpdateBATracks( int newCameraIndex, vector<int> cameraVisited,
+	vector<ImgFeature>&  imageFeatures, 
+	vector<TrackInfo>& tracks, 
+	vector<TrackInfo>& trackSeqNew,
+	vector<CameraPara>& cameras)
+{
+	int nFeatPtNum = imageFeatures[newCameraIndex].featPts.size();
+
+	for(int i=0; i<nFeatPtNum; i++)
+	{
+		int nTrackIndex = imageFeatures[newCameraIndex].featPts[i].extra;
+
+		if(nTrackIndex<0)
+			continue;
+
+		int nNewTrackIndex = tracks[nTrackIndex].extra;
+
+		ImageKey ik;
+		ik.first  = newCameraIndex;
+		ik.second = i; 
+
+		if(nNewTrackIndex>=0) //corresponding to the new Track sequence
+		{
+			trackSeqNew[nNewTrackIndex].views.push_back(ik);
+		}
+		else //adding a new track into the new Track sequence
+		{
+			TrackInfo newTrack;
+			newTrack.extra = nTrackIndex;
+			newTrack.valid = 1;
+			newTrack.views.push_back(ik);
+
+			for(int k=0; k<tracks[nTrackIndex].views.size(); k++)
+			{
+				int imageId = tracks[nTrackIndex].views[k].first;
+				int nPtId = tracks[nTrackIndex].views[k].second;
+				if( cameraVisited[imageId]>0)
+				{
+					ik.first = imageId;
+					ik.second = nPtId;
+					newTrack.views.push_back(ik);
+				}
+			}
+
+			if(newTrack.views.size()>1)
+			{
+				tracks[nTrackIndex].extra = trackSeqNew.size(); //added by xdh, 2016.10.31
+				trackSeqNew.push_back(newTrack);
+			}
+		}
+	}		
+
+
+	//because we add new tracks into the current track sequence, so we need calculate the ground point
+	//for those new tracks, added by xiedonghai, 2016.11.16
+	CaculateTrackSeqGrd(imageFeatures, trackSeqNew, cameras, true);
+
+
 
 	return 0;
 }
@@ -1079,6 +1139,8 @@ int RefineAllParameters(vector<TrackInfo>& trackSeq, vector<ImgFeature>& imageFe
 		nOutliers = RemoveOutlierPts(tracks, trackSeq, imageFeatures, cameraIDOrder, cameras);
 		nTotalOutliers += nOutliers;
 
+		//printf("outlier: %d \n", nOutliers);
+
 		//int nCurrentGood = trackSeq.size();
 
 		//3. evaluate the optimization
@@ -1163,24 +1225,22 @@ int CalculateNewCamParas(int nCameraId,
 	//collect the track corresponding to the new camera
 	for(int i=0; i<trackSeqNew.size(); i++)
 	{
-		int nTrackId = trackSeqNew[i].extra;              //find the original track
-
-		//ignore the track with large projection error
-		if( trackSeqNew[i].derror > 16 )
+		if( trackSeqNew[i].GetImageKeySum() == 0 )
 			continue;
 
-		for(int j=0; j<tracks[nTrackId].views.size(); j++)
+		int nTrackId = trackSeqNew[i].GetRemapTrackId(); //trackSeqNew[i].extra;              //find the original track
+
+		int nviews = tracks[nTrackId].GetImageKeySum();
+		for(int j=0; j<nviews; j++)
 		{
-			int nImageId = tracks[nTrackId].views[j].first;
-			int nPtId = tracks[nTrackId].views[j].second;
+			ImageKey ik = tracks[nTrackId].GetImageKey(j);
+			int nImageId = ik.first;
+			int nPtId    = ik.second;
 
 			if(nImageId == nCameraId)
 			{
-				pt3.push_back( trackSeqNew[i].grd );
-
-				Point2DDouble p2;
-				p2.p[0] = imageFeatures[nImageId].featPts[nPtId].cx;
-				p2.p[1] = imageFeatures[nImageId].featPts[nPtId].cy;
+				pt3.push_back( trackSeqNew[i].GetGround() );
+				Point2DDouble p2 = imageFeatures[nImageId].GetCenteredPt(nPtId);
 				pt2.push_back(p2);
 			}
 		}
@@ -1260,7 +1320,7 @@ int GrdToImg(Point3DDouble gp, Point2DDouble& ip, CameraPara cam)
 	return 0;
 }
 
-int SaveTracksToPly(char* filepath, const vector<TrackInfo>& trackSeq,
+int SaveTracksToPly(char* filepath, vector<TrackInfo>& trackSeq,
 					vector<int> cameraIDOrder, const vector<CameraPara>& cameras)
 {	
 	//save the ba results: camera position, track points
@@ -1269,10 +1329,13 @@ int SaveTracksToPly(char* filepath, const vector<TrackInfo>& trackSeq,
 	printf("output the optimized track points.... \n");
 	for(int i=0; i<trackSeq.size(); i++)
 	{
-		if( trackSeq[i].valid<1 )
+		//if( trackSeq[i].valid<1 )
+		//	continue;
+
+		if( trackSeq[i].GetImageKeySum() == 0 )
 			continue;
 
-		if( trackSeq[i].derror<4 )
+		//if( trackSeq[i].derror<4 )
 		{
 			goodGrds.push_back( trackSeq[i].grd );
 
@@ -1423,20 +1486,23 @@ int CCeresBA::BundleAdjust(int numCameras,
 	vector<int> cameraIDOrder;
 	cameraIDOrder.push_back(leftImageId);
 	cameraIDOrder.push_back(rightImageId);
-	vector<Point3DDouble> goodPts;
+	//vector<Point3DDouble> goodPts;
 	for(int i=0; i<gpts.size(); i++)
 	{
 		trackSeq[i].grd = gpts[i];
 		trackSeq[i].derror = errorarray[i];
-
-		if( errorarray[i]<4 )
-			goodPts.push_back( gpts[i] );
+		//if( errorarray[i]<4 ) goodPts.push_back( gpts[i] );
 	}
 	
 	RemoveOutlierPts(tracks, trackSeq, imageFeatures, cameraIDOrder, cameras);
 
-	CeresBA(trackSeq, imageFeatures, cameras);
+	SaveTracksToPly("c:\\temp\\pair-raw.ply", trackSeq, cameraIDOrder, cameras);
 
+	//CeresBA(trackSeq, imageFeatures, cameras);
+	RunBA(trackSeq, imageFeatures, cameraIDOrder, cameras);
+
+	RemoveOutlierPts(tracks, trackSeq, imageFeatures, cameraIDOrder, cameras);
+	
 	//update the track coordinates and calculate the error
 	//CaculateTrackSeqGrd(imageFeatures, trackSeq, cameras, true);
 	
@@ -1462,24 +1528,22 @@ int CCeresBA::BundleAdjust(int numCameras,
 			continue;
 		}
 
-		printf("\n\n\n adding image %d and BA all  \n", newCameraIndex);
+		printf("\n\n\n adding image %d \n", newCameraIndex);
 
 		//adding the image points of new image into the current tracks 
-		UpdateBATracks(newCameraIndex, cameraVisited, imageFeatures, tracks, trackSeq);
+		UpdateBATracks(newCameraIndex, cameraVisited, imageFeatures, tracks, trackSeq, cameras);
 
+		//we may add bad points, so remove the outliers 
+		//RemoveOutlierPts(tracks, trackSeq, imageFeatures, cameraIDOrder, cameras);
+		//RemoveBadPoints(trackSeq, imageFeatures, cameras);
 
-		//update the track point 3D coordinate
-		//CaculateTrackSeqGrd(imageFeatures, trackSeq, cameras, true);
-		
 		cameraVisited[newCameraIndex] = 1;
 		cameraIDOrder.push_back(newCameraIndex);
 		
-		//printf("\n BA for all cameras... \n");
-		//CeresBA(trackSeq, imageFeatures, cameras);
+		printf("\n BA for all cameras... \n");
 		RefineAllParameters(trackSeq, imageFeatures, cameraIDOrder, tracks, cameras);
 		
-		//update the track coordinates and calculate the error
-		//CaculateTrackSeqGrd(imageFeatures, trackSeq, cameras, true);
+		//remove the bad points according to the angle
 		RemoveBadPoints(trackSeq, imageFeatures, cameras);
 	}
 	
