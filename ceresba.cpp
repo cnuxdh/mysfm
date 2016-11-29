@@ -606,11 +606,13 @@ int CaculateTrackSeqGrd(vector<ImgFeature>&  imageFeatures,
 }
 
 //update the current track sequence
-int UpdateBATracks( int newCameraIndex, vector<int> cameraVisited,
-	vector<ImgFeature>&  imageFeatures, 
-	vector<TrackInfo>& tracks, 
-	vector<TrackInfo>& trackSeqNew,
-	vector<CameraPara>& cameras)
+int UpdateBATracks( int newCameraIndex, 
+					vector<int>&  cameraVisited,
+					vector<int>&  cameraIDOrder,
+					vector<ImgFeature>&  imageFeatures, 
+					vector<TrackInfo>& tracks, 
+					vector<TrackInfo>& trackSeqNew,
+					vector<CameraPara>& cameras)
 {
 	int nFeatPtNum = imageFeatures[newCameraIndex].featPts.size();
 
@@ -629,7 +631,14 @@ int UpdateBATracks( int newCameraIndex, vector<int> cameraVisited,
 
 		if(nNewTrackIndex>=0) //corresponding to the new Track sequence
 		{
-			trackSeqNew[nNewTrackIndex].views.push_back(ik);
+			int nviews = trackSeqNew[nNewTrackIndex].GetImageKeySum();
+			
+			//only valid track can be added 
+			if(nviews>0)
+			{
+				trackSeqNew[nNewTrackIndex].AddImageKey(ik);
+				//trackSeqNew[nNewTrackIndex].views.push_back(ik);
+			}
 		}
 		else //adding a new track into the new Track sequence
 		{
@@ -664,6 +673,12 @@ int UpdateBATracks( int newCameraIndex, vector<int> cameraVisited,
 	CaculateTrackSeqGrd(imageFeatures, trackSeqNew, cameras, true);
 
 
+	//remove the outliers
+	//RemoveOutlierPts(tracks, trackSeqNew, imageFeatures, cameraIDOrder, cameras);
+
+
+	cameraIDOrder.push_back(newCameraIndex);
+	cameraVisited[newCameraIndex] = 1;
 
 	return 0;
 }
@@ -1531,14 +1546,14 @@ int CCeresBA::BundleAdjust(int numCameras,
 		printf("\n\n\n adding image %d \n", newCameraIndex);
 
 		//adding the image points of new image into the current tracks 
-		UpdateBATracks(newCameraIndex, cameraVisited, imageFeatures, tracks, trackSeq, cameras);
+		UpdateBATracks(newCameraIndex, cameraVisited, cameraIDOrder, imageFeatures, tracks, trackSeq, cameras);
 
 		//we may add bad points, so remove the outliers 
 		//RemoveOutlierPts(tracks, trackSeq, imageFeatures, cameraIDOrder, cameras);
 		//RemoveBadPoints(trackSeq, imageFeatures, cameras);
 
-		cameraVisited[newCameraIndex] = 1;
-		cameraIDOrder.push_back(newCameraIndex);
+		//cameraVisited[newCameraIndex] = 1;
+		//cameraIDOrder.push_back(newCameraIndex);
 		
 		printf("\n BA for all cameras... \n");
 		RefineAllParameters(trackSeq, imageFeatures, cameraIDOrder, tracks, cameras);

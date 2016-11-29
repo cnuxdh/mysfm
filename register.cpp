@@ -893,14 +893,18 @@ int CSiftMatch::Match(ImgFeature& lImage, ImgFeature& rImage, PairMatchRes& pair
 
 	//duplicate removal
 	int nMatch = lKeyIds.size();
+	//printf("before duplicate removal: %d \n", nMatch);
 	vector<int> mask( nMatch, 0 );
 	for(int j=0; j<nMatch; j++)
 	{
+		if(mask[j]>0)
+			continue;
+
 		for(int i=j+1; i<nMatch; i++)
 		{
-			if( rKeyIds[j]==rKeyIds[i] )
+			if( (lKeyIds[j]==lKeyIds[i]) || (rKeyIds[j]==rKeyIds[i]) )
 			{
-				mask[i]=1;
+				mask[j]=1;
 			}
 		}
 	}
@@ -916,6 +920,7 @@ int CSiftMatch::Match(ImgFeature& lImage, ImgFeature& rImage, PairMatchRes& pair
 	}
 	lKeyIds = lKeyIdsNew;
 	rKeyIds = rKeyIdsNew;
+	//printf("after duplicate removal: %d \n", lKeyIds.size());
 
 	//save result
 	for(int i=0; i<lKeyIds.size(); i++)
@@ -967,8 +972,22 @@ int CSiftMatch::Match(ImgFeature& lImage, ImgFeature& rImage, PairMatchRes& pair
 			lpts.push_back(lp);
 			rpts.push_back(rp);
 		}
-		
-		vector<int> inliers = EstimateFMatrix(lpts, rpts, 512, 32);
+	
+		//for debug
+		if(0)
+		{
+			char filename[256];
+			sprintf(filename, "c:\\temp\\match-%d-%d.txt", pairMatch.lId, pairMatch.rId);
+			FILE* fp = fopen(filename, "w");
+			for(int ti=0; ti<lpts.size(); ti++)
+			{
+				fprintf(fp, "%.4lf %.4lf  %.4lf %.4lf \n", lpts[ti].p[0], lpts[ti].p[1],
+					rpts[ti].p[0], rpts[ti].p[1]);
+			}
+			fclose(fp);
+		}
+
+		vector<int> inliers = EstimateFMatrix(lpts, rpts, 2048, 32);
 
 		vector<MatchPairIndex> inlierMatch;
 		for(int i=0; i<inliers.size(); i++)
