@@ -1156,26 +1156,13 @@ int RefineAllParameters(vector<TrackInfo>& trackSeq, vector<ImgFeature>& imageFe
 	int nOutliers = 0;
 	int nTotalOutliers = 0;
 	do
-	{
+	{ 
 		//1. optimization 
-		//nGoodTrack = CeresBA(trackSeq, imageFeatures, cameras);
 		RunBA(trackSeq, imageFeatures, cameraIDOrder, cameras);
 		
-		//CaculateTrackSeqGrd(imageFeatures, trackSeq, cameras, true);
-
 		//2. find the wrong feature point projections and remove them
-		//int nBadTrack = FindProjectionOutliersByTrack(trackSeq, imageFeatures, cameraIDOrder,
-		//	tracks, cameras, 4);
 		nOutliers = RemoveOutlierPts(tracks, trackSeq, imageFeatures, cameraIDOrder, cameras);
 		nTotalOutliers += nOutliers;
-
-		//printf("outlier: %d \n", nOutliers);
-		//int nCurrentGood = trackSeq.size();
-		//3. evaluate the optimization
-		//if(nBadTrack<16)
-		//if( nCurrentGood>nGoodTrack || abs(nCurrentGood-nGoodTrack)<1 )
-		//	break;
-
 	}while(nOutliers>0);
 	
 	//remove the bad points according to the angle
@@ -1522,7 +1509,6 @@ int CCeresBA::BundleAdjust(int numCameras,
 	{
 		trackSeq[i].grd = gpts[i];
 		trackSeq[i].derror = errorarray[i];
-		//if( errorarray[i]<4 ) goodPts.push_back( gpts[i] );
 	}
 	
 	RemoveOutlierPts(tracks, trackSeq, imageFeatures, cameraIDOrder, cameras);
@@ -1563,7 +1549,7 @@ int CCeresBA::BundleAdjust(int numCameras,
 
 
 		printf("\n BA for all cameras... \n");
-		//optimiaztion for all cameras
+		//optimization for all cameras
 		RefineAllParameters(trackSeq, imageFeatures, cameraIDOrder, tracks, cameras);
 	}
 	
