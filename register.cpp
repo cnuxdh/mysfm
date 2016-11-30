@@ -987,7 +987,10 @@ int CSiftMatch::Match(ImgFeature& lImage, ImgFeature& rImage, PairMatchRes& pair
 			fclose(fp);
 		}
 
-		vector<int> inliers = EstimateFMatrix(lpts, rpts, 2048, 32);
+		//from "Modeling the World from Internet Photo Collections"
+		int threshold = 0.008*max( lImage.ht, lImage.wd );
+
+		vector<int> inliers = EstimateFMatrix(lpts, rpts, 2048, threshold);
 
 		vector<MatchPairIndex> inlierMatch;
 		for(int i=0; i<inliers.size(); i++)

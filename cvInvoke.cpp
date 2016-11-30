@@ -50,7 +50,7 @@ int DetectFileFeaturePts(char** filenames, int nFile, char* outpath)
 }
 
 //interface for memory
-int DetectFileFeaturePts(char** filenames, int nFile, vector<ImgFeature>& imgFeatures)
+int DetectFileFeaturePts(char** filenames, int nFile, vector<ImgFeature>& imgFeatures, int maxHt)
 {
 
 	printf("[DetectFileFeaturePts] ... \n");
@@ -63,7 +63,7 @@ int DetectFileFeaturePts(char** filenames, int nFile, vector<ImgFeature>& imgFea
 		printf("image: %s \n", filenames[i]);
 		
 		ImgFeature feats;
-		pFeatDetect->Detect(filenames[i], feats);
+		pFeatDetect->Detect(filenames[i], feats, maxHt);
 		imgFeatures.push_back(feats);
 	}
 	

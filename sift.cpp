@@ -242,6 +242,107 @@ int CSIFTFloat::Detect(char* filePath, ImgFeature& imgFeat)
 	return 1;
 }
 
+
+int CSIFTFloat::Detect(char* filePath, ImgFeature& imgFeat, int maxHt)
+{
+	//IplImage* pImage = cvLoadImage(filePath, 0);
+	
+	IplImage* pSrc = cvLoadImage(filePath, 0);
+	int sht = pSrc->height;
+	int swd = pSrc->width;
+
+	//image resize, to improve the speed	
+	int dstHt, dstWd;
+	dstHt = maxHt;
+	GetResizeDimension(pSrc->height, pSrc->width, dstHt, dstWd);
+	double sx = (double)(swd) / (double)(dstWd);
+	double sy = (double)(sht) / (double)(dstHt);
+
+	IplImage* pImage = cvCreateImage(cvSize(dstWd, dstHt), 8, 1);
+	cvResize(pSrc, pImage);    
+	cvReleaseImage(&pSrc);
+
+
+	/*
+	float* fImage;
+	int ht,wd;
+	IplImageToFloatImage(pImage, &fImage, &ht, &wd);
+	*/
+	
+	int i,j;
+	int ht = pImage->height;
+	int wd = pImage->width;
+	int scanwd = pImage->widthStep;
+	float* fImage = (float*)malloc(ht*wd*sizeof(float));
+	float  scale = 1.0;//1.0/256.0;
+	for(j=0; j<ht; j++)
+		for(i=0; i<wd; i++)
+		{
+			fImage[j*wd+i] = float(  (unsigned char)(pImage->imageData[j*scanwd+i]) )*scale;
+		}
+	
+	
+	printf("ht: %d wd: %d \n", ht, wd);
+	printf("Sift Feature detection ... \n");
+	
+
+	int keynumber = 0;
+	
+	#ifdef _WIN32
+	//unsigned long t1 = timeGetTime();
+	#endif
+	
+	//int64 t1 = getTickCount();
+	Key_Point* featPts = SiftFeaturesFloat(fImage, wd, ht, keynumber);
+	printf("Feature Number: %d \n", keynumber);
+	
+	#ifdef _WIN32
+	//unsigned long t2 = timeGetTime();	
+	//int64 t2 = getTickCount();
+	//printf("time for detection: %lf s \n", (double)(t2-t1)/getTickFrequency() );
+	//printf("time for detection: %lf s \n", (double)(t2-t1)/1000 );
+  #endif
+   
+	
+
+	imgFeat.ht = sht;
+	imgFeat.wd = swd;
+	for(i=0; i<keynumber; i++)
+	{
+		stPtFeature feat;
+		feat.id         = featPts[i].index;
+		feat.scl        = featPts[i].scl;
+		feat.scl_octave = featPts[i].scl_octave;
+		feat.sub_intvl  = featPts[i].sub_intvl;
+		feat.ori        = featPts[i].ori;
+		feat.key_intvl  = featPts[i].key_intvl;
+		feat.key_octave = featPts[i].key_octave;
+
+		feat.col = featPts[i].initl_column*sx;
+		feat.row = featPts[i].initl_row*sy;
+		
+		feat.x = featPts[i].initl_column*sx;
+		feat.y = featPts[i].initl_row*sy;
+
+		feat.cx = feat.x - swd*0.5; //normalized coordinate
+		feat.cy = sht*0.5 - feat.y; //normalized coordinate        
+		
+		for(j=0; j<128; j++)
+			feat.feat.push_back( featPts[i].descriptor[j]);
+		feat.trackIdx = -1;
+		feat.extra = -1;
+		imgFeat.featPts.push_back(feat);
+	}
+
+	delete[] featPts;
+	free(fImage);
+
+	cvReleaseImage(&pImage);
+	
+	return 1;
+}
+
+
 int CSIFTFloat::Detect(char* filePath, int dstHt, int dstWd, ImgFeature& imgFeat)
 {
 	IplImage* pImage = cvLoadImage(filePath, 0);

@@ -14,7 +14,7 @@ using namespace std;
 
 int DLL_EXPORT DetectFileFeaturePts(char** filenames, int nFile, char* outpath);
 
-int DLL_EXPORT DetectFileFeaturePts(char** filenames, int nFile, vector<ImgFeature>& imgFeatures);
+int DLL_EXPORT DetectFileFeaturePts(char** filenames, int nFile, vector<ImgFeature>& imgFeatures, int maxHt);
 
 int DLL_EXPORT MatchImageFiles(vector<ImgFeature>& imgFeatures, vector<PairMatchRes>& matchRes);
 

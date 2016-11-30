@@ -9,11 +9,10 @@
 
 
 //the maximal image height for feature detection
-#define DETECT_IMAGE_HT 420
+//#define DETECT_IMAGE_HT 420
 
 //get the image dimension after scale
 void GetResizeDimension(int srcHt, int srcWd, int& dstHt, int& dstWd);
-
 
 //////////////////////////////////////////////////////////////////////////
 // feature detection interface 
@@ -26,7 +25,10 @@ public:
 	virtual int Detect(char* filePath, char* featurePath){return 0;}
 	virtual int Detect(char* filePath, vector<double>& px, vector<double>& py){return 0;}
 	virtual int Detect(char* filePath, vector<PtFeature>& featPts){return 0;};
+	
 	virtual int Detect(char* filePath, ImgFeature& imgFeat){return 0;};
+	virtual int Detect(char* filePath, ImgFeature& imgFeat, int maxHt){return 0;};
+
 	virtual int Detect(char* filePath, int dstHt, int dstWd, ImgFeature& imgFeat){return 0;};
 };
 
