@@ -145,7 +145,8 @@ int RunBA( vector<TrackInfo>& trackSeq, vector<ImgFeature>& imageFeatures,
 	//save the optimized results
 	ceres::Solver::Options options;
 	options.linear_solver_type = ceres::DENSE_SCHUR;
-	options.minimizer_progress_to_stdout = true;
+	//options.parameter_tolerance = 1e-9;
+	options.minimizer_progress_to_stdout = false;
 
 	cout<<"NumParameterBlocks: "<<problem.NumParameterBlocks()<<"\n";
 	cout<<"NumResidualBlocks: "<<problem.NumResidualBlocks()<<"\n";
@@ -153,14 +154,25 @@ int RunBA( vector<TrackInfo>& trackSeq, vector<ImgFeature>& imageFeatures,
 
 	ceres::Solver::Summary summary;
 	ceres::Solve(options, &problem, &summary);
-	//std::cout << summary.FullReport() << "\n";
 
-	std::cout<<"\n"<<" all cameras optimized results: "<<"\n";
+	//std::cout << summary.FullReport() << "\n";
+	std::cout<<"final cost: "<<summary.final_cost<<"\n";
+	std::cout<<"average error: "<<(summary.final_cost/nProjection)<<"\n";
+	std::cout<<"successful steps: "<<summary.num_successful_steps<<"\n";
+	std::cout<<"unsuccessful steps: "<<summary.num_unsuccessful_steps<<"\n";
+	
+
+	//if the error is large, delete the new added data
+
+
+
+	std::cout<<"all cameras optimized results: "<<"\n";
 
 	printf("Intrinsic parameters... \n");
 	for(int i=0; i<3; i++)
 		std::cout<<pInteriorParams[i]<<"  ";
 	std::cout<<endl;
+	
 	
 	printf("Extrinsic parameters ...\n");
 	for(int i=0; i<nBACameras; i++)
@@ -190,8 +202,8 @@ int RunBA( vector<TrackInfo>& trackSeq, vector<ImgFeature>& imageFeatures,
 		cameras[camId].ay = ea[1];
 		cameras[camId].az = ea[2];
 		
-		cout<<"Angle: "<< cameras[camId].ax <<" "<< 
-			cameras[camId].ay<<" " << cameras[camId].az << "\n"; 
+		//cout<<"Angle: "<< cameras[camId].ax <<" "<< 
+		//cameras[camId].ay<<" " << cameras[camId].az << "\n"; 
 
 		//from RX+T to RX-T
 		double iR[9];
@@ -208,11 +220,12 @@ int RunBA( vector<TrackInfo>& trackSeq, vector<ImgFeature>& imageFeatures,
 		cameras[camId].t[1] = -et[1];
 		cameras[camId].t[2] = -et[2];
 
-		cout<<"Translation: "<<cameras[camId].t[0]<<" "<<
-			cameras[camId].t[1]<<" "<<cameras[camId].t[2]<<"\n";
+		//cout<<"Translation: "<<cameras[camId].t[0]<<" "<<
+			//cameras[camId].t[1]<<" "<<cameras[camId].t[2]<<"\n";
 
-		std::cout<<endl;
+		//std::cout<<endl;
 	}
+	std::cout<<endl;
 
 	for(int i=0; i<num_pts; i++)
 	{   
@@ -1175,8 +1188,9 @@ int FindGoodPoints(vector<Point3DDouble>& grdPts, vector<Point2DDouble>& imgPts,
 					double projThreshold)
 {
 	int nInliers = 0;
-	vector<Point3DDouble> newGrdPts;
-	vector<Point2DDouble> newImgPts;
+	
+	//calculate all projection errors and get the threshold
+	double* pErrors = new double[grdPts.size()];
 	for(int i=0; i<grdPts.size(); i++)
 	{
 		Point2DDouble projPt;
@@ -1185,14 +1199,34 @@ int FindGoodPoints(vector<Point3DDouble>& grdPts, vector<Point2DDouble>& imgPts,
 		double dx = imgPts[i].p[0] - projPt.p[0];
 		double dy = imgPts[i].p[1] - projPt.p[1];
 		double err = sqrt(dx*dx+dy*dy);
+		pErrors[i] = err;
+	}
+	double med = dll_kth_element_copy(grdPts.size(), dll_iround(0.95 * grdPts.size()), pErrors);
+	double threshold = 1.2 * NUM_STDDEV * med; 
+	threshold = CLAMP(threshold, MIN_PROJ_ERROR_THRESHOLD, MAX_PROJ_ERROR_THRESHOLD);  
+	
+	//find the good points
+	vector<Point3DDouble> newGrdPts;
+	vector<Point2DDouble> newImgPts;
+	for(int i=0; i<grdPts.size(); i++)
+	{
+		/*
+		Point2DDouble projPt;
+		GrdToImg(grdPts[i], projPt, camera);
+		double dx = imgPts[i].p[0] - projPt.p[0];
+		double dy = imgPts[i].p[1] - projPt.p[1];
+		double err = sqrt(dx*dx+dy*dy);
+		*/
 
-		if(err<projThreshold)
+		if(pErrors[i]<threshold)
 		{
 			newGrdPts.push_back(grdPts[i]);
 			newImgPts.push_back(imgPts[i]);
 			nInliers++;
 		}
 	}
+
+	delete[] pErrors;
 
 	grdPts = newGrdPts;
 	imgPts = newImgPts;
@@ -1290,7 +1324,7 @@ int CalculateNewCamParas(int nCameraId,
 		cam.focus = initFocalLen;
 		int nInliers = RefineCamera(inlierPt3, inlierPt2, cam);
 		
-		if(nInliers<6)
+		if(nInliers<18)
 			return -1;
 	}
 	else
@@ -1530,7 +1564,7 @@ int CCeresBA::BundleAdjust(int numCameras,
 			break;
 		
 		//calculate the camera parameters of new selected
-		printf("\n\n\n Calculate the new image camera parameters..... \n");
+		printf("\n\n************** get initial parameters for camera: %d ******************** \n", newCameraIndex);
 		int initFocalLen = cameras[cameraIDOrder[0]].focus;
 		int res = CalculateNewCamParas(newCameraIndex, imageFeatures, trackSeq, tracks, 
 			initFocalLen, cameras[newCameraIndex]);
@@ -1544,7 +1578,7 @@ int CCeresBA::BundleAdjust(int numCameras,
 		}
 		
 		//adding the image points of new image into the current tracks 
-		printf("\n\n\n adding image %d \n", newCameraIndex);
+		printf("\n\n\n ******************* adding image %d ******************** \n", newCameraIndex);
 		UpdateBATracks(newCameraIndex, cameraVisited, cameraIDOrder, imageFeatures, tracks, trackSeq, cameras);
 
 
@@ -1556,7 +1590,7 @@ int CCeresBA::BundleAdjust(int numCameras,
 	SaveTracksToPly("c:\\temp\\final-ba.ply", trackSeq, cameraIDOrder, cameras);
 
 	//output the camera parameters
-	printf("\n Final results: \n");
+	printf("\n ****************** Final results: ********************** \n");
 	printf("Camera Number: %d \n", cameraIDOrder.size());
 	for(int i=0; i<cameraIDOrder.size(); i++)
 	{

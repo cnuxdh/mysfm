@@ -6,7 +6,6 @@
 #include "register.hpp"
 #include "defines.hpp"
 
-
 //sfm-driver
 #include "sfm.h"
 
@@ -155,25 +154,16 @@ private:
 //////////////////////////////////////////////////////////////////////////
 
 
-
-/**********************  Homography Matrix *****************************/
-
-
-
-
-
-
-
 DLL_EXPORT int CalculateExplicitT(double* R, double* T, double* explicitT);
 
 /*
    relative pose estimation for panorama
 */
 DLL_EXPORT int EstimatePose5Point_Pano( vector<Point3DDouble>& p1, 
-							 vector<Point3DDouble>& p2,
-							 double radius,
-							 int num_trials, double threshold, 
-							 double *R, double *t, vector<double>& residual);
+								 vector<Point3DDouble>& p2,
+								 double radius,
+								 int num_trials, double threshold, 
+								 double *R, double *t, vector<double>& residual);
 
 
 DLL_EXPORT Point3DDouble TriangulatePt(Point2DDouble p, Point2DDouble q, 

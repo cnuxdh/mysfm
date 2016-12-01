@@ -54,6 +54,11 @@
 using namespace std;
 
 
+
+
+
+
+
 //convert from RX+T to R(X - (-inv(R)*T) )
 int CalculateExplicitT(double* R, double* T, double* explicitT)
 {

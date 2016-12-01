@@ -4,7 +4,8 @@
 #include"cvInvoke.hpp"
 #include"sift.hpp"
 #include"dataBase.hpp"
-#include "register.hpp"
+#include"register.hpp"
+#include"relativepose.hpp"
 
 
 //corelib
@@ -48,6 +49,20 @@ int DetectFileFeaturePts(char** filenames, int nFile, char* outpath)
 	
 	return 0;
 }
+
+
+int DLL_EXPORT DetectFileFeaturePts(char* filenames, ImgFeature& imgFeatures, int maxHt)
+{
+	CFeatureBase* pFeatDetect = new CSIFTFloat();
+
+	pFeatDetect->Detect(filenames, imgFeatures, maxHt);
+
+	delete pFeatDetect;
+
+	return 0;
+}
+
+
 
 //interface for memory
 int DetectFileFeaturePts(char** filenames, int nFile, vector<ImgFeature>& imgFeatures, int maxHt)
@@ -101,5 +116,23 @@ int MatchImageFiles(vector<ImgFeature>& imgFeatures, vector<PairMatchRes>& match
 	delete pMatch;
 
 	return 0;
+}
+
+
+DLL_EXPORT int dll_EstimatePose5Point_Pano( vector<Point3DDouble>& p1, 
+	vector<Point3DDouble>& p2,
+	double radius,
+	int num_trials, double threshold, 
+	double *R, double *t, vector<double>& residual)
+{
+	return EstimatePose5Point_Pano(p1, p2, radius, num_trials, threshold, R, t, residual);
+}
+
+
+DLL_EXPORT Point3DDouble dll_TriangulatePt(Point2DDouble p, Point2DDouble q, 
+	double *R0, double *t0, 
+	double *R1, double *t1, double *error)
+{
+	return  TriangulatePt(p, q, R0, t0, R1, t1, error);
 }
 
