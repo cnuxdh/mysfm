@@ -165,20 +165,6 @@ int EstimatePose5Point_Pano( vector<Point3DDouble>& p1,
 	int num_inliers = dll_compute_pose_ransac_pano(num_pts, k1_pts, k2_pts, 
 		radius, threshold, num_trials, em, R, t);
     
-	/*
-	for(int j=0; j<3; j++)
-		for(int i=0; i<3; i++)
-		{
-
-		}
-		*/
-
-	//compute the rotation angle 
-	double ax = atan( R[5]/R[8] ) / PI*180; 
-	double ay = asin( -R[2] ) /PI*180;
-	double az = atan( R[1]/R[0]) /PI*180;
-
-
 	//printf("residuals ... \n");
 	for (int i = 0; i < num_pts; i++) 
 	{
@@ -186,12 +172,7 @@ int EstimatePose5Point_Pano( vector<Point3DDouble>& p1,
 		//printf("%d  %lf \n", i, dis);
 		residual[i] = dis;
 	}
-
-	printf("Rotation... \n");
-	printf("%lf %lf %lf \n", ax, ay, az);
-	printf("Translation .... \n");
-	printf("%lf %lf %lf \n", t[0], t[1], t[2]);
-
+	
 	delete [] k1_pts;
 	delete [] k2_pts;
 
@@ -497,7 +478,7 @@ int CEstimatePose5Point::EstimatePose( PairMatchRes pairMatches, ImgFeature& lIm
 int CEstimatePose5Point::EstimatePose( vector<Point2DDouble> lPts, vector<Point2DDouble> rPts, 
 									  CameraPara& cam1, CameraPara& cam2 )
 {
-	printf(" \n Relative Pose Estimation ... \n");
+	//printf(" \n Relative Pose Estimation ... \n");
 
 	double K1[9],K2[9],R[9],t[3],R0[9],t0[3];
 	memset(K1, 0, sizeof(double)*9);
@@ -559,21 +540,21 @@ int CEstimatePose5Point::EstimatePose( vector<Point2DDouble> lPts, vector<Point2
 #endif
 	*/
 
-	//output
-	printf("Focus: %lf \n", cam2.focus);
-	printf("Rotation Angle x:%lf y:%lf z:%lf \n", cam2.ax, cam2.ay, cam2.az);
-	for(int j=0; j<3; j++)
-	{
-		for(int i=0; i<3; i++)
-		{
-			printf("%lf ", cam2.R[j*3+i]);
-		}
-		printf("\n");
-	}
-	printf("Translation: \n");
-	for(int j=0; j<3; j++)
-		printf("%lf ", cam2.t[j]);
-	printf("\n\n");
+	////output
+	//printf("Focus: %lf \n", cam2.focus);
+	//printf("Rotation Angle x:%lf y:%lf z:%lf \n", cam2.ax, cam2.ay, cam2.az);
+	//for(int j=0; j<3; j++)
+	//{
+	//	for(int i=0; i<3; i++)
+	//	{
+	//		printf("%lf ", cam2.R[j*3+i]);
+	//	}
+	//	printf("\n");
+	//}
+	//printf("Translation: \n");
+	//for(int j=0; j<3; j++)
+	//	printf("%lf ", cam2.t[j]);
+	//printf("\n\n");
 
   	return 1;
 }
@@ -689,6 +670,8 @@ void CTriangulateCV::Triangulate(vector<Point2DDouble> lPts, vector<Point2DDoubl
 	}
 }
 
+
+//default model: RX+T
 void CTriangulateCV::Triangulate(vector<Point2DDouble> pts,  
 								 vector<CameraPara> cams, 
 							 	 Point3DDouble& gps,
@@ -756,6 +739,8 @@ void CTriangulateCV::Triangulate(vector<Point2DDouble> pts,
 	}
 
 	ferror = 0;
+
+	//model: RX+T
 	v3_t pt = dll_triangulate_n(num_views, pv, Rs, ts, &ferror);
 
 	ferror = 0.0;

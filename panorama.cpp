@@ -386,7 +386,7 @@ int GrdToSphere_center(double gx, double gy, double gz, double radius, double& i
 	return 0;
 }
 
-//from 3D point to spherical coordinate
+//from 3D point to spherical coordinate, the image origin is the top-left 
 int GrdToSphere(double gx, double gy, double gz, double radius, double& ix, double& iy)
 {
 	double sita, fai; //sita-lontitude, fai-latitude
