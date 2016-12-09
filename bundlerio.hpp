@@ -19,6 +19,8 @@ using namespace std;
 
 DLL_EXPORT int ReadBundlerOutFile(char* filename, vector<stPOS>& camParas, vector<stTrack>& tracks );
 
+DLL_EXPORT int WriteBundlerOutFile(char* filepath, vector<CameraPara>& camParas );
+
 
 
 DLL_EXPORT int ReadPMVSPly(char* filename, vector<stTrack>& tracks);

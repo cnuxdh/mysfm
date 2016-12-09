@@ -47,7 +47,7 @@ int PanoToPlane(char* srcImageFile, char* outImageFile,
 				double& focalLen, int& outHt, int& outWd, double* pR 
 				)
 {
-	
+
 	double R[9];
 	double xT[3] = {0,0,1};
 
@@ -56,24 +56,24 @@ int PanoToPlane(char* srcImageFile, char* outImageFile,
 	//CalculateAlignRotation1(xT, direction, R);
 	//second method: orthogonal Procrustes algorithm
 
-  POINT3D zp;
-  zp.x = direction[0];
-  zp.y = direction[1];
-  zp.z = direction[2];
-  POINT3D xp,yp;
-  GenerateProjectAxis(zp, xp, yp);
-  vector<POINT3D> srcPts;
-  vector<POINT3D> dstPts;
-  srcPts.resize(3);
-  dstPts.resize(3);
-  srcPts[0].x = 1; srcPts[0].y = 0; srcPts[0].z = 0;
-  srcPts[1].x = 0; srcPts[1].y = 1; srcPts[1].z = 0;
-  srcPts[2].x = 0; srcPts[2].y = 0; srcPts[2].z = 1;  
+	POINT3D zp;
+	zp.x = direction[0];
+	zp.y = direction[1];
+	zp.z = direction[2];
+	POINT3D xp,yp;
+	GenerateProjectAxis(zp, xp, yp);
+	vector<POINT3D> srcPts;
+	vector<POINT3D> dstPts;
+	srcPts.resize(3);
+	dstPts.resize(3);
+	srcPts[0].x = 1; srcPts[0].y = 0; srcPts[0].z = 0;
+	srcPts[1].x = 0; srcPts[1].y = 1; srcPts[1].z = 0;
+	srcPts[2].x = 0; srcPts[2].y = 0; srcPts[2].z = 1;  
 	dstPts[0] = xp;
 	dstPts[1] = yp;
 	dstPts[2] = zp;
-  RotationAlign(srcPts, dstPts, R); //from projection image space to sphere space
-  
+	RotationAlign(srcPts, dstPts, R); //from projection image space to sphere space
+
 	//char   filename[256];	
 	//strcpy(filename, argv[1]);
 	//double vangle = atof(argv[2]); //fov vertical angle
@@ -81,35 +81,35 @@ int PanoToPlane(char* srcImageFile, char* outImageFile,
 	//double widthAngle = PI*(1.0/3.0); // 60 degree
 	//printf("input image: %s \n", filename);
 	//printf("input angle: %lf %lf \n", vangle,hangle);
-		
+
 	IplImage* pImage = cvLoadImage(srcImageFile, 1);
 	//cvNamedWindow("panoimage");
 	//cvShowImage("panoimage", pImage);
-	
+
 	int ht = pImage->height;
 	int wd = pImage->width;
 	int scanWd = pImage->widthStep;
 	double radius = double(wd)/(2*PI);
 	//printf("radius: %lf \n", radius);
-	
+
 	//calculate the projection plane size
 	double radianAngle = 1.0 / 180.0 * PI;
 	double projFocus = radius*focalLenRatio;    //radius*0.8; 
 	printf("proj focus: %lf \n", projFocus);
-	
+
 	int projHt = projFocus*tan(vangle*radianAngle*0.5)*2;
 	int projWd = projFocus*tan(hangle*radianAngle*0.5)*2;
-	
-		
+
+
 	printf("proj width:%d   height:%d \n", projWd, projHt);
-	
+
 	//image reprojection
 	IplImage* planeImage = cvCreateImage( cvSize(projWd, projHt), 8, 3);
 	int projScanWd = planeImage->widthStep;
-	
+
 	double grd[3];
 	grd[2] = -projFocus;  //z axis
-	
+
 	for(int y=-projHt*0.5; y<projHt*0.5; y++)
 	{
 		for(int x=-projWd*0.5; x<projWd*0.5; x++)
@@ -119,7 +119,7 @@ int PanoToPlane(char* srcImageFile, char* outImageFile,
 			int pi =  x + projWd*0.5;
 			pj = max( 0, min(projHt-1, pj) );
 			pi = max( 0, min(projWd-1, pi) );
-             
+
 			//3D point coordinates
 			grd[0] = x;
 			grd[1] = y;
@@ -153,19 +153,19 @@ int PanoToPlane(char* srcImageFile, char* outImageFile,
 
 	//cvNamedWindow("projimage");
 	//cvShowImage("projimage", planeImage);
-		
+
 	cvReleaseImage(&planeImage);
 	cvReleaseImage(&pImage);
-	
+
 	//generate the projection rotation
 	memcpy(pR, R, sizeof(double)*9);
 	invers_matrix(pR, 3);
-	
+
 	//get the inner parameters of projection camera
 	focalLen = projFocus;
 	outHt = projHt;
 	outWd = projWd;
-	
+
 	printf("pano to plane projection Finished! \n");
 
 	return 0;
@@ -225,12 +225,12 @@ int PanoToPlanes( int nImageIndex, char* srcFile, double anglestep,
 									double* R, double* T,
 									vector<CameraPara>& camParas)
 {
-	
+
 	char title[256];
 	strcpy(title, srcFile);
 	strcpy(title+strlen(title)-4, "\0");
-	
-	
+
+
 	//projection from panorama to plane 
 	int nAngleStep  = anglestep;
 	int nProjectNum = 360 / nAngleStep;
@@ -239,89 +239,89 @@ int PanoToPlanes( int nImageIndex, char* srcFile, double anglestep,
 	//double ratio = 1;
 	for(int i=0; i<nProjectNum; i++)
 	{
-		
+
 		double lat = 90 / 180.0 * PI; //from top to bottom: 0-180
 		double lon = i*nAngleStep / 180.0 * PI; //from left to right: 0-360
-		
+
 		//printf("input image: %s \n", filename);
 		//printf("input angle: %lf %lf \n", vangle,hangle);
-		
+
 		//calculate the direction according to (lon,lat), must be the opposite
 		double direction[3];
 		direction[0] = -sin(lon)*sin(lat);  //x
 		direction[1] = -cos(lon)*sin(lat);  //y
 		direction[2] = -cos(lat);           //z
-		
-		
+
+
 		printf("direction: %lf %lf %lf \n", direction[0], direction[1], direction[2]);
-		
-		
+
+
 		char outfile[256];
 		//sprintf(outfile, "%s_%d_%d.jpg", title, int(lat/PI*180+0.5), int(lon/PI*180+0.5));
 		sprintf(outfile, "visualize/%.8d.jpg", (nImageIndex*nProjectNum+i) );
 		printf("plane file: %s \n", outfile);
-		
-		
+
+
 		double Rp[9]; //rotation matrix for plane 
 		//generate the plane projection image and save it
 		double focalLen;
 		int outHt, outWd;
 		PanoToPlane( srcFile, outfile, vangle, hangle, direction, fratio, 
-								 focalLen, outHt, outWd, Rp);
-	  
-	  //transform from spherical space to image space,
-	  //Xs = Rg.Xg + Tg, Xp = Rp.Xs ---> Xp = Rp.Rg.Xg + Rp.Tg, define Rpg = Rp.Rg, Tpg=Rp.Tg
-	  double Rpg[9];
-	  double Tpg[3];
-	  mult(Rp, R, Rpg, 3, 3, 3);
-	  mult(Rp, T, Tpg, 3, 3, 1);
-	   
-	  
-	  //generate the projection matrix for PMVS and save it	  
-	  char projFile[256];
+			focalLen, outHt, outWd, Rp);
+
+		//transform from spherical space to image space,
+		//Xs = Rg.Xg + Tg, Xp = Rp.Xs ---> Xp = Rp.Rg.Xg + Rp.Tg, define Rpg = Rp.Rg, Tpg=Rp.Tg
+		double Rpg[9];
+		double Tpg[3];
+		mult(Rp, R, Rpg, 3, 3, 3);
+		mult(Rp, T, Tpg, 3, 3, 1);
+
+
+		//generate the projection matrix for PMVS and save it	  
+		char projFile[256];
 		//sprintf(projFile, "%s_%d_%d.txt", title, int(lat/PI*180+0.5), int(lon/PI*180+0.5));
 		sprintf(projFile, "txt/%.8d.txt", (nImageIndex*nProjectNum+i) );
-		
-	  double K[9] = 
-            { -focalLen, 0.0, 0.5 * outWd - 0.5,
-              0.0, focalLen,  0.5 * outHt - 0.5,
-              0.0, 0.0, 1.0 };
 
-    double Ptmp[12] = 
-        { Rpg[0], Rpg[1], Rpg[2], Tpg[0],
-          Rpg[3], Rpg[4], Rpg[5], Tpg[1],
-          Rpg[6], Rpg[7], Rpg[8], Tpg[2] };
-    
-    double P[12];
-    dll_matrix_product(3, 3, 3, 4, K, Ptmp, P);
-    dll_matrix_scale(3, 4, P, -1.0, P);
+		double K[9] = 
+		{ -focalLen, 0.0, 0.5 * outWd - 0.5,
+		0.0, focalLen,  0.5 * outHt - 0.5,
+		0.0, 0.0, 1.0 };
+
+		double Ptmp[12] = 
+		{ Rpg[0], Rpg[1], Rpg[2], Tpg[0],
+		Rpg[3], Rpg[4], Rpg[5], Tpg[1],
+		Rpg[6], Rpg[7], Rpg[8], Tpg[2] };
+
+		double P[12];
+		dll_matrix_product(3, 3, 3, 4, K, Ptmp, P);
+		dll_matrix_scale(3, 4, P, -1.0, P);
 
 		FILE* f = fopen(projFile, "w");
-    fprintf(f, "CONTOUR\n");
-    fprintf(f, "%0.6f %0.6f %0.6f %0.6f\n", P[0], P[1], P[2],  P[3]);
-    fprintf(f, "%0.6f %0.6f %0.6f %0.6f\n", P[4], P[5], P[6],  P[7]);
-    fprintf(f, "%0.6f %0.6f %0.6f %0.6f\n", P[8], P[9], P[10], P[11]);
-    fprintf(f, "%lf %d %d \n", focalLen, outHt, outWd);
-    //append the R and T for other applications
-    fprintf(f, "%lf %lf %lf \n", Tpg[0], Tpg[1], Tpg[2]);
-    fprintf(f, "%lf %lf %lf \n", Rpg[0], Rpg[1], Rpg[2]);
-    fprintf(f, "%lf %lf %lf \n", Rpg[3], Rpg[4], Rpg[5]);
-    fprintf(f, "%lf %lf %lf \n", Rpg[6], Rpg[7], Rpg[8]);
-    fclose(f);
-	  
-	  //save the R and T into the array
-	  CameraPara cam;
-	  cam.focus = focalLen;
-	  cam.k1 = 0;
-	  cam.k2 = 0;
-	  cam.rows = outHt;
-	  cam.cols = outWd;
-	  memcpy(cam.R, Rpg, 9*sizeof(double));
-	  memcpy(cam.t, Tpg, 3*sizeof(double));
-	  
-	  camParas.push_back(cam);
+		fprintf(f, "CONTOUR\n");
+		fprintf(f, "%0.6f %0.6f %0.6f %0.6f\n", P[0], P[1], P[2],  P[3]);
+		fprintf(f, "%0.6f %0.6f %0.6f %0.6f\n", P[4], P[5], P[6],  P[7]);
+		fprintf(f, "%0.6f %0.6f %0.6f %0.6f\n", P[8], P[9], P[10], P[11]);
+		fprintf(f, "%lf %d %d \n", focalLen, outHt, outWd);
+		//append the R and T for other applications
+		fprintf(f, "%lf %lf %lf \n", Tpg[0], Tpg[1], Tpg[2]);
+		fprintf(f, "%lf %lf %lf \n", Rpg[0], Rpg[1], Rpg[2]);
+		fprintf(f, "%lf %lf %lf \n", Rpg[3], Rpg[4], Rpg[5]);
+		fprintf(f, "%lf %lf %lf \n", Rpg[6], Rpg[7], Rpg[8]);
+		fclose(f);
+
+		//save the R and T into the array
+		CameraPara cam;
+		cam.focus = focalLen;
+		cam.k1 = 0;
+		cam.k2 = 0;
+		cam.rows = outHt;
+		cam.cols = outWd;
+		memcpy(cam.R, Rpg, 9*sizeof(double));
+		memcpy(cam.t, Tpg, 3*sizeof(double));
+
+		camParas.push_back(cam);
 	}
-	
+
 	return 0;
 }
 
@@ -695,7 +695,7 @@ DLL_EXPORT int GeneratePanoEpipolarImageHeading(double* R, double* T, char* left
 
 			//change projection mode to original
 			double gx,gy,gz;
-			gx = -res[0];	gy=res[2];	gz=res[1];
+			gx = res[0];	gy=-res[2];	gz=res[1];
 
 			//convert from 3D to spherical coordinate
 			double dx,dy;
@@ -727,7 +727,7 @@ DLL_EXPORT int GeneratePanoEpipolarImageHeading(double* R, double* T, char* left
 
 			//change projection mode to original
 			double og[3];
-			og[0]=-res[0];	og[1]=res[2];	og[2]=res[1];
+			og[0]=res[0];	og[1]=-res[2];	og[2]=res[1];
 
 			//from right to left
 			double lt[3];
@@ -740,15 +740,15 @@ DLL_EXPORT int GeneratePanoEpipolarImageHeading(double* R, double* T, char* left
 			GrdToSphere(gx, gy, gz, radius, dx, dy);
 			int ix = min(wd-1, int(dx+0.5));
 			int iy = min(ht-1, int(dy+0.5));
-
+			 
 			pEpipolarLeft->imageData[j*scanwd + 3*i]     = pLeftImage->imageData[iy*scanwd + 3*ix];
 			pEpipolarLeft->imageData[j*scanwd + 3*i + 1] = pLeftImage->imageData[iy*scanwd + 3*ix + 1];
 			pEpipolarLeft->imageData[j*scanwd + 3*i + 2] = pLeftImage->imageData[iy*scanwd + 3*ix + 2];
 		}
 	}
 
-	cvSaveImage("c:\\epipolarLeftHeading.jpg",  pEpipolarLeft);
-	cvSaveImage("c:\\epipolarRightHeading.jpg", pEpipolarRight);
+	cvSaveImage("c:\\temp\\epipolarLeftHeading.jpg",  pEpipolarLeft);
+	cvSaveImage("c:\\temp\\epipolarRightHeading.jpg", pEpipolarRight);
 
 	cvReleaseImage(&pLeftImage);
 	cvReleaseImage(&pRightImage);
@@ -911,8 +911,8 @@ DLL_EXPORT int GeneratePanoEpipolarImage(double* R, double* T, char* leftFile, c
 		}
 	}
 
-	cvSaveImage("c:\\epipolarLeft.jpg", pEpipolarLeft);
-	cvSaveImage("c:\\epipolarRight.jpg", pEpipolarRight);
+	cvSaveImage("c:\\temp\\epipolarLeft.jpg", pEpipolarLeft);
+	cvSaveImage("c:\\temp\\epipolarRight.jpg", pEpipolarRight);
 
 	cvReleaseImage(&pLeftImage);
 	cvReleaseImage(&pRightImage);

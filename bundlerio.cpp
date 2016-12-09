@@ -71,6 +71,44 @@ int ReadBundlerOutFile(char* filename, vector<stPOS>& camParas, vector<stTrack>&
 
 
 
+int WriteBundlerOutFile(char* filepath, vector<CameraPara>& camParas )
+{
+	FILE *f = fopen(filepath, "w");
+	if (f == NULL) 
+	{
+		printf("Error opening file %s for writing\n", filepath);
+		return -1;
+	}
+
+	int num_images = camParas.size();
+	int num_visible_points = 0; 
+
+	/* Print version number */
+	fprintf(f, "# Bundle file v0.3\n");
+	/* Print number of cameras and points */
+	fprintf(f, "%d %d\n", num_images, num_visible_points);
+
+	for(int i=0; i<num_images; i++)
+	{
+		fprintf(f, "%0.10e %0.10e %0.10e \n",	camParas[i].focus, camParas[i].k1, camParas[i].k2);
+
+		fprintf(f, "%0.10e %0.10e %0.10e\n", camParas[i].R[0], camParas[i].R[1],camParas[i].R[2]);
+		fprintf(f, "%0.10e %0.10e %0.10e\n", camParas[i].R[3], camParas[i].R[4],camParas[i].R[5]);
+		fprintf(f, "%0.10e %0.10e %0.10e\n", camParas[i].R[6], camParas[i].R[7],camParas[i].R[8]);
+
+		//double t[3];
+		//matrix_product(3, 3, 3, 1, camParas[i].R, camParas[i].t, t);
+		//matrix_scale(3, 1, t, -1.0, t);
+		//fprintf(f, "%0.10e %0.10e %0.10e\n", t[0], t[1], t[2]);
+		fprintf(f, "%0.10e %0.10e %0.10e\n", camParas[i].t[0], camParas[i].t[1], camParas[i].t[2]);
+	}
+	fclose(f);
+
+	return 0;
+}
+
+
+
 
 
 

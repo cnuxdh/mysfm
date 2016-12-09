@@ -110,8 +110,7 @@ int MatchImageFiles(vector<ImgFeature>& imgFeatures, vector<PairMatchRes>& match
 			//printf("%d-%d  %d %lf \n", i, j, mr.matchs.size(), mr.inlierRatio );
 			printf("%d-%d  %d  \n", i, j, mr.matchs.size() );
 			
-			matchRes.push_back(mr);
-			
+			matchRes.push_back(mr);			
 		}
 	
 	delete pMatch;

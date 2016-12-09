@@ -57,8 +57,9 @@ DLL_EXPORT int PanoToPlane(char* srcImageFile, char* outImageFile,
 DLL_EXPORT int PanoToPlanes(char* srcFile, double anglestep, double vangle, 
 	double hangle, double fratio, char* outpath);
 
-//panoram image is projected to several images
-int PanoToPlanes(int nImageIndex, char* srcFile, double anglestep,
+
+//panoram image is projected to several images and save the projection matrix 
+DLL_EXPORT int PanoToPlanes(int nImageIndex, char* srcFile, double anglestep,
 				double vangle, double hangle, double fratio,
 				double* R, double* T, vector<CameraPara>& camParas);
 
