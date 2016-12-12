@@ -74,6 +74,22 @@ int PanoToPlane(char* srcImageFile, char* outImageFile,
 	dstPts[2] = zp;
 	RotationAlign(srcPts, dstPts, R); //from projection image space to sphere space
 
+
+	char rotatefile[256];
+	strcpy(rotatefile, outImageFile);
+	strcat(rotatefile, ".txt");
+	FILE* fp = fopen(rotatefile, "w");
+	for(int j=0; j<3; j++)
+	{
+		for(int i=0; i<3; i++)
+		{
+			fprintf(fp, "%lf ", R[j*3+i]);		
+		}
+		fprintf(fp, "\n");
+	}
+	fclose(fp);
+
+
 	//char   filename[256];	
 	//strcpy(filename, argv[1]);
 	//double vangle = atof(argv[2]); //fov vertical angle
@@ -95,7 +111,8 @@ int PanoToPlane(char* srcImageFile, char* outImageFile,
 	//calculate the projection plane size
 	double radianAngle = 1.0 / 180.0 * PI;
 	double projFocus = radius*focalLenRatio;    //radius*0.8; 
-	printf("proj focus: %lf \n", projFocus);
+	printf("focal length: %.4lf \n", radius);
+	printf("proj focus:   %.4lf \n", projFocus);
 
 	int projHt = projFocus*tan(vangle*radianAngle*0.5)*2;
 	int projWd = projFocus*tan(hangle*radianAngle*0.5)*2;
@@ -680,7 +697,7 @@ DLL_EXPORT int GeneratePanoEpipolarImageHeading(double* R, double* T, char* left
 	//right epipolar image
 	for(int j=0; j<ht; j++)
 	{
-		printf("%d \n", j);
+		//printf("%d \n", j);
 
 		for(int i=0; i<wd; i++)
 		{
@@ -712,7 +729,7 @@ DLL_EXPORT int GeneratePanoEpipolarImageHeading(double* R, double* T, char* left
 	//left epipolar image
 	for(int j=0; j<ht; j++)
 	{
-		printf("%d \n", j);
+		//printf("%d \n", j);
 
 		for(int i=0; i<wd; i++)
 		{
