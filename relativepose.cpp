@@ -85,7 +85,8 @@ void FixIntrinsics(double *P, double *K, double *R, double *t)
 	int neg = (K[0] < 0.0) + (K[4] < 0.0) + (K[8] < 0.0);
 
 	/* If odd parity, negate the instrinsic matrix */
-	if ((neg % 2) == 1) {
+	if ((neg % 2) == 1) 
+	{
 		dll_matrix_scale(3, 3, K, -1.0, K);
 		dll_matrix_scale(3, 4, P, -1.0, P);
 	}
@@ -95,13 +96,18 @@ void FixIntrinsics(double *P, double *K, double *R, double *t)
 	dll_matrix_ident(3, fix);
 	double tmp[9], tmp2[12];
 
-	if (K[0] < 0.0 && K[4] < 0.0) {
+	if (K[0] < 0.0 && K[4] < 0.0) 
+	{
 		fix[0] = -1.0;
 		fix[4] = -1.0;
-	} else if (K[0] < 0.0) {
+	} 
+	else if (K[0] < 0.0) 
+	{
 		fix[0] = -1.0;
 		fix[8] = -1.0;
-	} else if (K[4] < 0.0) {
+	} 
+	else if (K[4] < 0.0) 
+	{
 		fix[4] = -1.0;
 		fix[8] = -1.0;
 	} else {
@@ -222,7 +228,7 @@ bool CheckCheirality(v3_t p, const camera_params_t &camera)
 	pt[1] -= camera.t[1];
 	pt[2] -= camera.t[2];
 	dll_matrix_product(3, 3, 3, 1, (double *) camera.R, pt, cam);
-
+		
 	// EDIT!!!
 	if (cam[2] > 0.0)
 		return false;
@@ -799,7 +805,7 @@ int CDLTPose::EstimatePose(vector<Point3DDouble> pt3, vector<Point2DDouble> pt2,
 		return -1;
 
 	v3_t *points_solve = (v3_t*)malloc( num_points*sizeof(v3_t) );
-	v2_t *projs_solve  = (v2_t*)malloc( num_points*sizeof(v3_t) );
+	v2_t *projs_solve  = (v2_t*)malloc( num_points*sizeof(v2_t) );
 
 	for(int i=0; i<num_points; i++)
 	{
@@ -990,6 +996,163 @@ vector<int> CDLTPose::GetWeakInliers()
 {
 	return inliers_weak;
 }
+
+
+CPanoDLTPose::CPanoDLTPose()
+{
+
+}
+
+CPanoDLTPose::~CPanoDLTPose()
+{
+
+}
+
+int CPanoDLTPose::EstimatePose(vector<Point3DDouble> pt3, vector<Point3DDouble> pt2, CameraPara& cam)
+{
+	double P[12];
+	int r = -1;
+	int num_points = pt3.size();
+
+	//too few points
+	if (num_points < 9)
+		return -1;
+
+	v3_t *points_solve = (v3_t*)malloc( num_points*sizeof(v3_t) );
+	v3_t *projs_solve  = (v3_t*)malloc( num_points*sizeof(v3_t) );
+
+	for(int i=0; i<num_points; i++)
+	{
+		points_solve[i].p[0] = pt3[i].p[0];
+		points_solve[i].p[1] = pt3[i].p[1];
+		points_solve[i].p[2] = pt3[i].p[2];
+
+		projs_solve[i].p[0] = pt2[i].p[0];
+		projs_solve[i].p[1] = pt2[i].p[1];
+		projs_solve[i].p[2] = pt2[i].p[2];
+	}
+
+	double proj_estimation_threshold = 2.0;
+	double proj_estimation_threshold_weak = 4.0*proj_estimation_threshold;
+
+	//find the 3*4 projection matrix
+	r = dll_find_projection_3x4_ransac_pano(num_points, 
+		points_solve, projs_solve, 
+		P, /* 2048 */ 4096 /* 100000 */, 
+		proj_estimation_threshold);
+
+	if (r == -1 ) 
+	{
+		printf("[FindAndVerifyCamera] Couldn't find projection matrix\n");
+		free(points_solve);
+		free(projs_solve);
+
+		return -1;
+	}
+	
+	/* If number of inliers is too low, fail */
+	if ( r <= MIN_INLIERS_EST_PROJECTION) 
+	{
+		printf("[FindAndVerifyCamera] Too few inliers to use projection matrix\n");
+		free(points_solve);
+		free(projs_solve);
+
+		return -1;
+	}
+
+	//decompose the P to K[R|t]
+	double KRinit[9], Kinit[9], Rinit[9], tinit[3];
+	memcpy(KRinit + 0, P + 0, 3 * sizeof(double));
+	memcpy(KRinit + 3, P + 4, 3 * sizeof(double));
+	memcpy(KRinit + 6, P + 8, 3 * sizeof(double));
+
+	// RQ factorization of KR
+	dll_dgerqf_driver(3, 3, KRinit, Kinit, Rinit);	    
+
+	/* We want our intrinsics to have a certain form */
+	FixIntrinsics(P, Kinit, Rinit, tinit);
+	dll_matrix_scale(3, 3, Kinit, 1.0 / Kinit[8], Kinit);
+
+	printf("[FindAndVerifyCamera] Estimated intrinsics:\n");
+	dll_matrix_print(3, 3, Kinit);
+	printf("[FindAndVerifyCamera] Estimated extrinsics:\n");
+	dll_matrix_print(3, 3, Rinit);
+	dll_matrix_print(1, 3, tinit);
+	fflush(stdout);
+
+	double Rigid[12] = 
+	{ Rinit[0], Rinit[1], Rinit[2], tinit[0],
+	  Rinit[3], Rinit[4], Rinit[5], tinit[1],
+	  Rinit[6], Rinit[7], Rinit[8], tinit[2] };
+
+	std::vector<int> outliers;
+
+	inliers.clear();
+	inliers_weak.clear();
+	outliers.clear();
+
+	int num_behind = 0;
+	for (int j = 0; j < num_points; j++) 
+	{
+		double p[4] = { Vx(points_solve[j]), 
+						Vy(points_solve[j]),
+						Vz(points_solve[j]), 
+						1.0 };
+
+		double q[3], q2[3];
+
+		dll_matrix_product(3, 4, 4, 1, Rigid, p, q);
+		
+		//calculate the angle	
+		v3_t projPt;
+		projPt.p[0] = q[0];
+		projPt.p[1] = q[1];
+		projPt.p[2] = q[2];
+		double diff = dll_cross_angle(projs_solve[j], projPt);
+		
+		if (diff < proj_estimation_threshold)
+			inliers.push_back(j);
+
+		if (diff < proj_estimation_threshold_weak) 
+		{
+			inliers_weak.push_back(j);
+		}
+		else 
+		{
+			printf("[FindAndVerifyCamera] Removing point [%d] "
+				"(reproj. error = %0.3f)\n", j, diff);
+			outliers.push_back(j);
+		}	
+	}
+
+	//free(idxs_solve);
+	free(points_solve);
+	free(projs_solve);
+
+	double K[9];
+	double R[9];
+	double t[3];
+	memcpy(K, Kinit, sizeof(double) * 9);
+	memcpy(R, Rinit, sizeof(double) * 9);
+	memcpy(t, tinit, sizeof(double) * 3);	
+
+	//conversion from RX+t to R(X-t')
+	printf(" Conversion from RX+t to R(X-t') \n");
+	double nt[3];
+	dll_matrix_transpose_product(3, 3, 3, 1, Rinit, tinit, nt);
+	dll_matrix_scale(3, 1, nt, -1.0, nt);
+	dll_matrix_print(1, 3, nt);
+	t[0]=nt[0]; t[1]=nt[1]; t[2]=nt[2];
+
+	memcpy(cam.K, K, sizeof(double)*9);
+	memcpy(cam.R, R, sizeof(double)*9);
+	memcpy(cam.t, t, sizeof(double)*3);	 
+
+	return 0;
+}
+
+
+
 
 //////////////////////////////////////////////////////////////////////////
 COpenCVFM::COpenCVFM()

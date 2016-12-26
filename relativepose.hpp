@@ -47,7 +47,8 @@ public:
 	virtual ~CPoseEstimationBase(){}
 	virtual int EstimatePose(vector<Point3DDouble> pt3, vector<Point2DDouble> pt2, double* K, double* R, double* t){return 0;}
 	virtual int EstimatePose(vector<Point3DDouble> pt3, vector<Point2DDouble> pt2, CameraPara& cam){return 0;}
-	
+	virtual int EstimatePose(vector<Point3DDouble> pt3, vector<Point3DDouble> pt2, CameraPara& cam){return 0;}
+
 	virtual vector<int> GetInliers()
 	{ vector<int> a; return a;  };
 	virtual vector<int> GetWeakInliers()
@@ -63,7 +64,8 @@ public:
 	~CDLTPose();
 	int EstimatePose(vector<Point3DDouble> pt3, vector<Point2DDouble> pt2, double* K, double* R, double* t);
 	int EstimatePose(vector<Point3DDouble> pt3, vector<Point2DDouble> pt2, CameraPara& cam);
-
+	int EstimatePose(vector<Point3DDouble> pt3, vector<Point3DDouble> pt2, CameraPara& cam){return 0;}
+	
 	vector<int> GetInliers();
 	vector<int> GetWeakInliers();
 
@@ -71,6 +73,27 @@ private:
 	std::vector<int> inliers;
 	std::vector<int> inliers_weak;
 };
+
+class DLL_EXPORT CPanoDLTPose: public CPoseEstimationBase
+{
+
+public:
+	CPanoDLTPose();
+	~CPanoDLTPose();
+	int EstimatePose(vector<Point3DDouble> pt3, vector<Point2DDouble> pt2, double* K, double* R, double* t){return 0;}
+	int EstimatePose(vector<Point3DDouble> pt3, vector<Point2DDouble> pt2, CameraPara& cam){return 0;}
+	int EstimatePose(vector<Point3DDouble> pt3, vector<Point3DDouble> pt2, CameraPara& cam);
+
+	vector<int> GetInliers(){return inliers;}
+	vector<int> GetWeakInliers(){return inliers_weak;}
+
+private:
+	std::vector<int> inliers;
+	std::vector<int> inliers_weak;
+};
+
+
+
 /////////////////////////////////////////////////////////////////////////
 
 

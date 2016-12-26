@@ -1431,9 +1431,11 @@ int SaveTracksToPly(char* filepath, vector<TrackInfo>& trackSeq,
 /////////////////////////////////////////////////////////////////////////////
 CCeresBA::CCeresBA()
 {
+
 }
 CCeresBA::~CCeresBA()
 {
+
 }
 int CCeresBA::RunSFM( vector<Point3DDouble> pt3, vector<ImageKeyVector> ptViews, 
 	vector<ImgFeature> imageFeatures,  vector<int> cameraIDOrder,

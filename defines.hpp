@@ -181,6 +181,12 @@ typedef enum
 	MotionFundametalMatrix,
 }MotionModel;
 
+typedef enum
+{
+	PerspectiveCam,
+	PanoramCam,
+}CameraType;
+
 
 
 #endif

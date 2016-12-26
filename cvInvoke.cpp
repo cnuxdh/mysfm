@@ -171,3 +171,50 @@ void dll_GrdToImg(double gx, double gy, double gz, double* ix, double* iy,
 	GrdToImg(gx, gy, gz, ix, iy, R, Ts, f, x0, y0, ht, wd);
 }
 
+int dll_DLT(vector<Point3DDouble>& grds, vector<Point3DDouble>& projs,
+			CameraPara& cam, CameraType camType)
+{
+	int res = 0;
+
+	if(camType == PerspectiveCam)
+	{
+		//for normal perspective camera
+		CPoseEstimationBase* pDLT = new CDLTPose();
+		vector<Point2DDouble> pts;
+		pts.resize( projs.size() );
+
+		//convert to normal coordinates
+		for(int i=0; i<projs.size(); i++)
+		{
+			pts[i].p[0] = projs[i].p[0] / projs[i].p[2];
+			pts[i].p[1] = projs[i].p[1] / projs[i].p[2];
+		}
+		
+		res = pDLT->EstimatePose(grds, pts, cam);
+
+		delete pDLT;
+	}
+
+	//for panorama camera
+	if(camType == PanoramCam)
+	{
+		//for normal perspective camera
+		CPoseEstimationBase* pDLT = new CPanoDLTPose();
+		vector<Point3DDouble> pts;
+		pts.resize( projs.size() );
+
+		//convert to normal coordinates
+		for(int i=0; i<projs.size(); i++)
+		{
+			pts[i].p[0] = projs[i].p[0];
+			pts[i].p[1] = projs[i].p[1];
+			pts[i].p[2] = projs[i].p[2];
+		}
+
+		res = pDLT->EstimatePose(grds, pts, cam);
+
+		delete pDLT;
+	}
+
+	return res;
+}

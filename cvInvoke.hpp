@@ -7,8 +7,9 @@ using namespace std;
 
 
 
-#include"dataBase.hpp"
+#include "dataBase.hpp"
 #include "defines.hpp"
+
 
 
 int DLL_EXPORT DetectFileFeaturePts(char** filenames, int nFile, char* outpath);
@@ -33,6 +34,11 @@ DLL_EXPORT int dll_EstimatePose5Point_Pano( vector<Point3DDouble>& pl,
 //interface for relative pose estimation
 DLL_EXPORT int dll_EstimatePose( vector<Point2DDouble> lPts, vector<Point2DDouble> rPts,
 				CameraPara& cam1, CameraPara& cam2 );
+
+
+//interface for DLT algorithm
+DLL_EXPORT int dll_DLT(vector<Point3DDouble>& grds, vector<Point3DDouble>& projs,
+						CameraPara& cam, CameraType camType);
 
 
 DLL_EXPORT Point3DDouble dll_TriangulatePt(Point2DDouble p, Point2DDouble q, 
