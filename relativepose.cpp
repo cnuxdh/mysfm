@@ -1151,9 +1151,6 @@ int CPanoDLTPose::EstimatePose(vector<Point3DDouble> pt3, vector<Point3DDouble> 
 	return 0;
 }
 
-
-
-
 //////////////////////////////////////////////////////////////////////////
 COpenCVFM::COpenCVFM()
 {
