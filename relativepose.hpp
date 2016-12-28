@@ -36,6 +36,15 @@ public:
 };
 
 
+class DLL_EXPORT CEstimatePose5PointPano: public CRelativePoseBase
+{
+public:
+	CEstimatePose5PointPano();
+	~CEstimatePose5PointPano();
+	int EstimatePose( PairMatchRes pairMatches, ImgFeature& lImageFeat, ImgFeature& rImageFeat, CameraPara& cam1, CameraPara& cam2 ){return 0;}
+	int EstimatePose( vector<Point2DDouble> lPts, vector<Point2DDouble> rPts, CameraPara& cam1, CameraPara& cam2 );
+};
+
 
 
 //////////////////////////////////////////////////////////////////////////
@@ -81,7 +90,7 @@ public:
 	CPanoDLTPose();
 	~CPanoDLTPose();
 	int EstimatePose(vector<Point3DDouble> pt3, vector<Point2DDouble> pt2, double* K, double* R, double* t){return 0;}
-	int EstimatePose(vector<Point3DDouble> pt3, vector<Point2DDouble> pt2, CameraPara& cam){return 0;}
+	int EstimatePose(vector<Point3DDouble> pt3, vector<Point2DDouble> pt2, CameraPara& cam);
 	int EstimatePose(vector<Point3DDouble> pt3, vector<Point3DDouble> pt2, CameraPara& cam);
 
 	vector<int> GetInliers(){return inliers;}

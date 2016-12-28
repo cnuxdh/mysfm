@@ -130,12 +130,21 @@ DLL_EXPORT int dll_EstimatePose5Point_Pano( vector<Point3DDouble>& pl,
 
 
 DLL_EXPORT int dll_EstimatePose( vector<Point2DDouble> lPts, vector<Point2DDouble> rPts,
-	CameraPara& cam1, CameraPara& cam2 )
+	CameraPara& cam1, CameraPara& cam2, CameraType camtype )
 {
+	if(camtype == PerspectiveCam)
+	{
+		CRelativePoseBase* pRP = new CEstimatePose5Point(); 
+		pRP->EstimatePose(lPts, rPts, cam1, cam2);
+		delete pRP;
+	}
 
-	CRelativePoseBase* pRP = new CEstimatePose5Point(); 
-	pRP->EstimatePose(lPts, rPts, cam1, cam2);
-	delete pRP;
+	if(camtype = PanoramCam)
+	{
+		CRelativePoseBase* pRP = new CEstimatePose5PointPano(); 
+		pRP->EstimatePose(lPts, rPts, cam1, cam2);
+		delete pRP;
+	}
 
 	return 0;
 }
@@ -171,7 +180,7 @@ void dll_GrdToImg(double gx, double gy, double gz, double* ix, double* iy,
 	GrdToImg(gx, gy, gz, ix, iy, R, Ts, f, x0, y0, ht, wd);
 }
 
-int dll_DLT(vector<Point3DDouble>& grds, vector<Point3DDouble>& projs,
+int dll_DLT(vector<Point3DDouble>& grds, vector<Point2DDouble>& projs,
 			CameraPara& cam, CameraType camType)
 {
 	int res = 0;
@@ -180,18 +189,7 @@ int dll_DLT(vector<Point3DDouble>& grds, vector<Point3DDouble>& projs,
 	{
 		//for normal perspective camera
 		CPoseEstimationBase* pDLT = new CDLTPose();
-		vector<Point2DDouble> pts;
-		pts.resize( projs.size() );
-
-		//convert to normal coordinates
-		for(int i=0; i<projs.size(); i++)
-		{
-			pts[i].p[0] = projs[i].p[0] / projs[i].p[2];
-			pts[i].p[1] = projs[i].p[1] / projs[i].p[2];
-		}
-		
-		res = pDLT->EstimatePose(grds, pts, cam);
-
+		res = pDLT->EstimatePose(grds, projs, cam);
 		delete pDLT;
 	}
 
@@ -200,19 +198,7 @@ int dll_DLT(vector<Point3DDouble>& grds, vector<Point3DDouble>& projs,
 	{
 		//for normal perspective camera
 		CPoseEstimationBase* pDLT = new CPanoDLTPose();
-		vector<Point3DDouble> pts;
-		pts.resize( projs.size() );
-
-		//convert to normal coordinates
-		for(int i=0; i<projs.size(); i++)
-		{
-			pts[i].p[0] = projs[i].p[0];
-			pts[i].p[1] = projs[i].p[1];
-			pts[i].p[2] = projs[i].p[2];
-		}
-
-		res = pDLT->EstimatePose(grds, pts, cam);
-
+		res = pDLT->EstimatePose(grds, projs, cam);
 		delete pDLT;
 	}
 

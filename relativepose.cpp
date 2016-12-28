@@ -23,11 +23,12 @@
 #include "cali.hpp"
 #include "distortion.hpp"
 //#include "ba.hpp"
-//#include "panorama.hpp"
+#include "panorama.hpp"
+#include "rotation.hpp"
 
 
 //corelib
-//#include "Matrix.h"
+#include "Matrix.h"
 #include "commonfile.h"
 
 #include "CalcAngle.h"
@@ -566,7 +567,97 @@ int CEstimatePose5Point::EstimatePose( vector<Point2DDouble> lPts, vector<Point2
 }
 
 
+CEstimatePose5PointPano::CEstimatePose5PointPano()
+{
 
+}
+
+CEstimatePose5PointPano::~CEstimatePose5PointPano()
+{
+
+}
+
+/*
+   Model: x = R(X-T)
+   
+*/
+int CEstimatePose5PointPano::EstimatePose( vector<Point2DDouble> lPts, vector<Point2DDouble> rPts, 
+	CameraPara& cam1, CameraPara& cam2 )
+{
+	int ht = cam1.rows;
+	int wd = cam1.cols;
+	double radius = (double)(wd) / (2*PI);
+
+	vector<Point3DDouble> pl;
+	vector<Point3DDouble> pr;
+
+	//from pano 2d to 3d 
+	for(int i=0; i<lPts.size(); i++)
+	{
+		double x = lPts[i].p[0];
+		double y = lPts[i].p[1];
+		//from image center to top-left
+		x = wd*0.5 + x;
+		y = ht*0.5 - y;
+		double gx,gy,gz;
+		SphereTo3D(x, y, radius, gx, gy, gz);
+		Point3DDouble p3;
+		p3.p[0] = gx;
+		p3.p[1] = gy;
+		p3.p[2] = gz;
+		pl.push_back(p3);
+
+
+		x = rPts[i].p[0];
+		y = rPts[i].p[1];
+		//from image center to top-left
+		x = wd*0.5 + x;
+		y = ht*0.5 - y;
+		SphereTo3D(x, y, radius, gx, gy, gz);
+		p3.p[0] = gx;
+		p3.p[1] = gy;
+		p3.p[2] = gz;
+		pr.push_back(p3);
+	}
+	
+	int num_trials = 512;
+	double threshold = 2.5;
+	double R[9];
+	double t[3];
+	vector<double> residual;
+	residual.resize(pl.size());
+	EstimatePose5Point_Pano(pl, pr, radius, num_trials, threshold, R, t, residual);
+
+	for(int i=0; i<9; i++)
+	{
+		cam1.R[i] = 0;
+		cam2.R[i] = R[i];
+	}
+	cam1.R[0] = cam1.R[4] = cam1.R[8] = 1;
+
+
+	//from RX+T to R(X-T')
+	double Rt[9];
+	transpose(R, Rt, 3, 3);
+	double gt[3];
+	mult(Rt, t, gt, 3, 3, 1);
+	for(int i=0; i<3; i++)
+	{
+		cam1.t[i] = 0;
+		cam2.t[i] = -gt[i];
+	}
+	
+	double ea[3];
+	rot2eular(R, ea);
+
+	cam1.ax = cam1.ay = cam1.az = 0;
+
+	cam2.ax = ea[0];
+	cam2.ay = ea[1];
+	cam2.az = ea[2];
+	
+	return 0;
+}
 
 //////////////////////////////////////////////////////////////////////////
 CTriangulateCV::CTriangulateCV()
@@ -1008,6 +1099,47 @@ CPanoDLTPose::~CPanoDLTPose()
 
 }
 
+
+/*
+pt3: 3D control points,
+pt2: 2D centered image points
+*/
+int CPanoDLTPose::EstimatePose(vector<Point3DDouble> pt3, vector<Point2DDouble> pt2, CameraPara& cam)
+{
+	int ht = cam.rows;
+	int wd = cam.cols;
+
+	double radius = (double)(wd) / (2*PI);
+
+	//from spherical image to 3D
+	vector<Point3DDouble> panoPt3;
+	for(int i=0; i<pt2.size(); i++)
+	{
+		Point3DDouble p3;
+		
+		double x,y;
+
+		//from center to top-left
+		x = pt2[i].p[0] + wd*0.5;
+		y = ht*0.5 - pt2[i].p[1];
+
+		double gx,gy,gz;
+		SphereTo3D(x,y,radius,gx,gy,gz);
+		p3.p[0] = gx;
+		p3.p[1] = gy;
+		p3.p[2] = gz;
+		
+		panoPt3.push_back(p3);
+	}
+	
+	//panorama pose estimation
+	int res = EstimatePose(pt3, panoPt3, cam);
+	
+	return res;
+}
+
+
+//pt3 and pt2 are 3D vectors
 int CPanoDLTPose::EstimatePose(vector<Point3DDouble> pt3, vector<Point3DDouble> pt2, CameraPara& cam)
 {
 	double P[12];

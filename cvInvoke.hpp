@@ -33,11 +33,11 @@ DLL_EXPORT int dll_EstimatePose5Point_Pano( vector<Point3DDouble>& pl,
 
 //interface for relative pose estimation
 DLL_EXPORT int dll_EstimatePose( vector<Point2DDouble> lPts, vector<Point2DDouble> rPts,
-				CameraPara& cam1, CameraPara& cam2 );
+				CameraPara& cam1, CameraPara& cam2, CameraType camtype );
 
 
 //interface for DLT algorithm
-DLL_EXPORT int dll_DLT(vector<Point3DDouble>& grds, vector<Point3DDouble>& projs,
+DLL_EXPORT int dll_DLT(vector<Point3DDouble>& grds, vector<Point2DDouble>& projs,
 						CameraPara& cam, CameraType camType);
 
 
