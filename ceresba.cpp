@@ -62,11 +62,17 @@ int RunBA( vector<TrackInfo>& trackSeq, vector<ImgFeature>& imageFeatures,
 		pOuterParams[i*6+2] = aa[2];
 		
 		//from R(X-T) to RX + T
+		/*
 		double iR[9];
 		memcpy(iR, cameras[ci].R, sizeof(double)*9);
 		invers_matrix(iR, 3);
 		double it[3];
 		mult(iR, cameras[ci].t, it, 3, 3, 1);
+		*/
+
+		//revised by xiedonghai, 2016.12.30
+		double it[3];
+		mult(cameras[ci].R, cameras[ci].t, it, 3, 3, 1);
 
 		pOuterParams[i*6+3] = -it[0];
 		pOuterParams[i*6+4] = -it[1];
@@ -962,11 +968,17 @@ int CeresBA( vector<Point3DDouble>& grdPts, vector<Point2DDouble>& imgPts, Camer
 	pOuterParams[1] = aa[1];
 	pOuterParams[2] = aa[2];
 
+	/*
 	double iR[9];
 	memcpy(iR, camera.R, sizeof(double)*9);
 	invers_matrix(iR, 3);
 	double it[3];
 	mult(iR, camera.t, it, 3, 3, 1);
+	*/
+
+	//from R(X-T) to RX+T, revised by xiedonghai, 2016.12.30
+	double it[3];
+	mult(camera.R, camera.t, it, 3, 3, 1);
 
 	pOuterParams[3] = -it[0];
 	pOuterParams[4] = -it[1];
@@ -1047,7 +1059,9 @@ int CeresBA( vector<Point3DDouble>& grdPts, vector<Point2DDouble>& imgPts, Camer
 	camera.ay = ea[1];
 	camera.az = ea[2];
 	
-	//double iR[9];
+
+	//from RX+T to R(X-T)
+	double iR[9];
 	memcpy(iR, R, sizeof(double)*9);
 	invers_matrix(iR, 3);
 	//double it[3];
