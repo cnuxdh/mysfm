@@ -20,7 +20,8 @@ int DLL_EXPORT DetectFileFeaturePts(char** filenames, int nFile, vector<ImgFeatu
 int DLL_EXPORT DetectFileFeaturePts(char* filenames, ImgFeature& imgFeatures, int maxHt);
 
 
-int DLL_EXPORT MatchImageFiles(vector<ImgFeature>& imgFeatures, vector<PairMatchRes>& matchRes);
+int DLL_EXPORT MatchImageFiles(vector<ImgFeature>& imgFeatures, vector<PairMatchRes>& matchRes,
+	CameraType camtype=PerspectiveCam);
 
 
 DLL_EXPORT int dll_EstimatePose5Point_Pano( vector<Point3DDouble>& pl, 

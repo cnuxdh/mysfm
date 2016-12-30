@@ -476,7 +476,7 @@ int CEstimatePose5Point::EstimatePose( PairMatchRes pairMatches, ImgFeature& lIm
 }
 
 /*
-  Model: x = R(X-T)
+  Output model: x = R(X-T)
   inputs:
        lpts,rpts: normalized point coordinates of image, the origin is the center of image
   output:
@@ -578,8 +578,7 @@ CEstimatePose5PointPano::~CEstimatePose5PointPano()
 }
 
 /*
-   Model: x = R(X-T)
-   
+   Output model: x = R(X-T)   
 */
 int CEstimatePose5PointPano::EstimatePose( vector<Point2DDouble> lPts, vector<Point2DDouble> rPts, 
 	CameraPara& cam1, CameraPara& cam2 )
@@ -628,6 +627,7 @@ int CEstimatePose5PointPano::EstimatePose( vector<Point2DDouble> lPts, vector<Po
 	residual.resize(pl.size());
 	EstimatePose5Point_Pano(pl, pr, radius, num_trials, threshold, R, t, residual);
 
+	//rotation matrix
 	for(int i=0; i<9; i++)
 	{
 		cam1.R[i] = 0;
@@ -647,14 +647,16 @@ int CEstimatePose5PointPano::EstimatePose( vector<Point2DDouble> lPts, vector<Po
 		cam2.t[i] = -gt[i];
 	}
 	
+	//save eular angle
 	double ea[3];
 	rot2eular(R, ea);
-
 	cam1.ax = cam1.ay = cam1.az = 0;
-
 	cam2.ax = ea[0];
 	cam2.ay = ea[1];
 	cam2.az = ea[2];
+
+	printf("relative pose eular angle: %lf %lf %lf \n", ea[0], ea[1], ea[2]);
+	printf("relative pose translation: %lf %lf %lf \n", cam2.t[0], cam2.t[1], cam2.t[2]);
 	
 	return 0;
 }
@@ -873,6 +875,90 @@ void CTriangulateCV::Triangulate(vector<Point2DDouble> pts,
 	delete [] cameras;
 }
 
+
+CTriangulatePano::CTriangulatePano()
+{
+
+}
+CTriangulatePano::~CTriangulatePano()
+{
+
+}
+
+void CTriangulatePano::Triangulate(vector<Point2DDouble> lPts, vector<Point2DDouble> rPts, 
+	CameraPara cam1, CameraPara cam2, vector<Point3DDouble>& gps)
+{
+
+}
+
+void CTriangulatePano::Triangulate(vector<Point2DDouble> lPts, vector<Point2DDouble> rPts, 
+	CameraPara cam1, CameraPara cam2, vector<Point3DDouble>& gps, vector<double>& errorArray)
+{
+	int ht = cam1.rows;
+	int wd = cam1.cols;
+	double radius = (double)(wd) / (2*PI);
+
+	bool explicit_camera_centers = true;
+
+	double R1[9];
+	double t1[3];
+	double R2[9];
+	double t2[3];
+
+	memcpy(R1, cam1.R, sizeof(double)*9);
+	memcpy(t1, cam1.t, sizeof(double)*3);
+	memcpy(R2, cam2.R, sizeof(double)*9);
+	memcpy(t2, cam2.t, sizeof(double)*3);
+
+	//from R(X-T) to RX+T
+	if (explicit_camera_centers) 
+	{
+		/* Put the translation in standard form */
+		mult(R1, cam1.t, t1, 3, 3, 1);
+		t1[0] = -t1[0];
+		t1[1] = -t1[1];
+		t1[2] = -t1[2];
+
+		mult(R2, cam2.t, t2, 3, 3, 1);
+		t2[0] = -t2[0];
+		t2[1] = -t2[1];
+		t2[2] = -t2[2];
+	}
+
+	for(int i=0; i<lPts.size(); i++)
+	{
+		//from spherical panorama image point to 3D point
+		double gx,gy,gz;
+		double x = lPts[i].p[0] + wd*0.5;
+		double y = ht*0.5 - lPts[i].p[1];
+		SphereTo3D(x,y,radius,gx,gy,gz);
+		//normalized the 3D point
+		Point2DDouble p;
+		p.p[0] = gx/(gz+MINIMAL_VALUE);
+		p.p[1] = gy/(gz+MINIMAL_VALUE);
+
+
+		x = rPts[i].p[0] + wd*0.5;
+		y = ht*0.5 - rPts[i].p[1];
+		SphereTo3D(x,y,radius,gx,gy,gz);
+		Point2DDouble q;
+		q.p[0] = gx/(gz+MINIMAL_VALUE);
+		q.p[1] = gy/(gz+MINIMAL_VALUE);
+		
+		double error = 0.0;
+		Point3DDouble gp = TriangulatePt(p, q, R1, t1, R2, t2, &error);
+				
+		gps.push_back(gp);
+		errorArray.push_back(error);
+	}
+}
+
+void CTriangulatePano::Triangulate(vector<Point2DDouble> pts, vector<CameraPara> cams, 
+	Point3DDouble& gps,bool explicit_camera_centers,double& ferror)
+{
+
+}
+
 //////////////////////////////////////////////////////////////////////////
 CDLTPose::CDLTPose()
 {
@@ -1059,6 +1145,8 @@ int CDLTPose::EstimatePose(vector<Point3DDouble> pt3, vector<Point2DDouble> pt2,
 	return 0;
 }
 
+
+//Output model: R(X-T)
 int CDLTPose::EstimatePose(vector<Point3DDouble> pt3, vector<Point2DDouble> pt2, CameraPara& cam)
 {
 	printf("\n  DLT Pose Estimation ... \n");
@@ -1089,20 +1177,19 @@ vector<int> CDLTPose::GetWeakInliers()
 }
 
 
+
 CPanoDLTPose::CPanoDLTPose()
 {
 
 }
-
 CPanoDLTPose::~CPanoDLTPose()
 {
 
 }
 
-
-/*
-pt3: 3D control points,
-pt2: 2D centered image points
+/* Output Model: R(X-T)
+   pt3: 3D control points,
+   pt2: 2D centered image points
 */
 int CPanoDLTPose::EstimatePose(vector<Point3DDouble> pt3, vector<Point2DDouble> pt2, CameraPara& cam)
 {
@@ -1123,6 +1210,7 @@ int CPanoDLTPose::EstimatePose(vector<Point3DDouble> pt3, vector<Point2DDouble> 
 		x = pt2[i].p[0] + wd*0.5;
 		y = ht*0.5 - pt2[i].p[1];
 
+		//calculate the 3D ray light 
 		double gx,gy,gz;
 		SphereTo3D(x,y,radius,gx,gy,gz);
 		p3.p[0] = gx;

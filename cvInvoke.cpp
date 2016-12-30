@@ -89,13 +89,23 @@ int DetectFileFeaturePts(char** filenames, int nFile, vector<ImgFeature>& imgFea
 
 
 //matching between image files
-int MatchImageFiles(vector<ImgFeature>& imgFeatures, vector<PairMatchRes>& matchRes)
+int MatchImageFiles(vector<ImgFeature>& imgFeatures, vector<PairMatchRes>& matchRes, CameraType camtype)
 {
 	printf("[MatchImageFiles] ... \n");
 
 	int nImageNum = imgFeatures.size();
 		
-	CMatchBase* pMatch = new CSiftMatch();  //new CKNNMatch();
+
+	CMatchBase* pMatch = NULL;
+	
+	if(camtype==PerspectiveCam)
+	{
+		pMatch = new CSiftMatch();  //new CKNNMatch();
+	}
+	else if(camtype==PanoramCam)
+	{
+		pMatch = new CPanoMatch();
+	}
 
 	for(int i=0; i<nImageNum; i++)
 		for(int j=i+1; j<nImageNum; j++)

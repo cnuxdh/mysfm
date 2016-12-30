@@ -663,7 +663,42 @@ int CPanoMatch::Match(ImgFeature& lImage, ImgFeature& rImage, vector<MatchPairIn
 }
 int CPanoMatch::Match(ImgFeature& lImage, ImgFeature& rImage, PairMatchRes& pairMatch )
 {
+	if(lImage.featPts.size()<8 || rImage.featPts.size()<8)
+		return 0;
 
+	int nDim = lImage.featPts[0].feat.size();
+
+	//data format conversion
+	int lPtNum = lImage.featPts.size();
+	int rPtNum = rImage.featPts.size();
+
+	Key_Point* lPts = (Key_Point*)malloc(lPtNum*sizeof(Key_Point));
+	Key_Point* rPts = (Key_Point*)malloc(rPtNum*sizeof(Key_Point));
+
+	int i = 0;
+	for(i=0; i<lPtNum; i++)
+	{
+		FeatureConvert( lImage.featPts[i], lPts[i] );
+	}
+	for(i=0; i<rPtNum; i++)
+	{
+		FeatureConvert( rImage.featPts[i], rPts[i] );
+	}
+
+	MatchPoint* pMatch;
+	int nMatch = 0;
+	SiftPairMatch(lPts, lPtNum, rPts, rPtNum, &pMatch, &nMatch, nDim);
+
+	for(i=0; i<nMatch; i++)
+	{
+		MatchPairIndex mid;
+		mid.l = pMatch[i].id1;
+		mid.r = pMatch[i].id2;
+		pairMatch.matchs.push_back(mid);
+	}
+	delete[] pMatch;
+	
+	return 1;
 	return 0;
 }
 
@@ -1307,7 +1342,7 @@ int CFastGenerateTrack::GenerateTracks(vector<ImgFeature>& imgFeatures, vector<P
 		int nRightImage = pairMatchs[i].rId; //right image index
 		int nMatchNum   = pairMatchs[i].matchs.size();
 
-		printf("match pair: %d - %d \n", nLeftImage, nRightImage);
+		//printf("match pair: %d - %d \n", nLeftImage, nRightImage);
 		
 		//process each match point pair
 		for(int j=0; j<nMatchNum; j++)

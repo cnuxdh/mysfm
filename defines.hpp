@@ -9,7 +9,7 @@
 using namespace std;
 
 #define PI 3.1415926
-
+#define MINIMAL_VALUE 0.000001
 
 
 typedef struct stMatrixByte

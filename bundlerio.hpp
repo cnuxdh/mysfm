@@ -4,6 +4,8 @@
 
 #include "export.hpp"
 #include "defines.hpp"
+#include "badata.hpp"
+
 
 //corelib
 //#include "commondata.h"
@@ -15,6 +17,8 @@
 using namespace std;
 
 
+int SaveTracksToPly(char* filepath, vector<TrackInfo>& trackSeq,
+	vector<int> cameraIDOrder, const vector<CameraPara>& cameras);
 
 
 DLL_EXPORT int ReadBundlerOutFile(char* filename, vector<stPOS>& camParas, vector<stTrack>& tracks );
