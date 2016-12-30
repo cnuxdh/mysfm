@@ -98,6 +98,7 @@ int CPanoBA::BundleAdjust(int numCameras, vector<CameraPara>& cameras,
 	CRelativePoseBase* pRP = new CEstimatePose5PointPano();
 	pRP->EstimatePose(lpts, rpts, cameras[leftImageId], cameras[rightImageId] );   
 
+
 	//2.2 triangulation
 	CTriangulateBase* pTri = new CTriangulatePano();
 	vector<Point3DDouble> gpts;
@@ -109,7 +110,6 @@ int CPanoBA::BundleAdjust(int numCameras, vector<CameraPara>& cameras,
 	vector<int> cameraIDOrder;
 	cameraIDOrder.push_back(leftImageId);
 	cameraIDOrder.push_back(rightImageId);
-	//vector<Point3DDouble> goodPts;
 	for(int i=0; i<gpts.size(); i++)
 	{
 		trackSeq[i].grd = gpts[i];

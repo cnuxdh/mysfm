@@ -61,6 +61,7 @@ int RunBA( vector<TrackInfo>& trackSeq, vector<ImgFeature>& imageFeatures,
 		pOuterParams[i*6+1] = aa[1];
 		pOuterParams[i*6+2] = aa[2];
 		
+		//from R(X-T) to RX + T
 		double iR[9];
 		memcpy(iR, cameras[ci].R, sizeof(double)*9);
 		invers_matrix(iR, 3);
@@ -205,7 +206,7 @@ int RunBA( vector<TrackInfo>& trackSeq, vector<ImgFeature>& imageFeatures,
 		//cout<<"Angle: "<< cameras[camId].ax <<" "<< 
 		//cameras[camId].ay<<" " << cameras[camId].az << "\n"; 
 
-		//from RX+T to RX-T
+		//from RX+T to R(X-T)
 		double iR[9];
 		memcpy(iR, R, sizeof(double)*9);
 		invers_matrix(iR, 3);

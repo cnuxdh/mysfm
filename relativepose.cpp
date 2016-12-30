@@ -623,6 +623,7 @@ int CEstimatePose5PointPano::EstimatePose( vector<Point2DDouble> lPts, vector<Po
 	double threshold = 2.5;
 	double R[9];
 	double t[3];
+
 	vector<double> residual;
 	residual.resize(pl.size());
 	EstimatePose5Point_Pano(pl, pr, radius, num_trials, threshold, R, t, residual);

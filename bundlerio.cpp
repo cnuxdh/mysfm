@@ -29,7 +29,15 @@ int SaveTracksToPly(char* filepath, vector<TrackInfo>& trackSeq,
 		if( trackSeq[i].GetImageKeySum() == 0 )
 			continue;
 
-		//if( trackSeq[i].derror<4 )
+		double gx = trackSeq[i].grd.p[0];
+		double gy = trackSeq[i].grd.p[1];
+		double gz = trackSeq[i].grd.p[2];
+		double distance = sqrt(gx*gx+gy*gy+gz*gz);
+
+		//if(distance>30)
+		//	continue;
+
+		if( trackSeq[i].derror<8 )
 		{
 			goodGrds.push_back( trackSeq[i].grd );
 
