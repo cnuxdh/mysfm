@@ -12,6 +12,14 @@ using namespace std;
 #define MINIMAL_VALUE 0.000001
 
 
+typedef enum
+{
+	PerspectiveCam,
+	PanoramCam,
+}CameraType;
+
+
+
 typedef struct stMatrixByte
 {
 	int ht,wd;
@@ -146,8 +154,9 @@ typedef struct stCameraPara
 	double t[3];
 	double xs,ys,zs; //absolute position of camera
 	double lon,lat;  //the lon/lat of position of camera
-	double ax,ay,az; //rotation angle around x,y,z (Eular degree)
+	double ax,ay,az;     //rotation angle around x,y,z (Eular degree)
 	int    rows,cols;    //the size of image in pixels
+	CameraType camtype;  //camera type
 }CameraPara;
 
 
@@ -180,13 +189,6 @@ typedef enum
 	MotionHomography,
 	MotionFundametalMatrix,
 }MotionModel;
-
-typedef enum
-{
-	PerspectiveCam,
-	PanoramCam,
-}CameraType;
-
 
 
 #endif

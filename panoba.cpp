@@ -13,6 +13,11 @@
 #include"relativepose.hpp"
 #include"bundlerio.hpp"
 
+#include"ceresba.hpp"
+
+
+
+
 
 CPanoBA::CPanoBA()
 {
@@ -116,10 +121,61 @@ int CPanoBA::BundleAdjust(int numCameras, vector<CameraPara>& cameras,
 		trackSeq[i].derror = errorarray[i];
 	}
 	
-	//RemoveOutlierPts(tracks, trackSeq, imageFeatures, cameraIDOrder, cameras);
+
+	RemoveOutlierPts(tracks, trackSeq, imageFeatures, cameraIDOrder, cameras);
   
 	SaveTracksToPly("c:\\temp\\pair-raw.ply", trackSeq, cameraIDOrder, cameras);
 
+	RunBA(trackSeq, imageFeatures, cameraIDOrder, cameras);
 
+	RemoveOutlierPts(tracks, trackSeq, imageFeatures, cameraIDOrder, cameras);
+
+	SaveTracksToPly("c:\\temp\\pair.ply", trackSeq, cameraIDOrder, cameras);
+
+	//3. adding new images
+	while(1)
+	{
+		int newCameraIndex = SelectNewImage(cameraVisited, tracks, trackSeq);
+		if(newCameraIndex<0)
+			break;
+
+		//calculate the camera parameters of new selected
+		printf("\n\n************** get initial parameters for camera: %d ******************** \n", newCameraIndex);
+		int initFocalLen = cameras[cameraIDOrder[0]].focus;
+		int res = CalculateNewCamParas(newCameraIndex, imageFeatures, trackSeq, tracks, 
+			initFocalLen, cameras[newCameraIndex]);
+
+		//DLT pose estimation failed
+		if( res < 0 )
+		{
+			cameraVisited[newCameraIndex] = 1;
+			printf("\n discard camera: %d \n", newCameraIndex);
+			continue;
+		}
+
+		//adding the image points of new image into the current tracks 
+		printf("\n\n\n ******************* adding image %d ******************** \n", newCameraIndex);
+		UpdateBATracks(newCameraIndex, cameraVisited, cameraIDOrder, imageFeatures, tracks, trackSeq, cameras);
+
+
+		printf("\n BA for all cameras... \n");
+		//optimization for all cameras
+		RefineAllParameters(trackSeq, imageFeatures, cameraIDOrder, tracks, cameras);
+	}
+
+	SaveTracksToPly("c:\\temp\\final-ba.ply", trackSeq, cameraIDOrder, cameras);
+
+	//output the camera parameters
+	printf("\n ****************** Final results: ********************** \n");
+	printf("Camera Number: %d \n", cameraIDOrder.size());
+	for(int i=0; i<cameraIDOrder.size(); i++)
+	{
+		int camId = cameraIDOrder[i];
+		printf("camera: %d ", camId);
+		printf(" focal: %lf  ", cameras[camId].focus);
+		printf(" angle: %lf %lf %lf  ", cameras[camId].ax, cameras[camId].ay, cameras[camId].az);
+		printf(" position: %lf %lf %lf \n", cameras[camId].t[0], cameras[camId].t[1], cameras[camId].t[2]);
+	}
+	
 	return 0;
 }

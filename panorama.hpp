@@ -7,6 +7,7 @@
 #include "export.hpp"
 #include "defines.hpp"
 
+//#include <cmath>
 
 
 
@@ -20,6 +21,27 @@ DLL_EXPORT int SphereTo3D(double x, double y, double radius, double& gx, double&
 DLL_EXPORT int GrdToSphere_center(double gx, double gy, double gz, double radius, double& ix, double& iy);
 DLL_EXPORT int GrdToSphere(double gx, double gy, double gz, double radius, double& ix, double& iy);
 
+
+//template function for "GrdToSphere"
+template<typename T>
+int GrdToPanoImage(T gx, T gy, T gz, T radius, T& ix, T& iy)
+{
+
+	T sita, fai; //sita-lontitude, fai-latitude
+
+	sita = atan2( gx, gy );
+	//sita = atan2( gy, gx );
+	if( sita<T(0.0) ) sita += T(2.0*PI);
+
+	fai  = atan2( sqrt(gx*gx+gy*gy), gz );
+	//fai  = atan2( gz, sqrt(gx*gx+gy*gy) );
+	if( fai<T(0.0) )  fai += T(PI);
+
+	ix = radius*sita;
+	iy = radius*fai;
+
+	return 0;
+}
 
 //for cylinder projection
 //from 3d space to cylinder projection

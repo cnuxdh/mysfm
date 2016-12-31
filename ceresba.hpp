@@ -164,7 +164,56 @@ struct SFMReprojectionError
 };
 
 
+// model: RX + T
+struct SFMPanoReprojectionError 
+{
+	SFMPanoReprojectionError(double observed_x, double observed_y, double radius)
+		: observed_x(observed_x), observed_y(observed_y), radius(radius) {}
+	
+	template <typename T>
+	bool operator()( const T* const cameraOut, //6 outer camera parameters
+					 const T* const point,     //3 parameters for ground point
+					 T* residuals) const       //2 output residual parameters
+	{
+		T aa[3];
+		aa[0] = cameraOut[0];
+		aa[1] = cameraOut[1];
+		aa[2] = cameraOut[2];
 
+		T t[3];
+		t[0] = cameraOut[3];
+		t[1] = cameraOut[4];
+		t[2] = cameraOut[5];
+
+		T p[3];
+		ceres::AngleAxisRotatePoint(aa, point, p);
+		p[0] += t[0];
+		p[1] += t[1];
+		p[2] += t[2];
+			
+		T dx,dy;
+		GrdToPanoImage(p[0], p[1], p[2], T(radius), dx, dy);
+		
+		residuals[0] = dx - T(observed_x);
+		residuals[1] = dy - T(observed_y);
+		
+		//printf("residual: %lf %lf \n", residuals[0], residuals[1]);
+
+		return true;
+	}
+	
+	// Factory to hide the construction of the CostFunction object from
+	// the client code.
+	static ceres::CostFunction* Create(const double observed_x, const double observed_y, const double radius) 
+	{
+			return (new ceres::AutoDiffCostFunction<SFMPanoReprojectionError, 2, 6, 3>(
+				new SFMPanoReprojectionError(observed_x, observed_y, radius)));
+	}
+
+	double observed_x;
+	double observed_y;
+	double radius;
+};
 
 
 
@@ -337,6 +386,35 @@ int CeresBA( vector<TrackInfo> trackSeq, vector<ImgFeature> imageFeatures, vecto
 int CeresBA( vector<Point3DDouble>& grdPts, vector<Point2DDouble>& imgPts, CameraPara& camera, 
 			 bool bIsFixedFocalLen );
 
+int SelectNewImage(vector<int> cameraVisited,
+	vector<TrackInfo>& tracks, 
+	vector<TrackInfo>& trackSeqNew );
+
+int RemoveOutlierPts( vector<TrackInfo>& tracks, vector<TrackInfo>& trackSeq, 
+	vector<ImgFeature>& imageFeatures, vector<int> cameraIDOrder, 
+	vector<CameraPara>& cameras);
+
+int RunBA( vector<TrackInfo>& trackSeq, vector<ImgFeature>& imageFeatures, 
+	vector<int> cameraIDOrder, vector<CameraPara> &cameras);
+
+int CalculateNewCamParas(int nCameraId, 
+	vector<ImgFeature>&  imageFeatures,
+	vector<TrackInfo>& trackSeqNew, 
+	vector<TrackInfo>& tracks,
+	double initFocalLen,
+	CameraPara& cam );
+
+int UpdateBATracks( int newCameraIndex, 
+	vector<int>&  cameraVisited,
+	vector<int>&  cameraIDOrder,
+	vector<ImgFeature>&  imageFeatures, 
+	vector<TrackInfo>& tracks, 
+	vector<TrackInfo>& trackSeqNew,
+	vector<CameraPara>& cameras);
+
+//refine the camera parameters and track points 
+int RefineAllParameters(vector<TrackInfo>& trackSeq, vector<ImgFeature>& imageFeatures, 
+	vector<int> cameraIDOrder, vector<TrackInfo>& tracks, vector<CameraPara>& cameras);
 
 
 class DLL_EXPORT CCeresBA: public CBABase

@@ -130,11 +130,15 @@ public:
 	virtual ~CTriangulateBase(){}
 	
 	//for track sequence with two projections
-	virtual void Triangulate(vector<Point2DDouble> lPts, vector<Point2DDouble> rPts, CameraPara cam1, CameraPara cam2, vector<Point3DDouble>& gps){} 
-	virtual void Triangulate(vector<Point2DDouble> lPts, vector<Point2DDouble> rPts, CameraPara cam1, CameraPara cam2, vector<Point3DDouble>& gps, vector<double>& errorArray){} 
+	virtual void Triangulate(vector<Point2DDouble> lPts, vector<Point2DDouble> rPts, 
+		CameraPara cam1, CameraPara cam2, vector<Point3DDouble>& gps){} 
+
+	virtual void Triangulate(vector<Point2DDouble> lPts, vector<Point2DDouble> rPts, 
+		CameraPara cam1, CameraPara cam2, vector<Point3DDouble>& gps, vector<double>& errorArray){} 
 		
 	//for one track with multiple projections
-	virtual void Triangulate(vector<Point2DDouble> pts, vector<CameraPara> cams, Point3DDouble& gps,bool explicit_camera_centers,double& ferror){} 
+	virtual void Triangulate(vector<Point2DDouble> pts, vector<CameraPara> cams, 
+		Point3DDouble& gps,bool explicit_camera_centers,double& ferror){} 
 
 };
 
@@ -143,9 +147,12 @@ class DLL_EXPORT CTriangulateCV: public CTriangulateBase
 public:
 	CTriangulateCV();
     ~CTriangulateCV();
-	void Triangulate(vector<Point2DDouble> lPts, vector<Point2DDouble> rPts, CameraPara cam1, CameraPara cam2, vector<Point3DDouble>& gps);
-	void Triangulate(vector<Point2DDouble> lPts, vector<Point2DDouble> rPts, CameraPara cam1, CameraPara cam2, vector<Point3DDouble>& gps, vector<double>& errorArray);
-	void Triangulate(vector<Point2DDouble> pts, vector<CameraPara> cams, Point3DDouble& gps,bool explicit_camera_centers,double& ferror);
+	void Triangulate(vector<Point2DDouble> lPts, vector<Point2DDouble> rPts,
+		CameraPara cam1, CameraPara cam2, vector<Point3DDouble>& gps);
+	void Triangulate(vector<Point2DDouble> lPts, vector<Point2DDouble> rPts, 
+		CameraPara cam1, CameraPara cam2, vector<Point3DDouble>& gps, vector<double>& errorArray);
+	void Triangulate(vector<Point2DDouble> pts, vector<CameraPara> cams, 
+		Point3DDouble& gps,bool explicit_camera_centers,double& ferror);
 };
 
 class DLL_EXPORT CTriangulatePano: public CTriangulateBase
@@ -153,9 +160,12 @@ class DLL_EXPORT CTriangulatePano: public CTriangulateBase
 public:
 	CTriangulatePano();
 	~CTriangulatePano();
-	void Triangulate(vector<Point2DDouble> lPts, vector<Point2DDouble> rPts, CameraPara cam1, CameraPara cam2, vector<Point3DDouble>& gps);
-	void Triangulate(vector<Point2DDouble> lPts, vector<Point2DDouble> rPts, CameraPara cam1, CameraPara cam2, vector<Point3DDouble>& gps, vector<double>& errorArray);
-	void Triangulate(vector<Point2DDouble> pts, vector<CameraPara> cams, Point3DDouble& gps,bool explicit_camera_centers,double& ferror);
+	void Triangulate(vector<Point2DDouble> lPts, vector<Point2DDouble> rPts,
+		CameraPara cam1, CameraPara cam2, vector<Point3DDouble>& gps);
+	void Triangulate(vector<Point2DDouble> lPts, vector<Point2DDouble> rPts, 
+		CameraPara cam1, CameraPara cam2, vector<Point3DDouble>& gps, vector<double>& errorArray);
+	void Triangulate(vector<Point2DDouble> pts, vector<CameraPara> cams, 
+		Point3DDouble& gps,bool explicit_camera_centers,double& ferror);
 };
 
 

@@ -11,6 +11,7 @@
 #include "bundlerio.hpp"
 #include "rotation.hpp"
 #include "badata.hpp"
+#include "panorama.hpp"
 
 
 //baselib
@@ -38,6 +39,9 @@ int RunBA( vector<TrackInfo>& trackSeq, vector<ImgFeature>& imageFeatures,
 {
 	int nBACameras = cameraIDOrder.size(); //the cameras attending the BA
 
+	if(nBACameras<2)
+		return -1;
+
 	int nAllCameras = cameras.size();
 	vector<int> cameraMap;
 	cameraMap.resize(nAllCameras, 0);      //save the index of reordered cameras 
@@ -62,14 +66,6 @@ int RunBA( vector<TrackInfo>& trackSeq, vector<ImgFeature>& imageFeatures,
 		pOuterParams[i*6+2] = aa[2];
 		
 		//from R(X-T) to RX + T
-		/*
-		double iR[9];
-		memcpy(iR, cameras[ci].R, sizeof(double)*9);
-		invers_matrix(iR, 3);
-		double it[3];
-		mult(iR, cameras[ci].t, it, 3, 3, 1);
-		*/
-
 		//revised by xiedonghai, 2016.12.30
 		double it[3];
 		mult(cameras[ci].R, cameras[ci].t, it, 3, 3, 1);
@@ -81,12 +77,9 @@ int RunBA( vector<TrackInfo>& trackSeq, vector<ImgFeature>& imageFeatures,
 	
 	//ground point parameters
 	int num_pts = trackSeq.size();
-	double* grdPt = new double[num_pts*3]; //(double*)malloc( _pts*3*sizeof(double) );
+	double* grdPt = new double[num_pts*3];
 	for(int i=0; i<num_pts; i++)
 	{   
-		//if( trackSeq[i].GetImageKeySum() == 0 )
-		//	continue;
-
 		Point3DDouble gp = trackSeq[i].GetGround();
 		grdPt[i*3]   = gp.p[0];
 		grdPt[i*3+1] = gp.p[1];
@@ -136,17 +129,37 @@ int RunBA( vector<TrackInfo>& trackSeq, vector<ImgFeature>& imageFeatures,
 	//invoke ceres functions, each time adding one projection
 	for(int i=0; i<nProjection; i++)
 	{
-		ceres::CostFunction* cost_function =
-			SFMReprojectionError::Create(projections[2 * i + 0], projections[2 * i + 1]);
-
 		int cameraId = vecCamIndex[i];
-		int trackId  = vecTrackIndex[i];
 		
-		problem.AddResidualBlock(cost_function,
-			NULL /* squared loss */,
-			pInteriorParams,			    //inner camera parameters: 3
-			pOuterParams + cameraId*6,      //outer camera parameters: 6
-			grdPt + trackId*3);			    //parameters for point :   3
+		if( cameras[cameraId].camtype == PerspectiveCam )
+		{				
+			ceres::CostFunction* cost_function =
+				SFMReprojectionError::Create(projections[2 * i + 0], projections[2 * i + 1]);
+
+			int trackId  = vecTrackIndex[i];
+
+			problem.AddResidualBlock(cost_function,
+				NULL /* squared loss */,
+				pInteriorParams,			    //inner camera parameters: 3
+				pOuterParams + cameraId*6,      //outer camera parameters: 6
+				grdPt + trackId*3);			    //parameters for point :   3
+		}
+		else if(cameras[cameraId].camtype == PanoramCam)
+		{
+			double radius = (double)(cameras[cameraId].cols) / (2*PI); 
+
+			ceres::CostFunction* cost_function =
+				SFMPanoReprojectionError::Create(projections[2 * i + 0], 
+												 projections[2 * i + 1], 
+												 radius);
+
+			int trackId  = vecTrackIndex[i];
+
+			problem.AddResidualBlock(cost_function,
+				NULL /* squared loss */,
+				pOuterParams + cameraId*6,      //outer camera parameters: 6
+				grdPt + trackId*3);			    //parameters for point :   3
+		}
 	}
 
 	//save the optimized results
@@ -170,8 +183,7 @@ int RunBA( vector<TrackInfo>& trackSeq, vector<ImgFeature>& imageFeatures,
 	
 
 	//if the error is large, delete the new added data
-
-
+	
 
 	std::cout<<"all cameras optimized results: "<<"\n";
 
@@ -1351,38 +1363,57 @@ int CalculateNewCamParas(int nCameraId,
 }
 
 
-//model: R(X-T), from ground point to image
+// model: R(X-T), from ground point to image
 int GrdToImg(Point3DDouble gp, Point2DDouble& ip, CameraPara cam)
 {
 	const double epsilon = 1e-18;
 	double p[3];
 	double res[3];
 
-	double f = cam.focus;
-	double k1 = cam.k1;
-	double k2 = cam.k2;
+	if( cam.camtype == PerspectiveCam )
+	{
+		double f = cam.focus;
+		double k1 = cam.k1;
+		double k2 = cam.k2;
 
-	p[0] = gp.p[0] - cam.t[0];
-	p[1] = gp.p[1] - cam.t[1];
-	p[2] = gp.p[2] - cam.t[2];
+		p[0] = gp.p[0] - cam.t[0];
+		p[1] = gp.p[1] - cam.t[1];
+		p[2] = gp.p[2] - cam.t[2];
 
-	mult(cam.R, p, res, 3, 3, 1);
+		mult(cam.R, p, res, 3, 3, 1);
 
-	//res[0] = R[0]*p[0]+R[1]*p[1]+R[2]*p[2];
-	//res[1] = R[3]*p[0]+R[4]*p[1]+R[5]*p[2];
-	//res[2] = R[6]*p[0]+R[7]*p[1]+R[8]*p[2];
+		//res[0] = R[0]*p[0]+R[1]*p[1]+R[2]*p[2];
+		//res[1] = R[3]*p[0]+R[4]*p[1]+R[5]*p[2];
+		//res[2] = R[6]*p[0]+R[7]*p[1]+R[8]*p[2];
 
-	double x0 = 0;
-	double y0 = 0;
-	double cx =  res[0]/(res[2]+epsilon)*(-f) + x0;
-	double cy =  res[1]/(res[2]+epsilon)*(-f) + y0;
+		double x0 = 0;
+		double y0 = 0;
+		double cx =  res[0]/(res[2]+epsilon)*(-f) + x0;
+		double cy =  res[1]/(res[2]+epsilon)*(-f) + y0;
 
-	double dx = cx;
-	double dy = cy;
-	Undistort(cx, cy, dx, dy, k1, k2);
+		double dx = cx;
+		double dy = cy;
+		Undistort(cx, cy, dx, dy, k1, k2);
 
-	ip.p[0] = dx;
-	ip.p[1] = dy;
+		ip.p[0] = dx;
+		ip.p[1] = dy;
+	}
+	else if(cam.camtype == PanoramCam)
+	{
+		p[0] = gp.p[0] - cam.t[0];
+		p[1] = gp.p[1] - cam.t[1];
+		p[2] = gp.p[2] - cam.t[2];
+
+		mult(cam.R, p, res, 3, 3, 1);
+		
+		double radius = double(cam.cols) / (2*PI);
+		double ix,iy;
+
+		GrdToSphere(res[0], res[1], res[2], radius, ix, iy);
+
+		ip.p[0] = ix;
+		ip.p[1] = iy;
+	}
 
 	return 0;
 }
