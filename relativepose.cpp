@@ -56,6 +56,58 @@ using namespace std;
 
 
 
+// model: R(X-T), from ground point to image
+int GrdToImg(Point3DDouble gp, Point2DDouble& ip, CameraPara cam, bool explicit_camera_center)
+{
+	const double epsilon = 1e-18;
+	double p[3];
+	double res[3];
+
+	if( cam.camtype == PerspectiveCam )
+	{
+		double f = cam.focus;
+		double k1 = cam.k1;
+		double k2 = cam.k2;
+
+		p[0] = gp.p[0] - cam.t[0];
+		p[1] = gp.p[1] - cam.t[1];
+		p[2] = gp.p[2] - cam.t[2];
+		mult(cam.R, p, res, 3, 3, 1);
+
+		//res[0] = R[0]*p[0]+R[1]*p[1]+R[2]*p[2];
+		//res[1] = R[3]*p[0]+R[4]*p[1]+R[5]*p[2];
+		//res[2] = R[6]*p[0]+R[7]*p[1]+R[8]*p[2];
+
+		double x0 = 0;
+		double y0 = 0;
+		double cx =  res[0]/(res[2]+epsilon)*(-f) + x0;
+		double cy =  res[1]/(res[2]+epsilon)*(-f) + y0;
+
+		double dx = cx;
+		double dy = cy;
+		Undistort(cx, cy, dx, dy, k1, k2);
+
+		ip.p[0] = dx;
+		ip.p[1] = dy;
+	}
+	else if(cam.camtype == PanoramCam)
+	{
+		p[0] = gp.p[0] - cam.t[0];
+		p[1] = gp.p[1] - cam.t[1];
+		p[2] = gp.p[2] - cam.t[2];
+		mult(cam.R, p, res, 3, 3, 1);
+
+		double radius = double(cam.cols) / (2*PI);
+		double ix,iy;
+
+		GrdToSphere(res[0], res[1], res[2], radius, ix, iy);
+
+		ip.p[0] = ix;
+		ip.p[1] = iy;
+	}
+
+	return 0;
+}
 
 
 
@@ -725,7 +777,7 @@ void CTriangulateCV::Triangulate(vector<Point2DDouble> lPts, vector<Point2DDoubl
 {
 	//printf(" \n Triangulation .... \n");
 	//assert( lPts.size() == rPts.size() );
-
+	/*
 	camera_params_t camera1,camera2;
 	InitializeCameraParams(camera1);
 	InitializeCameraParams(camera2);
@@ -739,39 +791,43 @@ void CTriangulateCV::Triangulate(vector<Point2DDouble> lPts, vector<Point2DDoubl
 	camera2.known_intrinsics = false;
 	memcpy(camera2.R, cam2.R, sizeof(double)*9);
 	memcpy(camera2.t, cam2.t, sizeof(double)*3);
+	*/
 
 	for(int i=0; i<lPts.size(); i++)
 	{
+		vector<CameraPara> cams;
+		vector<Point2DDouble> pts;
+
+		cams.push_back(cam1);
+		cams.push_back(cam2);
+		pts.push_back( lPts[i] );
+		pts.push_back( rPts[i] );
+		
+		/*
 		v2_t p = dll_v2_new(lPts[i].p[0], lPts[i].p[1]);
 		v2_t q = dll_v2_new(rPts[i].p[0], rPts[i].p[1]);
-
 		double error = 0.0;
 		bool   in_front = true;
 		double angle = 0.0;
-
 		v3_t gp = PtTriangulate( p, q, camera1, camera2, error, in_front, angle, true);
-
-		//printf(" tri.error[%d] = %0.3f\n", i, error);
-
-		/*
-		if (error > 4) 
-		{
-		printf(" skipping point\n");
-		continue;
-		}*/
 		
 		Point3DDouble p3;
 		p3.p[0] = gp.p[0]; p3.p[1] = gp.p[1]; p3.p[2] = gp.p[2];
 		p3.extra = i;
 		gps.push_back(p3);
+		*/
 
+		Point3DDouble p3;
+		double error;
+		Triangulate(pts, cams, p3, true, error);
+		
 		errorArray.push_back(error);
 		//printf("%lf %lf ")
 	}
 }
 
 
-//default model: RX+T
+//default model: RX+T, single point
 void CTriangulateCV::Triangulate(vector<Point2DDouble> pts,  
 								 vector<CameraPara> cams, 
 							 	 Point3DDouble& gps,
@@ -805,27 +861,41 @@ void CTriangulateCV::Triangulate(vector<Point2DDouble> pts,
 		double cx = pts[i].p[0];
 		double cy = pts[i].p[1];
 
-		//undistort the image points, added by xiedonghai, 2016.11.18
-		double dx,dy;
-		double k1 = cams[i].k1;
-		double k2 = cams[i].k2;
-		Undistort(cx, cy, dx, dy, k1, k2);
+		if(cams[i].camtype == PerspectiveCam)
+		{
+			//undistort the image points, added by xiedonghai, 2016.11.18
+			double dx,dy;
+			double k1 = cams[i].k1;
+			double k2 = cams[i].k2;
+			Undistort(cx, cy, dx, dy, k1, k2);
+			double p3[3] = { dx, dy, 1.0 };
+			double K[9], Kinv[9];
+			GetIntrinsics(cameras[i], K);
+			dll_matrix_invert(3, K, Kinv);
+			double p_n[3];
+			dll_matrix_product(3, 3, 3, 1, Kinv, p3, p_n);
+			// EDIT!!!
+			pv[i] = dll_v2_new(-p_n[0], -p_n[1]);
+			//pv[i] = UndistortNormalizedPoint(pv[i], cameras[i]);
+		}
+		else if( cams[i].camtype == PanoramCam )
+		{
+			int ht = cams[i].rows;
+			int wd = cams[i].cols;
+			double radius = double(wd) / (2*PI);
 
-		double p3[3] = { dx, dy, 1.0 };
+			//from spherical panorama image point to 3D point
+			double gx,gy,gz;
+			double x = cx + wd*0.5;
+			double y = ht*0.5 - cy;
+			SphereTo3D(x,y,radius,gx,gy,gz);
+			//normalized the 3D point
+			pv[i].p[0] = gx/(gz+MINIMAL_VALUE);
+			pv[i].p[1] = gy/(gz+MINIMAL_VALUE);
+		}
 
-		double K[9], Kinv[9];
-		GetIntrinsics(cameras[i], K);
-		dll_matrix_invert(3, K, Kinv);
-
-		double p_n[3];
-		dll_matrix_product(3, 3, 3, 1, Kinv, p3, p_n);
-
-		// EDIT!!!
-		pv[i] = dll_v2_new(-p_n[0], -p_n[1]);
-		//pv[i] = UndistortNormalizedPoint(pv[i], cameras[i]);
-
+		//
 		cam = cameras + i;
-
 		memcpy(Rs + 9 * i, cam->R, 9 * sizeof(double));
 		if (!explicit_camera_centers) 
 		{
@@ -853,12 +923,22 @@ void CTriangulateCV::Triangulate(vector<Point2DDouble> pts,
 		key.cx = cx;
 		key.cy = cy;
 
+		/*
 		v2_t pr = dll_sfm_project_final(cameras + i, pt, 
 			explicit_camera_centers ? 1 : 0,
 			estimate_distortion ? 1 : 0);
+			*/
+
+		Point3DDouble gpt;
+		Point2DDouble ipt;
+		gpt.p[0] = pt.p[0];
+		gpt.p[1] = pt.p[1];
+		gpt.p[2] = pt.p[2];
 		
-		double dx = Vx(pr) - key.cx; //key.m_x;
-		double dy = Vy(pr) - key.cy; //key.m_y;
+		GrdToImg(gpt, ipt, cams[i]);
+		
+		double dx = ipt.p[0] - key.cx; //key.m_x;
+		double dy = ipt.p[1] - key.cy; //key.m_y;
 
 		ferror += dx * dx + dy * dy;
 	}

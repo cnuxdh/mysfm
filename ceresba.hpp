@@ -216,6 +216,61 @@ struct SFMPanoReprojectionError
 };
 
 
+//when the coordinates of track points are fixed, only optimize the camera intrinsic parameters 
+struct RefinePanoCameraError 
+{
+	RefinePanoCameraError(double observed_x, double observed_y, double gx, double gy, double gz, double radius)
+		: observed_x(observed_x), observed_y(observed_y), gx(gx), gy(gy), gz(gz), radius(radius) {}
+	
+	template <typename T>
+	bool operator()(const T* const cameraOut, //6 outer camera parameters
+					T* residuals) const       //2 output residual parameters
+	{
+		T aa[3];
+		aa[0] = cameraOut[0];
+		aa[1] = cameraOut[1];
+		aa[2] = cameraOut[2];
+
+		T t[3];
+		t[0] = cameraOut[3];
+		t[1] = cameraOut[4];
+		t[2] = cameraOut[5];
+
+		T point[3];
+		point[0] = T(gx);
+		point[1] = T(gy);
+		point[2] = T(gz);
+
+		//RX + T
+		T p[3];
+		ceres::AngleAxisRotatePoint(aa, point, p);
+
+		p[0] += t[0];
+		p[1] += t[1];
+		p[2] += t[2];
+
+		T dx,dy;
+		GrdToPanoImage(p[0], p[1], p[2], T(radius), dx, dy);
+			
+		residuals[0] = dx - T(observed_x);
+		residuals[1] = dy - T(observed_y);
+		
+		return true;
+	}
+	// Factory to hide the construction of the CostFunction object from
+	// the client code.
+	static ceres::CostFunction* Create(const double observed_x,	const double observed_y, 
+		const double gx, const double gy, const double gz, const double radius) {
+			return (new ceres::AutoDiffCostFunction<RefinePanoCameraError, 2, 6>(
+				new RefinePanoCameraError(observed_x, observed_y, gx, gy, gz, radius) ) );
+	}
+
+	double observed_x;
+	double observed_y;
+	double gx,gy,gz;
+	double radius;
+};
+
 
 //when the coordinates of track points are fixed, only optimize the camera intrinsic parameters 
 struct RefineCameraError 
@@ -376,7 +431,7 @@ struct RefineCameraFixedFocalLen
 	double focal_len;
 };
 
-int GrdToImg(Point3DDouble gp, Point2DDouble& ip, CameraPara cam);
+
 
 
 //bundle adjustment for multiple cameras

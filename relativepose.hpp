@@ -13,6 +13,7 @@ void FixIntrinsics(double *P, double *K, double *R, double *t);
 void GetIntrinsics(const camera_params_t &camera, double *K); 
 bool CheckCheirality(v3_t p, const camera_params_t &camera);
 
+int GrdToImg(Point3DDouble gp, Point2DDouble& ip, CameraPara cam, bool explicit_camera_center=true);
 
 
 //////////////////////////////////////////////////////////////////////////

@@ -565,9 +565,7 @@ int CaculateTrackSeqGrd(vector<ImgFeature>&  imageFeatures,
 		//ferror is the projection error of all points average in one image
 		tracks[i].derror = ferror;
 		tracks[i].grd    = gps;
-
-
-
+		
 		/*
 		if( gps.p[2]>0 )
 		{
@@ -1002,28 +1000,44 @@ int CeresBA( vector<Point3DDouble>& grdPts, vector<Point2DDouble>& imgPts, Camer
 	//invoke ceres functions, each time adding one projection
 	for(int i=0; i<nProjection; i++)
 	{
-		if(bIsFixedFocalLen)
+		if( camera.camtype == PerspectiveCam )
 		{
+			if(bIsFixedFocalLen)
+			{
+				ceres::CostFunction* cost_function =
+					RefineCameraFixedFocalLen::Create( imgPts[i].p[0] , imgPts[i].p[1], 
+					camera.focus, grdPts[i].p[0], grdPts[i].p[1], grdPts[i].p[2]);
+
+				problem.AddResidualBlock(cost_function,
+					NULL /* squared loss */,
+					pOuterParams       //camera extrinsic parameters: 6
+					);
+			}
+			else
+			{
+				ceres::CostFunction* cost_function =
+					RefineCameraError::Create( imgPts[i].p[0] , imgPts[i].p[1], 
+					grdPts[i].p[0], grdPts[i].p[1], grdPts[i].p[2]);
+
+				problem.AddResidualBlock(cost_function,
+					NULL /* squared loss */,
+					pInteriorParams,   //inner camera parameters: 3
+					pOuterParams       //outer camera parameters: 6
+					);			   
+			}
+		}
+		else if( camera.camtype == PanoramCam )
+		{
+			double radius = (double)(camera.cols) / (2*PI);
+
 			ceres::CostFunction* cost_function =
-				RefineCameraFixedFocalLen::Create( imgPts[i].p[0] , imgPts[i].p[1], 
-				camera.focus, grdPts[i].p[0], grdPts[i].p[1], grdPts[i].p[2]);
+				RefinePanoCameraError::Create( imgPts[i].p[0] , imgPts[i].p[1], 
+				grdPts[i].p[0], grdPts[i].p[1], grdPts[i].p[2], radius);
 
 			problem.AddResidualBlock(cost_function,
 				NULL /* squared loss */,
 				pOuterParams       //camera extrinsic parameters: 6
 				);
-		}
-		else
-		{
-			ceres::CostFunction* cost_function =
-				RefineCameraError::Create( imgPts[i].p[0] , imgPts[i].p[1], 
-				grdPts[i].p[0], grdPts[i].p[1], grdPts[i].p[2]);
-
-			problem.AddResidualBlock(cost_function,
-				NULL /* squared loss */,
-				pInteriorParams,   //inner camera parameters: 3
-				pOuterParams       //outer camera parameters: 6
-			);			   
 		}
 	}
 
@@ -1327,8 +1341,15 @@ int CalculateNewCamParas(int nCameraId,
 	}
 
 	//ransac DLT calculation
-	CPoseEstimationBase* pPE = new CDLTPose();
+	CPoseEstimationBase* pPE = NULL;
+	
+	if( cam.camtype == PerspectiveCam )
+		pPE = new CDLTPose();
+	else if(cam.camtype == PanoramCam)
+		pPE = new CPanoDLTPose();
+
 	int r = pPE->EstimatePose(pt3, pt2, cam);
+
 	vector<int> inliers = pPE->GetInliers();
 	vector<int> inliers_weak = pPE->GetWeakInliers();
 	delete pPE;
@@ -1351,6 +1372,7 @@ int CalculateNewCamParas(int nCameraId,
 		cam.focus = initFocalLen;
 		int nInliers = RefineCamera(inlierPt3, inlierPt2, cam);
 		
+		//
 		if(nInliers<18)
 			return -1;
 	}
@@ -1362,61 +1384,6 @@ int CalculateNewCamParas(int nCameraId,
 	return 0;
 }
 
-
-// model: R(X-T), from ground point to image
-int GrdToImg(Point3DDouble gp, Point2DDouble& ip, CameraPara cam)
-{
-	const double epsilon = 1e-18;
-	double p[3];
-	double res[3];
-
-	if( cam.camtype == PerspectiveCam )
-	{
-		double f = cam.focus;
-		double k1 = cam.k1;
-		double k2 = cam.k2;
-
-		p[0] = gp.p[0] - cam.t[0];
-		p[1] = gp.p[1] - cam.t[1];
-		p[2] = gp.p[2] - cam.t[2];
-
-		mult(cam.R, p, res, 3, 3, 1);
-
-		//res[0] = R[0]*p[0]+R[1]*p[1]+R[2]*p[2];
-		//res[1] = R[3]*p[0]+R[4]*p[1]+R[5]*p[2];
-		//res[2] = R[6]*p[0]+R[7]*p[1]+R[8]*p[2];
-
-		double x0 = 0;
-		double y0 = 0;
-		double cx =  res[0]/(res[2]+epsilon)*(-f) + x0;
-		double cy =  res[1]/(res[2]+epsilon)*(-f) + y0;
-
-		double dx = cx;
-		double dy = cy;
-		Undistort(cx, cy, dx, dy, k1, k2);
-
-		ip.p[0] = dx;
-		ip.p[1] = dy;
-	}
-	else if(cam.camtype == PanoramCam)
-	{
-		p[0] = gp.p[0] - cam.t[0];
-		p[1] = gp.p[1] - cam.t[1];
-		p[2] = gp.p[2] - cam.t[2];
-
-		mult(cam.R, p, res, 3, 3, 1);
-		
-		double radius = double(cam.cols) / (2*PI);
-		double ix,iy;
-
-		GrdToSphere(res[0], res[1], res[2], radius, ix, iy);
-
-		ip.p[0] = ix;
-		ip.p[1] = iy;
-	}
-
-	return 0;
-}
 
 
 /////////////////////////////////////////////////////////////////////////////
