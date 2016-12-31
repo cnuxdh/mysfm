@@ -13,6 +13,7 @@
 #include"relativepose.hpp"
 #include"bundlerio.hpp"
 
+#include "panorama.hpp"
 #include"ceresba.hpp"
 
 
