@@ -166,7 +166,7 @@ int RunBA( vector<TrackInfo>& trackSeq, vector<ImgFeature>& imageFeatures,
 	ceres::Solver::Options options;
 	options.linear_solver_type = ceres::DENSE_SCHUR;
 	//options.parameter_tolerance = 1e-9;
-	options.minimizer_progress_to_stdout = false;
+	options.minimizer_progress_to_stdout = true;
 
 	cout<<"NumParameterBlocks: "<<problem.NumParameterBlocks()<<"\n";
 	cout<<"NumResidualBlocks: "<<problem.NumResidualBlocks()<<"\n";

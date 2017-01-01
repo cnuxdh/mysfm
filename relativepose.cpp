@@ -815,14 +815,16 @@ void CTriangulateCV::Triangulate(vector<Point2DDouble> lPts, vector<Point2DDoubl
 		p3.p[0] = gp.p[0]; p3.p[1] = gp.p[1]; p3.p[2] = gp.p[2];
 		p3.extra = i;
 		gps.push_back(p3);
+		errorArray.push_back(error);
 		*/
 
 		Point3DDouble p3;
 		double error;
 		Triangulate(pts, cams, p3, true, error);
-		
-		errorArray.push_back(error);
-		//printf("%lf %lf ")
+		p3.extra = i;
+
+		gps.push_back(p3);
+		errorArray.push_back(error); 
 	}
 }
 
@@ -913,6 +915,8 @@ void CTriangulateCV::Triangulate(vector<Point2DDouble> pts,
 	//model: RX+T
 	v3_t pt = dll_triangulate_n(num_views, pv, Rs, ts, &ferror);
 
+
+	//calculate the average error 
 	ferror = 0.0;
 	for (int i = 0; i < num_views; i++)
 	{
@@ -942,7 +946,6 @@ void CTriangulateCV::Triangulate(vector<Point2DDouble> pts,
 
 		ferror += dx * dx + dy * dy;
 	}
-
 	ferror = sqrt(ferror / num_views);
 
 	gps.p[0] = pt.p[0];
