@@ -653,9 +653,9 @@ int CEstimatePose5PointPano::EstimatePose( vector<Point2DDouble> lPts, vector<Po
 		double gx,gy,gz;
 		SphereTo3D(x, y, radius, gx, gy, gz);
 		Point3DDouble p3;
-		p3.p[0] = gx;
-		p3.p[1] = gy;
-		p3.p[2] = gz;
+		p3.p[0] = gx / radius;
+		p3.p[1] = gy / radius;
+		p3.p[2] = gz / radius;
 		pl.push_back(p3);
 
 
@@ -665,9 +665,9 @@ int CEstimatePose5PointPano::EstimatePose( vector<Point2DDouble> lPts, vector<Po
 		x = wd*0.5 + x;
 		y = ht*0.5 - y;
 		SphereTo3D(x, y, radius, gx, gy, gz);
-		p3.p[0] = gx;
-		p3.p[1] = gy;
-		p3.p[2] = gz;
+		p3.p[0] = gx / radius;
+		p3.p[1] = gy / radius;
+		p3.p[2] = gz / radius;
 		pr.push_back(p3);
 	}
 	

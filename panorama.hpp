@@ -10,6 +10,11 @@
 //#include <cmath>
 
 
+//opencv, these should be put previously, otherwise errors appear
+#include "opencv2/core/core.hpp"
+#include "opencv2/highgui/highgui.hpp"
+
+
 
 #include <vector>
 using namespace std;
@@ -77,13 +82,27 @@ DLL_EXPORT int PanoToPlane(char* srcImageFile, char* outImageFile,
 						double* pR);
 
 DLL_EXPORT int PanoToPlanes(char* srcFile, double anglestep, double vangle, 
-	double hangle, double fratio, char* outpath);
-
+							double hangle, double fratio, char* outpath);
 
 //panoram image is projected to several images and save the projection matrix 
 DLL_EXPORT int PanoToPlanes(int nImageIndex, char* srcFile, double anglestep,
-				double vangle, double hangle, double fratio,
-				double* R, double* T, vector<CameraPara>& camParas);
+							double vangle, double hangle, double fratio,
+							double* R, double* T, vector<CameraPara>& camParas);
+
+
+
+DLL_EXPORT IplImage*  PanoToPlane(IplImage* panoImage, double  vangle, double hangle, 
+	double* direction, double focalLenRatio, 
+	double& focalLen, int& outHt, int& outWd, double* pR);
+
+//panoram image is projected to several images and save the images and projection matrix 
+DLL_EXPORT int PanoToPlanes(IplImage* panoImage, double anglestep,
+	double vangle, double hangle, double fratio,
+	double* R, double* T, 
+	vector<IplImage*> projImages,
+	vector<CameraPara>& camParas);
+
+
 
 
 

@@ -5,10 +5,6 @@
 #include"math.h"
 
 
-//opencv, these should be put previously, otherwise errors appear
-#include "opencv2/core/core.hpp"
-#include "opencv2/highgui/highgui.hpp"
-
 
 #include "panorama.hpp"
 #include "absOri.hpp"
@@ -25,6 +21,165 @@
 //matrix lib
 //#include "matrix/matrix.h"
 
+
+IplImage*  PanoToPlane(IplImage* panoImage, double  vangle, double hangle, 
+	double* direction, double focalLenRatio, 
+	double& focalLen, int& outHt, int& outWd, double* pR)
+{
+
+	double R[9];
+	double xT[3] = {0,0,1};
+
+	//calculate the rotation between spherical coordinate to projection coordinate
+	POINT3D zp;
+	zp.x = direction[0];
+	zp.y = direction[1];
+	zp.z = direction[2];
+	POINT3D xp,yp;
+	GenerateProjectAxis(zp, xp, yp);
+	vector<POINT3D> srcPts;
+	vector<POINT3D> dstPts;
+	srcPts.resize(3);
+	dstPts.resize(3);
+	srcPts[0].x = 1; srcPts[0].y = 0; srcPts[0].z = 0;
+	srcPts[1].x = 0; srcPts[1].y = 1; srcPts[1].z = 0;
+	srcPts[2].x = 0; srcPts[2].y = 0; srcPts[2].z = 1;  
+	dstPts[0] = xp;
+	dstPts[1] = yp;
+	dstPts[2] = zp;
+	//orthogonal Procrustes algorithm
+	RotationAlign(srcPts, dstPts, R); //from projection image space to sphere space
+	
+	int ht = panoImage->height;
+	int wd = panoImage->width;
+	int scanWd = panoImage->widthStep;
+	double radius = double(wd)/(2*PI);
+	//printf("radius: %lf \n", radius);
+
+	//calculate the projection plane size
+	double radianAngle = 1.0 / 180.0 * PI;
+	double projFocus = radius*focalLenRatio;    //radius*0.8; 
+	printf("focal length: %.4lf \n", radius);
+	printf("proj focus:   %.4lf \n", projFocus);
+
+	int projHt = projFocus*tan(vangle*radianAngle*0.5)*2;
+	int projWd = projFocus*tan(hangle*radianAngle*0.5)*2;
+	
+	printf("proj width:%d   height:%d \n", projWd, projHt);
+
+	//image reprojection
+	IplImage* planeImage = cvCreateImage( cvSize(projWd, projHt), 8, 3);
+	int projScanWd = planeImage->widthStep;
+
+	double grd[3];
+	grd[2] = -projFocus;  //z axis
+
+	for(int y=-projHt*0.5; y<projHt*0.5; y++)
+	{
+		for(int x=-projWd*0.5; x<projWd*0.5; x++)
+		{  
+			//calculate the image coordinates
+			int pj = -y + projHt*0.5;
+			int pi =  x + projWd*0.5;
+			pj = max( 0, min(projHt-1, pj) );
+			pi = max( 0, min(projWd-1, pi) );
+
+			//3D point coordinates
+			grd[0] = x;
+			grd[1] = y;
+
+			//from projection image space to sphere space
+			double rg[3];
+			mult(R, grd, rg, 3, 3, 1);
+
+			//for sphere 3D to panorama image space
+			double ix, iy;
+			GrdToSphere( rg[0], rg[1], rg[2], radius, ix, iy);	
+			//printf("%lf %lf \n", ix, iy);
+
+			if(ix>=wd) ix=wd-1;
+			if(iy>=ht) iy=ht-1;
+			if(ix<0) ix = 0;
+			if(iy<0) iy = 0;
+
+			int nx = ix;
+			int ny = iy;
+			planeImage->imageData[pj*projScanWd + pi*3 ]    = panoImage->imageData[ny*scanWd+nx*3];
+			planeImage->imageData[pj*projScanWd + pi*3 + 1] = panoImage->imageData[ny*scanWd+nx*3 + 1];
+			planeImage->imageData[pj*projScanWd + pi*3 + 2] = panoImage->imageData[ny*scanWd+nx*3 + 2];
+		}
+	}
+
+	//generate the projection rotation
+	memcpy(pR, R, sizeof(double)*9);
+	invers_matrix(pR, 3);
+
+	//get the inner parameters of projection camera
+	focalLen = projFocus;
+	outHt = projHt;
+	outWd = projWd;
+
+	printf("pano to plane projection Finished! \n");
+
+	return planeImage;
+}
+
+
+int PanoToPlanes(IplImage* panoImage, double anglestep,
+	double vangle, double hangle, double fratio,
+	double* R, double* T, 
+	vector<IplImage*> projImages,
+	vector<CameraPara>& camParas)
+{
+	//projection from panorama to plane 
+	int nAngleStep  = anglestep;
+	int nProjectNum = 360 / nAngleStep;
+	for(int i=0; i<nProjectNum; i++)
+	{
+
+		double lat = 90 / 180.0 * PI; //from top to bottom: 0-180
+		double lon = i*nAngleStep / 180.0 * PI; //from left to right: 0-360
+
+		//calculate the direction according to (lon,lat), must be the opposite
+		double direction[3];
+		direction[0] = -sin(lon)*sin(lat);  //x
+		direction[1] = -cos(lon)*sin(lat);  //y
+		direction[2] = -cos(lat);           //z
+
+
+		printf("direction: %lf %lf %lf \n", direction[0], direction[1], direction[2]);
+
+		double Rp[9]; //rotation matrix for plane 
+		//generate the plane projection image and save it
+		double focalLen;
+		int outHt, outWd;
+		IplImage* planeImage = PanoToPlane( panoImage, vangle, hangle, direction, fratio, 
+			focalLen, outHt, outWd, Rp);
+
+		projImages.push_back(planeImage);
+
+		//transform from spherical space to image space,
+		//Xs = Rg.Xg + Tg, Xp = Rp.Xs ---> Xp = Rp.Rg.Xg + Rp.Tg, define Rpg = Rp.Rg, Tpg=Rp.Tg
+		double Rpg[9];
+		double Tpg[3];
+		mult(Rp, R, Rpg, 3, 3, 3);
+		mult(Rp, T, Tpg, 3, 3, 1);
+		
+		//save the R and T into the array
+		CameraPara cam;
+		cam.focus = focalLen;
+		cam.k1 = 0;
+		cam.k2 = 0;
+		cam.rows = outHt;
+		cam.cols = outWd;
+		memcpy(cam.R, Rpg, 9*sizeof(double));
+		memcpy(cam.t, Tpg, 3*sizeof(double));
+
+		camParas.push_back(cam);
+	}
+
+	return 0;
+}
 
 
 /* panorama to one plane projection
@@ -238,16 +393,15 @@ outputs:
 	projected plane image series
 */
 int PanoToPlanes( int nImageIndex, char* srcFile, double anglestep,
-									double vangle, double hangle, double fratio,
-									double* R, double* T,
-									vector<CameraPara>& camParas)
+				  double vangle, double hangle, double fratio,
+				  double* R, double* T,
+				  vector<CameraPara>& camParas)
 {
 
 	char title[256];
 	strcpy(title, srcFile);
 	strcpy(title+strlen(title)-4, "\0");
-
-
+	
 	//projection from panorama to plane 
 	int nAngleStep  = anglestep;
 	int nProjectNum = 360 / nAngleStep;

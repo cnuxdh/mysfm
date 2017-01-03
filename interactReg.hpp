@@ -20,27 +20,35 @@
 
 /* base class for image interactive registration
 */
-class CIRegBase
+class DLL_EXPORT CIRegBase
 {
 public:
-	CIRegBase();
-	~CIRegBase();
+	CIRegBase(){}
+	virtual ~CIRegBase(){}
 
-	virtual int PtReg(IplImage* pLeft, IplImage* pRight, Point2DDouble srcPt, Point2DDouble& dstPt);
+	virtual int Init(char* pLeftFile, char* pRightFile){return 0;}
+	virtual int PtReg(IplImage* pLeft, IplImage* pRight, Point2DDouble srcPt, Point2DDouble& dstPt){return 0;}
 };
 
 
 //for interactive panorama image registration
-class CIPanoReg: public CIRegBase
+class DLL_EXPORT CIPanoReg: public CIRegBase
 {
 public:
 	CIPanoReg();
 	~CIPanoReg();
 
-	int PtReg(IplImage* pLeft, IplImage* pRight, Point2DDouble srcPt, Point2DDouble& dstPt);
+	int Init(char* pLeftFile, char* pRightFile);
+	int PtReg(Point2DDouble srcPt, Point2DDouble& dstPt);
 
+private:
+	IplImage* m_pLeft;
+	IplImage* m_pRight;
+	vector<IplImage*>  m_pLeftPlaneImages;
+	vector<CameraPara> m_leftPlaneCams;
+	vector<IplImage*>  m_pRightPlaneImages;
+	vector<CameraPara> m_rightPlaneCams;
 };
-
 
 
 #endif
