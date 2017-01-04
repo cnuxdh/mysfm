@@ -128,7 +128,7 @@ IplImage*  PanoToPlane(IplImage* panoImage, double  vangle, double hangle,
 int PanoToPlanes(IplImage* panoImage, double anglestep,
 	double vangle, double hangle, double fratio,
 	double* R, double* T, 
-	vector<IplImage*> projImages,
+	vector<IplImage*>& projImages,
 	vector<CameraPara>& camParas)
 {
 	//projection from panorama to plane 

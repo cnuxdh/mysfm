@@ -27,7 +27,7 @@ public:
 	virtual ~CIRegBase(){}
 
 	virtual int Init(char* pLeftFile, char* pRightFile){return 0;}
-	virtual int PtReg(IplImage* pLeft, IplImage* pRight, Point2DDouble srcPt, Point2DDouble& dstPt){return 0;}
+	virtual int PtReg(Point2DDouble srcPt, Point2DDouble& dstPt, int nImageIndex){return 0;}
 };
 
 
@@ -39,11 +39,17 @@ public:
 	~CIPanoReg();
 
 	int Init(char* pLeftFile, char* pRightFile);
-	int PtReg(Point2DDouble srcPt, Point2DDouble& dstPt);
+	int PtReg(Point2DDouble srcPt, Point2DDouble& dstPt, int nImageIndex);
 
 private:
-	IplImage* m_pLeft;
-	IplImage* m_pRight;
+
+	//for panorama images
+	IplImage*  m_pLeft;
+	IplImage*  m_pRight;
+	CameraPara m_leftPanoCam, m_rightPanoCam;
+	double     m_EM[9]; //essential matrix
+
+	//for perspective images
 	vector<IplImage*>  m_pLeftPlaneImages;
 	vector<CameraPara> m_leftPlaneCams;
 	vector<IplImage*>  m_pRightPlaneImages;

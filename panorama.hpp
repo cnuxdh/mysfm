@@ -99,7 +99,7 @@ DLL_EXPORT IplImage*  PanoToPlane(IplImage* panoImage, double  vangle, double ha
 DLL_EXPORT int PanoToPlanes(IplImage* panoImage, double anglestep,
 	double vangle, double hangle, double fratio,
 	double* R, double* T, 
-	vector<IplImage*> projImages,
+	vector<IplImage*>& projImages,
 	vector<CameraPara>& camParas);
 
 
