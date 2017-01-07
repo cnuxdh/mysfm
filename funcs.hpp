@@ -17,6 +17,8 @@
 
 #include "defines.hpp"
 
+double dot(Point3DDouble p1, Point3DDouble p2);
+
 double distanceVec(Point2DDouble p1, Point2DDouble p2);
 
 //return value: degree

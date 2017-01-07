@@ -638,11 +638,27 @@ int CIPanoRegDirect::PtReg(Point2DDouble srcPt, Point2DDouble& dstPt, int nImage
 
 	if(nImageIndex==0)
 	{
+		int ht = m_pLeft->height;
+		int wd = m_pLeft->width;
+		double cx = srcPt.p[0] - wd*0.5;
+		double cy = ht*0.5 - srcPt.p[1];
 
 		//from pano 2D to sphere 3D 
 		double radius = (double)(m_pLeft->width) / (2*PI);
 		double lp[3];
-		SphereTo3D(srcPt.p[0], srcPt.p[1], radius, lp[0], lp[1], lp[2]);
+		SphereTo3D_center(cx, cy, radius, lp[0], lp[1], lp[2]);
+		printf("left bundle: %lf %lf %lf \n", lp[0], lp[1], lp[2]);
+
+		Point3DDouble leftBundleDir;
+		leftBundleDir.p[0] = lp[0];
+		leftBundleDir.p[1] = lp[1];
+		leftBundleDir.p[2] = lp[2];
+
+		Point3DDouble baselineDir;
+		baselineDir.p[0] = m_leftPanoCam.t[0] - m_rightPanoCam.t[0];
+		baselineDir.p[1] = m_leftPanoCam.t[1] - m_rightPanoCam.t[1];
+		baselineDir.p[2] = m_leftPanoCam.t[2] - m_rightPanoCam.t[2];
+		printf("baseline : %lf %lf %lf \n", baselineDir.p[0], baselineDir.p[1], baselineDir.p[2]);
 
 		//calculate the epipolar normal
 		mult(m_EM, lp, n, 3, 3, 1);
@@ -656,24 +672,52 @@ int CIPanoRegDirect::PtReg(Point2DDouble srcPt, Point2DDouble& dstPt, int nImage
 
 		if(1)
 		{
+			double rPanoR[9];
+			memcpy(rPanoR, m_rightPanoCam.R, sizeof(double)*9);
+			invers_matrix(rPanoR, 3);
+
 			double radius = (double)(m_pRight->width) / (2*PI);
 			IplImage* pDisp = cvCloneImage(m_pRight);
 			for(int i=0; i<ptVecs.size()-2; i++)
 			{
+				//visibility decision							
+				//from right pano to the left pano
+				double rp[3];
+				rp[0] = ptVecs[i].p[0];
+				rp[1] = ptVecs[i].p[1];
+				rp[2] = ptVecs[i].p[2];		
+				double ct[3];
+				mult(rPanoR, rp, ct, 3, 3, 1);
+				
+				Point3DDouble rightBundleDir;
+				rightBundleDir.p[0] = ct[0];
+				rightBundleDir.p[1] = ct[1];
+				rightBundleDir.p[2] = ct[2];				
+				
+				//printf("%lf %lf %lf \n", )
+
+				double angle1 = angleOfVector(baselineDir, leftBundleDir);
+				double angle2 = angleOfVector(baselineDir,   rightBundleDir);
+				double angle3 = angleOfVector(leftBundleDir, rightBundleDir);
+				//printf("%lf %lf %lf  %lf \n", angle1, angle2, angle3, angle1-angle2-angle3);
+
+				if( fabs(angle1-angle2-angle3)>5 )
+					continue;
+				
 				double ix,iy;
-				GrdToSphere(ptVecs[i].p[0], ptVecs[i].p[1], ptVecs[i].p[2], radius, ix, iy);
+				GrdToSphere_center(ptVecs[i].p[0], ptVecs[i].p[1], ptVecs[i].p[2], radius, ix, iy);
 				CvPoint ip1;
-				ip1.x = ix;
-				ip1.y = iy;
+				ip1.x = ix+wd*0.5;
+				ip1.y = ht*0.5-iy;
 				cvDrawCircle(pDisp, ip1, 1, CV_RGB(255,0,0), 2);
 				
-				GrdToSphere(ptVecs[i+1].p[0], ptVecs[i+1].p[1], ptVecs[i+1].p[2], radius, ix, iy);
+				GrdToSphere_center(ptVecs[i+1].p[0], ptVecs[i+1].p[1], ptVecs[i+1].p[2], radius, ix, iy);
 				CvPoint ip2;
-				ip2.x = ix;
-				ip2.y = iy;
+				ip2.x = ix+wd*0.5;
+				ip2.y = ht*0.5-iy;
 				//cvDrawCircle(pDisp, ip, 1, CV_RGB(255,0,0), 1);
 
-				cvLine(pDisp, ip1, ip2, CV_RGB(0,255,0),1);
+				//cvLine(pDisp, ip1, ip2, CV_RGB(0,255,0),1);
 			}
 			cvSaveImage("c:\\temp\\epipolarLine.jpg", pDisp);
 			cvReleaseImage(&pDisp);

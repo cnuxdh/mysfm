@@ -529,8 +529,8 @@ int SphereTo3D_center(double x, double y, double radius, double& gx, double& gy,
 	int wd = 2*PI*radius;
     int ht = wd*0.5;
 
-	double lon = (x - wd*0.5) / radius;
-	double lat = (ht*0.5 - y) / radius;
+	double lon = x/radius; //(x - wd*0.5) / radius;
+	double lat = y/radius; //(ht*0.5 - y) / radius;
 
 	gx = radius*sin(lon)*cos(lat);
 	gy = radius*cos(lon)*cos(lat);
@@ -571,8 +571,8 @@ int GrdToSphere_center(double gx, double gy, double gz, double radius, double& i
 	//fai  = atan2( gz, sqrt(gx*gx+gy*gy) );
 	//if(fai<0)  fai += PI;
 
-	ix = radius*sita + 2*PI*radius ;
-	iy = -radius*fai + PI*radius ;
+	ix = radius*sita; //radius*sita + 2*PI*radius ;
+	iy = radius*fai;  //-radius*fai + PI*radius ;
 
 	return 0;
 }
