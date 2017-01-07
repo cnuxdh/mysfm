@@ -818,9 +818,9 @@ vector<Point3DDouble> GenerateEpipolarPlaneVectors(Point3DDouble normal,int num)
 
 	//the initial point vertical to the (xs, ys, zs)
 	Point3DDouble initialPt;
-	initialPt.p[0] = 0;   //-ys;
-	initialPt.p[1] = zs;  //xs;
-	initialPt.p[2] = -ys;  
+	initialPt.p[0] = -zs;   //-ys;
+	initialPt.p[1] = 0;  //xs;
+	initialPt.p[2] = xs;  
 
 	Point3DDouble fixedPt;
 	fixedPt.p[0] = xs;

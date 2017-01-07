@@ -678,7 +678,7 @@ int CIPanoRegDirect::PtReg(Point2DDouble srcPt, Point2DDouble& dstPt, int nImage
 
 			double radius = (double)(m_pRight->width) / (2*PI);
 			IplImage* pDisp = cvCloneImage(m_pRight);
-			for(int i=0; i<ptVecs.size()-2; i++)
+			for(int i=0; i<ptVecs.size(); i++)
 			{
 				//visibility decision							
 				//from right pano to the left pano
@@ -711,13 +711,15 @@ int CIPanoRegDirect::PtReg(Point2DDouble srcPt, Point2DDouble& dstPt, int nImage
 				ip1.y = ht*0.5-iy;
 				cvDrawCircle(pDisp, ip1, 1, CV_RGB(255,0,0), 2);
 				
+				/*
 				GrdToSphere_center(ptVecs[i+1].p[0], ptVecs[i+1].p[1], ptVecs[i+1].p[2], radius, ix, iy);
 				CvPoint ip2;
 				ip2.x = ix+wd*0.5;
 				ip2.y = ht*0.5-iy;
 				//cvDrawCircle(pDisp, ip, 1, CV_RGB(255,0,0), 1);
 
-				//cvLine(pDisp, ip1, ip2, CV_RGB(0,255,0),1);
+				cvLine(pDisp, ip1, ip2, CV_RGB(0,255,0),1);
+				*/
 			}
 			cvSaveImage("c:\\temp\\epipolarLine.jpg", pDisp);
 			cvReleaseImage(&pDisp);
