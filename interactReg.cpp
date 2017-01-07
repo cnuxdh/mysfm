@@ -585,8 +585,8 @@ int CIPanoRegDirect::Init(char* pLeftFile, char* pRightFile)
 {
 
 	//loading gray image
-	m_pLeft = cvLoadImage(pLeftFile, 0);
-	m_pRight = cvLoadImage(pRightFile, 0);
+	m_pLeft = cvLoadImage(pLeftFile);
+	m_pRight = cvLoadImage(pRightFile);
 
 	//detect feature points
 	CFeatureBase* pFeatDetect = new CSIFTFloat();
@@ -633,10 +633,52 @@ int CIPanoRegDirect::Init(char* pLeftFile, char* pRightFile)
 
 int CIPanoRegDirect::PtReg(Point2DDouble srcPt, Point2DDouble& dstPt, int nImageIndex)
 {
-
 	//generate the normal of epipolar plane
+	double n[3];
 
+	if(nImageIndex==0)
+	{
 
+		//from pano 2D to sphere 3D 
+		double radius = (double)(m_pLeft->width) / (2*PI);
+		double lp[3];
+		SphereTo3D(srcPt.p[0], srcPt.p[1], radius, lp[0], lp[1], lp[2]);
+
+		//calculate the epipolar normal
+		mult(m_EM, lp, n, 3, 3, 1);
+		Point3DDouble enormal;
+		enormal.p[0] = n[0];
+		enormal.p[1] = n[1];
+		enormal.p[2] = n[2];
+
+		//generate the points
+		vector<Point3DDouble> ptVecs =  GenerateEpipolarPlaneVectors(enormal, 360);
+
+		if(1)
+		{
+			double radius = (double)(m_pRight->width) / (2*PI);
+			IplImage* pDisp = cvCloneImage(m_pRight);
+			for(int i=0; i<ptVecs.size()-2; i++)
+			{
+				double ix,iy;
+				GrdToSphere(ptVecs[i].p[0], ptVecs[i].p[1], ptVecs[i].p[2], radius, ix, iy);
+				CvPoint ip1;
+				ip1.x = ix;
+				ip1.y = iy;
+				cvDrawCircle(pDisp, ip1, 1, CV_RGB(255,0,0), 2);
+				
+				GrdToSphere(ptVecs[i+1].p[0], ptVecs[i+1].p[1], ptVecs[i+1].p[2], radius, ix, iy);
+				CvPoint ip2;
+				ip2.x = ix;
+				ip2.y = iy;
+				//cvDrawCircle(pDisp, ip, 1, CV_RGB(255,0,0), 1);
+
+				cvLine(pDisp, ip1, ip2, CV_RGB(0,255,0),1);
+			}
+			cvSaveImage("c:\\temp\\epipolarLine.jpg", pDisp);
+			cvReleaseImage(&pDisp);
+		}
+	}
 
 	return 0;
 }

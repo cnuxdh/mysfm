@@ -818,9 +818,9 @@ vector<Point3DDouble> GenerateEpipolarPlaneVectors(Point3DDouble normal,int num)
 
 	//the initial point vertical to the (xs, ys, zs)
 	Point3DDouble initialPt;
-	initialPt.p[0] = -ys;
-	initialPt.p[1] = xs;
-	initialPt.p[2] = 0;
+	initialPt.p[0] = 0;   //-ys;
+	initialPt.p[1] = zs;  //xs;
+	initialPt.p[2] = -ys;  
 
 	Point3DDouble fixedPt;
 	fixedPt.p[0] = xs;
@@ -831,7 +831,7 @@ vector<Point3DDouble> GenerateEpipolarPlaneVectors(Point3DDouble normal,int num)
 	double interval = 360.0 / num;
 	for(int i=0; i<num; i++)
 	{
-		double angle = i*interval;
+		double angle = -i*interval;
 
 		Point3DDouble vec = RotateByVector(initialPt, fixedPt, angle );
 
