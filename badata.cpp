@@ -21,6 +21,15 @@ Point2DDouble ImgFeature::GetCenteredPt(int ptIndex)
 
 	return cp;
 }
+Point2DDouble ImgFeature::GetTopLeftPt(int ptIndex)
+{
+	Point2DDouble cp;
+
+	cp.p[0] = featPts[ptIndex].x;
+	cp.p[1] = featPts[ptIndex].y;
+
+	return cp;
+}
 
 
 

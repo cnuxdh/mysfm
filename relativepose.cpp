@@ -445,7 +445,7 @@ v3_t PtTriangulate(v2_t p, v2_t q,
 //////////////////////////////////////////////////////////////////////////
 CEstimatePose5Point::CEstimatePose5Point()
 {
-
+	m_bIsExplicit = false;
 }
 CEstimatePose5Point::~CEstimatePose5Point()
 {
@@ -511,13 +511,14 @@ int CEstimatePose5Point::EstimatePose( PairMatchRes pairMatches, ImgFeature& lIm
 	printf("number of inliers : %d \n", num_inliers);
     
 
-	bool initialized = false;
-	if (!initialized) 
+	//bool initialized = false;
+	//if (!initialized) 
 	{
 		memcpy(camera2.R, R0, sizeof(double) * 9);
 		dll_matrix_transpose_product(3, 3, 3, 1, R0, t0, camera2.t);
 		dll_matrix_scale(3, 1, camera2.t, -1.0, camera2.t);
 	}
+	m_bIsExplicit = true;
 
 	memcpy(cam1.R, camera1.R, sizeof(double)*9);
 	memcpy(cam1.t, camera1.t, sizeof(double)*3);
@@ -534,7 +535,7 @@ int CEstimatePose5Point::EstimatePose( PairMatchRes pairMatches, ImgFeature& lIm
   output:
 	   cam2: the results are output into cam2
 */
-int CEstimatePose5Point::EstimatePose( vector<Point2DDouble> lPts, vector<Point2DDouble> rPts, 
+int CEstimatePose5Point::EstimatePose( vector<Point2DDouble>& lPts, vector<Point2DDouble>& rPts, 
 									  CameraPara& cam1, CameraPara& cam2 )
 {
 	//printf(" \n Relative Pose Estimation ... \n");
@@ -575,6 +576,8 @@ int CEstimatePose5Point::EstimatePose( vector<Point2DDouble> lPts, vector<Point2
 		memcpy(cam2.t,nt,sizeof(double)*3);
 	}	
    
+	m_bIsExplicit = true;
+
 	/*
 	//print results
 #ifdef _DEBUG
@@ -621,7 +624,7 @@ int CEstimatePose5Point::EstimatePose( vector<Point2DDouble> lPts, vector<Point2
 
 CEstimatePose5PointPano::CEstimatePose5PointPano()
 {
-
+	m_bIsExplicit = false;
 }
 
 CEstimatePose5PointPano::~CEstimatePose5PointPano()
@@ -632,7 +635,7 @@ CEstimatePose5PointPano::~CEstimatePose5PointPano()
 /*
    Output model: x = R(X-T)   
 */
-int CEstimatePose5PointPano::EstimatePose( vector<Point2DDouble> lPts, vector<Point2DDouble> rPts, 
+int CEstimatePose5PointPano::EstimatePose( vector<Point2DDouble>& lPts, vector<Point2DDouble>& rPts, 
 	CameraPara& cam1, CameraPara& cam2 )
 {
 	int ht = cam1.rows;
@@ -680,6 +683,20 @@ int CEstimatePose5PointPano::EstimatePose( vector<Point2DDouble> lPts, vector<Po
 	residual.resize(pl.size());
 	EstimatePose5Point_Pano(pl, pr, radius, num_trials, threshold, R, t, residual);
 
+	//remove the outliers
+	double epipolarThreshold = wd*0.005;
+	vector<Point2DDouble> inlierLeftPts, inlierRightPts;
+	for(int i=0; i<lPts.size(); i++)
+	{
+		if(residual[i]<epipolarThreshold)
+		{
+			inlierLeftPts.push_back(lPts[i]);
+			inlierRightPts.push_back(rPts[i]);
+		}
+	}
+	lPts = inlierLeftPts;
+	rPts = inlierRightPts;
+
 	//rotation matrix
 	for(int i=0; i<9; i++)
 	{
@@ -699,6 +716,8 @@ int CEstimatePose5PointPano::EstimatePose( vector<Point2DDouble> lPts, vector<Po
 		cam1.t[i] = 0;
 		cam2.t[i] = -gt[i];
 	}
+
+	m_bIsExplicit = true;
 	
 	//save eular angle
 	double ea[3];

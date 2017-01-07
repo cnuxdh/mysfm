@@ -142,6 +142,10 @@ DLL_EXPORT int GeneratePanoEpipolarImage(double* R, double* T, char* leftFile, c
 DLL_EXPORT int GeneratePanoEpipolarImageHeading(double* R, double* T, char* leftFile, char* rightFile);
 
 
+DLL_EXPORT int GeneratePanoEpipolarImageHeading(double* R, double* T, IplImage* pLeftImage, IplImage* pRightImage);
+
+
+DLL_EXPORT vector<Point3DDouble> GenerateEpipolarPlaneVectors(Point3DDouble normal,int num);
 
 
 #endif

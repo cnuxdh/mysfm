@@ -30,6 +30,7 @@ public:
 
 	//get the centered x,y of feaure point
 	Point2DDouble GetCenteredPt(int ptIndex);
+	Point2DDouble GetTopLeftPt(int ptIndex);
 	
 	//set the feature points data
 	void SetFeaturePoints(vector<stPtFeature>& srcFeatPts){ featPts=srcFeatPts; }

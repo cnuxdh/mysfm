@@ -47,8 +47,10 @@ IplImage*  PanoToPlane(IplImage* panoImage, double  vangle, double hangle,
 	dstPts[0] = xp;
 	dstPts[1] = yp;
 	dstPts[2] = zp;
+	
 	//orthogonal Procrustes algorithm
 	RotationAlign(srcPts, dstPts, R); //from projection image space to sphere space
+	
 	
 	int ht = panoImage->height;
 	int wd = panoImage->width;
@@ -67,8 +69,9 @@ IplImage*  PanoToPlane(IplImage* panoImage, double  vangle, double hangle,
 	
 	printf("proj width:%d   height:%d \n", projWd, projHt);
 
-	//image reprojection
-	IplImage* planeImage = cvCreateImage( cvSize(projWd, projHt), 8, 3);
+	//image re-projection
+	int nBand = panoImage->nChannels;
+	IplImage* planeImage = cvCreateImage( cvSize(projWd, projHt), 8, nBand);
 	int projScanWd = planeImage->widthStep;
 
 	double grd[3];
@@ -104,9 +107,17 @@ IplImage*  PanoToPlane(IplImage* panoImage, double  vangle, double hangle,
 
 			int nx = ix;
 			int ny = iy;
-			planeImage->imageData[pj*projScanWd + pi*3 ]    = panoImage->imageData[ny*scanWd+nx*3];
-			planeImage->imageData[pj*projScanWd + pi*3 + 1] = panoImage->imageData[ny*scanWd+nx*3 + 1];
-			planeImage->imageData[pj*projScanWd + pi*3 + 2] = panoImage->imageData[ny*scanWd+nx*3 + 2];
+
+			if(nBand==3)
+			{
+				planeImage->imageData[pj*projScanWd + pi*3 ]    = panoImage->imageData[ny*scanWd+nx*3];
+				planeImage->imageData[pj*projScanWd + pi*3 + 1] = panoImage->imageData[ny*scanWd+nx*3 + 1];
+				planeImage->imageData[pj*projScanWd + pi*3 + 2] = panoImage->imageData[ny*scanWd+nx*3 + 2];
+			}
+			else if(nBand==1)
+			{
+				planeImage->imageData[pj*projScanWd + pi ]    = panoImage->imageData[ny*scanWd+nx];
+			}
 		}
 	}
 
@@ -155,6 +166,15 @@ int PanoToPlanes(IplImage* panoImage, double anglestep,
 		int outHt, outWd;
 		IplImage* planeImage = PanoToPlane( panoImage, vangle, hangle, direction, fratio, 
 			focalLen, outHt, outWd, Rp);
+
+		for(int kj=0; kj<3; kj++)
+		{
+			for(int ki=0; ki<3; ki++)
+			{
+				printf("%6.4lf ", Rp[kj*3+ki]);
+			}
+			printf("\n");
+		}
 
 		projImages.push_back(planeImage);
 
@@ -782,6 +802,44 @@ Point3DDouble RotateByVector(Point3DDouble srcVector, Point3DDouble fixedVector,
 	return dstVector;
 }
 
+/* generate the points lying on the panorama epipolar line  
+   input
+		normal: the normal of epipolar plane
+   return
+		3d point vectors of epipolar line 
+*/
+vector<Point3DDouble> GenerateEpipolarPlaneVectors(Point3DDouble normal,int num)
+{
+	vector<Point3DDouble> epipolarVecs;
+
+	double xs = normal.p[0];
+	double ys = normal.p[1];
+	double zs = normal.p[2];
+
+	//the initial point vertical to the (xs, ys, zs)
+	Point3DDouble initialPt;
+	initialPt.p[0] = -ys;
+	initialPt.p[1] = xs;
+	initialPt.p[2] = 0;
+
+	Point3DDouble fixedPt;
+	fixedPt.p[0] = xs;
+	fixedPt.p[1] = ys;
+	fixedPt.p[2] = zs;
+
+	//rotation 
+	double interval = 360.0 / num;
+	for(int i=0; i<num; i++)
+	{
+		double angle = i*interval;
+
+		Point3DDouble vec = RotateByVector(initialPt, fixedPt, angle );
+
+		epipolarVecs.push_back(vec);
+	}
+
+	return epipolarVecs;
+}
 
 
 /* generate the normals of epipolar planes    
@@ -813,6 +871,117 @@ vector<Point3DDouble> GenerateEpipolarPlaneNormals(double xs, double ys, double 
 	}
 
 	return normals;
+}
+
+DLL_EXPORT int GeneratePanoEpipolarImageHeading(double* R, double* T, IplImage* pLeftImage, IplImage* pRightImage)
+{
+	int ht = pLeftImage->height;
+	int wd = pLeftImage->width;
+	int scanwd = pLeftImage->widthStep;
+
+	IplImage* pEpipolarLeft  = cvCloneImage(pLeftImage);
+	IplImage* pEpipolarRight = cvCloneImage(pRightImage);
+
+	//calculate the position of second camera relative to the first camera, from RX+T to R(X-T')
+	double sT[3];
+	double iR[9];
+	memcpy(iR, R, sizeof(double)*9);
+	invers_matrix(iR, 3);
+	mult(iR, T, sT, 3, 3, 1);
+	sT[0] = -sT[0];
+	sT[1] = -sT[1];
+	sT[2] = -sT[2];
+	printf("position: %lf %lf %lf \n", sT[0], sT[1], sT[2]);
+
+	double radius = wd / (2*PI);
+
+	double nR[9];
+	double a[3];
+	double b[3];
+	a[0]=0;		a[1]=0;		a[2]=1;
+	b[0]=-T[0];	b[1]=T[2];	b[2]=T[1];
+	CalculateAlignRotation1(a, b, nR);
+	//invers_matrix(nR, 3);
+
+	//right epipolar image
+	for(int j=0; j<ht; j++)
+	{
+		//printf("%d \n", j);
+
+		for(int i=0; i<wd; i++)
+		{
+			double ngx,ngy,ngz;
+			SphereTo3D( (double)(i), (double)(j), radius, ngx, ngy, ngz );
+
+			//transform to the old coordinate
+			double gt[3];
+			gt[0]=ngx;	gt[1]=ngy;	gt[2]=ngz;
+			double res[3];
+			mult(nR, gt, res, 3, 3, 1);
+
+			//change projection mode to original
+			double gx,gy,gz;
+			gx = res[0];	gy=-res[2];	gz=res[1];
+
+			//convert from 3D to spherical coordinate
+			double dx,dy;
+			GrdToSphere(gx, gy, gz, radius, dx, dy);
+			int ix = min(wd-1, int(dx+0.5));
+			int iy = min(ht-1, int(dy+0.5));
+
+			pEpipolarRight->imageData[j*scanwd + 3*i]     = pRightImage->imageData[iy*scanwd + 3*ix];
+			pEpipolarRight->imageData[j*scanwd + 3*i + 1] = pRightImage->imageData[iy*scanwd + 3*ix + 1];
+			pEpipolarRight->imageData[j*scanwd + 3*i + 2] = pRightImage->imageData[iy*scanwd + 3*ix + 2];
+		}
+	}
+
+	//left epipolar image
+	for(int j=0; j<ht; j++)
+	{
+		//printf("%d \n", j);
+
+		for(int i=0; i<wd; i++)
+		{
+			double ngx,ngy,ngz;
+			SphereTo3D((double)(i), (double)(j), radius, ngx, ngy, ngz);
+			double gt[3];
+			gt[0]=ngx;	gt[1]=ngy;	gt[2]=ngz;
+
+			//transform to the old coordinate
+			double res[3];
+			mult(nR, gt, res, 3, 3, 1);
+
+			//change projection mode to original
+			double og[3];
+			og[0]=res[0];	og[1]=-res[2];	og[2]=res[1];
+
+			//from right to left
+			double lt[3];
+			mult(iR, og, lt, 3, 3, 1);
+			double gx,gy,gz;
+			gx=lt[0];	gy=lt[1];	gz=lt[2];
+
+			//convert from 3D to spherical coordinate
+			double dx,dy;
+			GrdToSphere(gx, gy, gz, radius, dx, dy);
+			int ix = min(wd-1, int(dx+0.5));
+			int iy = min(ht-1, int(dy+0.5));
+
+			pEpipolarLeft->imageData[j*scanwd + 3*i]     = pLeftImage->imageData[iy*scanwd + 3*ix];
+			pEpipolarLeft->imageData[j*scanwd + 3*i + 1] = pLeftImage->imageData[iy*scanwd + 3*ix + 1];
+			pEpipolarLeft->imageData[j*scanwd + 3*i + 2] = pLeftImage->imageData[iy*scanwd + 3*ix + 2];
+		}
+	}
+
+	cvSaveImage("c:\\temp\\epipolarLeftHeading.jpg",  pEpipolarLeft);
+	cvSaveImage("c:\\temp\\epipolarRightHeading.jpg", pEpipolarRight);
+
+	cvReleaseImage(&pEpipolarLeft);
+	cvReleaseImage(&pEpipolarRight);
+
+	printf(" \n GeneratePanoEpipolarImage(..) is finished ! \n");
+
+	return 0;
 }
 
 DLL_EXPORT int GeneratePanoEpipolarImageHeading(double* R, double* T, char* leftFile, char* rightFile)
