@@ -21,6 +21,114 @@
 //matrix lib
 //#include "matrix/matrix.h"
 
+/*
+  generate perspective image of one direction
+*/
+IplImage*  PanoToPlane(IplImage* panoImage,double* direction, double vangle, double hangle)
+{
+	double R[9];
+	double xT[3] = {0,0,1};
+
+	double nd = sqrt( direction[0]*direction[0] + direction[1]*direction[1] + direction[2]*direction[2] );
+
+	//calculate the rotation between spherical coordinate to projection coordinate
+	POINT3D zp;
+	zp.x = -direction[0] / nd;
+	zp.y = -direction[1] / nd;
+	zp.z = -direction[2] / nd;
+	POINT3D xp,yp;
+	GenerateProjectAxis(zp, xp, yp);
+	vector<POINT3D> srcPts;
+	vector<POINT3D> dstPts;
+	srcPts.resize(3);
+	dstPts.resize(3);
+	srcPts[0].x = 1; srcPts[0].y = 0; srcPts[0].z = 0;
+	srcPts[1].x = 0; srcPts[1].y = 1; srcPts[1].z = 0;
+	srcPts[2].x = 0; srcPts[2].y = 0; srcPts[2].z = 1;  
+	dstPts[0] = xp;
+	dstPts[1] = yp;
+	dstPts[2] = zp;
+
+	//orthogonal Procrustes algorithm
+	RotationAlign(srcPts, dstPts, R); //from projection image space to sphere space
+
+	int ht = panoImage->height;
+	int wd = panoImage->width;
+	int scanWd = panoImage->widthStep;
+	double radius = double(wd)/(2*PI);
+	//printf("radius: %lf \n", radius);
+
+	//calculate the projection plane size
+	double radianAngle = 1.0 / 180.0 * PI;
+	double projFocus = radius;    //radius*0.8; 
+	//printf("focal length: %.4lf \n", radius);
+	//printf("proj focus:   %.4lf \n", projFocus);
+
+	int projHt = projFocus*tan(vangle*radianAngle*0.5)*2;
+	int projWd = projFocus*tan(hangle*radianAngle*0.5)*2;
+
+	//printf("proj width:%d   height:%d \n", projWd, projHt);
+
+	//image re-projection
+	int nBand = panoImage->nChannels;
+	IplImage* planeImage = cvCreateImage( cvSize(projWd, projHt), 8, nBand);
+	int projScanWd = planeImage->widthStep;
+
+	double grd[3];
+	grd[2] = -projFocus;  //z axis
+
+	for(int y=-projHt*0.5; y<projHt*0.5; y++)
+	{
+		for(int x=-projWd*0.5; x<projWd*0.5; x++)
+		{  
+			//calculate the image coordinates
+			int pj = -y + projHt*0.5;
+			int pi =  x + projWd*0.5;
+			pj = max( 0, min(projHt-1, pj) );
+			pi = max( 0, min(projWd-1, pi) );
+
+			//3D point coordinates
+			grd[0] = x;
+			grd[1] = y;
+
+			//from projection image space to sphere space
+			double rg[3];
+			mult(R, grd, rg, 3, 3, 1);
+
+			//for sphere 3D to panorama image space
+			double ix, iy;
+			GrdToSphere_center( rg[0], rg[1], rg[2], radius, ix, iy);	
+			//printf("%lf %lf \n", ix, iy);
+			ix = ix + wd*0.5;
+			iy = ht*0.5 - iy;
+
+			if(ix>=wd) ix=wd-1;
+			if(iy>=ht) iy=ht-1;
+			if(ix<0) ix = 0;
+			if(iy<0) iy = 0;
+
+			int nx = ix;
+			int ny = iy;
+
+			if(nBand==3)
+			{
+				planeImage->imageData[pj*projScanWd + pi*3 ]    = panoImage->imageData[ny*scanWd+nx*3];
+				planeImage->imageData[pj*projScanWd + pi*3 + 1] = panoImage->imageData[ny*scanWd+nx*3 + 1];
+				planeImage->imageData[pj*projScanWd + pi*3 + 2] = panoImage->imageData[ny*scanWd+nx*3 + 2];
+			}
+			else if(nBand==1)
+			{
+				planeImage->imageData[pj*projScanWd + pi ]    = panoImage->imageData[ny*scanWd+nx];
+			}
+		}
+	}
+
+	//printf("pano to plane projection Finished! \n");
+
+	return planeImage;
+}
+
+
 
 IplImage*  PanoToPlane(IplImage* panoImage, double  vangle, double hangle, 
 	double* direction, double focalLenRatio, 

@@ -2,6 +2,33 @@
 #include "funcs.hpp"
 
 
+int    CalculateColorHist(IplImage* pImage, int grayStep, vector<double>& hist)
+{
+	int nChannels = pImage->nChannels;
+	int singleDim = 256/grayStep;
+	int nHistDim  = singleDim*nChannels;
+	
+	hist.resize(nHistDim, 0);
+
+	int ht = pImage->height;
+	int wd = pImage->width;
+	int scanwd = pImage->widthStep;
+
+	for(int i=0; i<nChannels; i++)
+	{
+		for(int m=0; m<ht; m++)
+			for(int n=0; n<wd; n++)
+			{
+				int value = (unsigned char)(pImage->imageData[m*scanwd + n*nChannels + i]);
+				int index = value / grayStep;
+
+				hist[singleDim*i+index] ++;
+			}
+	}
+	
+	return 0;
+}
+
 double distanceVec(Point2DDouble p1, Point2DDouble p2)
 {
 	double dis = 0;

@@ -649,6 +649,14 @@ int CIPanoRegDirect::PtReg(Point2DDouble srcPt, Point2DDouble& dstPt, int nImage
 		SphereTo3D_center(cx, cy, radius, lp[0], lp[1], lp[2]);
 		printf("left bundle: %lf %lf %lf \n", lp[0], lp[1], lp[2]);
 
+		//generate perspective image
+		IplImage* lPtPlane = PanoToPlane(m_pLeft, lp, 12, 12);
+		cvSaveImage("c:\\temp\\left_pt_plane.jpg", lPtPlane);
+		vector<double> lHist;
+		CalculateColorHist(lPtPlane, 8, lHist);
+		cvReleaseImage(&lPtPlane);
+		
+
 		Point3DDouble leftBundleDir;
 		leftBundleDir.p[0] = lp[0];
 		leftBundleDir.p[1] = lp[1];
@@ -678,6 +686,7 @@ int CIPanoRegDirect::PtReg(Point2DDouble srcPt, Point2DDouble& dstPt, int nImage
 
 			double radius = (double)(m_pRight->width) / (2*PI);
 			IplImage* pDisp = cvCloneImage(m_pRight);
+			double minDif = 100000000;
 			for(int i=0; i<ptVecs.size(); i++)
 			{
 				//visibility decision							
@@ -685,7 +694,8 @@ int CIPanoRegDirect::PtReg(Point2DDouble srcPt, Point2DDouble& dstPt, int nImage
 				double rp[3];
 				rp[0] = ptVecs[i].p[0];
 				rp[1] = ptVecs[i].p[1];
-				rp[2] = ptVecs[i].p[2];		
+				rp[2] = ptVecs[i].p[2];
+				
 				double ct[3];
 				mult(rPanoR, rp, ct, 3, 3, 1);
 				
@@ -706,18 +716,40 @@ int CIPanoRegDirect::PtReg(Point2DDouble srcPt, Point2DDouble& dstPt, int nImage
 				
 				double ix,iy;
 				GrdToSphere_center(ptVecs[i].p[0], ptVecs[i].p[1], ptVecs[i].p[2], radius, ix, iy);
-				CvPoint ip1;
-				ip1.x = ix+wd*0.5;
-				ip1.y = ht*0.5-iy;
-				cvDrawCircle(pDisp, ip1, 1, CV_RGB(255,0,0), 2);
+				CvPoint ip;
+				ip.x = ix+wd*0.5;
+				ip.y = ht*0.5-iy;
+				cvDrawCircle(pDisp, ip, 1, CV_RGB(255,0,0), 2);
 				
+				//
+				IplImage* rPtPlane = PanoToPlane(m_pRight, rp, 12, 12);
+				//cvSaveImage("c:\\temp\\left_pt_plane.jpg", lPtPlane);
+				vector<double> rHist;
+				CalculateColorHist(rPtPlane, 8, rHist);
+				
+				//calculate the similarity
+				int sim = 0;
+				for(int ki=0; ki<lHist.size(); ki++)
+				{
+					sim += fabs( lHist[ki]-rHist[ki] );
+				}
+				if(sim<minDif)
+				{
+					minDif = sim;
+					dstPt.p[0] = ip.x;
+					dstPt.p[1] = ip.y;
+					cvSaveImage("c:\\temp\\dstPtImg.jpg", rPtPlane);
+				}
+				cvReleaseImage(&rPtPlane);
+
+
+
 				/*
 				GrdToSphere_center(ptVecs[i+1].p[0], ptVecs[i+1].p[1], ptVecs[i+1].p[2], radius, ix, iy);
 				CvPoint ip2;
 				ip2.x = ix+wd*0.5;
 				ip2.y = ht*0.5-iy;
 				//cvDrawCircle(pDisp, ip, 1, CV_RGB(255,0,0), 1);
-
 				cvLine(pDisp, ip1, ip2, CV_RGB(0,255,0),1);
 				*/
 			}

@@ -13,9 +13,10 @@
 //#include "opencv2/calib3d/calib3d.hpp"
 #endif
 
-
-
 #include "defines.hpp"
+
+
+
 
 double dot(Point3DDouble p1, Point3DDouble p2);
 
@@ -25,8 +26,13 @@ double distanceVec(Point2DDouble p1, Point2DDouble p2);
 double angleOfVector(Point3DDouble p1, Point3DDouble p2);
 
 
-int DrawMatches(char* filename, IplImage* pLeft, IplImage* pRight, 
-	vector<Point2DDouble> lpts, vector<Point2DDouble> rpts);
+int	   DrawMatches(char* filename, IplImage* pLeft, IplImage* pRight, 
+			vector<Point2DDouble> lpts, vector<Point2DDouble> rpts);
+
+int    CalculateColorHist(IplImage* pImage, int grayStep, vector<double>& hist);
+
+
+
 
 
 #endif

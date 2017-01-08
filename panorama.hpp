@@ -63,6 +63,8 @@ DLL_EXPORT int SphereToCilinder(char* infile, char* outfile);
 
 
 
+IplImage*  PanoToPlane(IplImage* panoImage,double* direction, double vangle, double hangle);
+
 
 /* panorama to plane projection
    srcImageFile: panoram file 
@@ -94,6 +96,8 @@ DLL_EXPORT int PanoToPlanes(int nImageIndex, char* srcFile, double anglestep,
 DLL_EXPORT IplImage*  PanoToPlane(IplImage* panoImage, double  vangle, double hangle, 
 	double* direction, double focalLenRatio, 
 	double& focalLen, int& outHt, int& outWd, double* pR);
+
+
 
 //panoram image is projected to several images and save the images and projection matrix 
 DLL_EXPORT int PanoToPlanes(IplImage* panoImage, double anglestep,
