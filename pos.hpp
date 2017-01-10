@@ -12,8 +12,10 @@ typedef struct stPOSInfo
 {
 	double lat,lon;
 	double height;
-	double rx,ry,rz;
+	double roll,pitch,yaw; //Eular angle
 	int    id;
+	double gx,gy;          //UTM x,y
+	char   filetitle[256]; //file title
 }POSInfo;
 
 
@@ -24,6 +26,7 @@ public:
 	virtual ~CReadPosBase(){}
 	
 	virtual int ReadPOSData(char* filename){return 0;}
+	virtual int GetPOS(int index, POSInfo& pos){return 0;}
 };
 
 
@@ -35,10 +38,25 @@ public:
 	~CReadUAVPose();
   
 	int ReadPOSData(char* filename);
+	int GetPOS(int index, POSInfo& pos);
 
 private:
 	vector<POSInfo> m_posArray;
 };
 
+
+//read the pos data installed in the car
+class DLL_EXPORT CReadCarPos: public CReadPosBase
+{
+public:
+	CReadCarPos();
+	~CReadCarPos();
+
+	int ReadPOSData(char* filename);
+	int GetPOS(int index, POSInfo& pos);
+
+private:
+	vector<POSInfo> m_posArray;
+};
 
 #endif

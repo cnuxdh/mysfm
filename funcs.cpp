@@ -1,5 +1,29 @@
 
 #include "funcs.hpp"
+#include "pos.hpp"
+
+//corelib
+#include "CalcAngle.h"
+
+
+int   InitCamera(CameraPara& cam, POSInfo pos)
+{
+	double R[9];
+	double roll  = pos.roll   / PI * 180;
+	double pitch = pos.pitch  / PI * 180;
+	double yaw   = -pos.yaw   / PI * 180;
+	GenerateRMatrix(roll, pitch, yaw, R);
+
+	memcpy(cam.R, R, sizeof(double)*9);
+
+	cam.t[0] = pos.gx;
+	cam.t[1] = pos.gy;
+	cam.t[2] = pos.height;
+
+	cam.bIsExplicit = true;
+	
+	return 0;
+}
 
 
 int    CalculateColorHist(IplImage* pImage, int grayStep, vector<double>& hist)

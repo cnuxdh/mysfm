@@ -74,6 +74,7 @@ CIPanoReg::~CIPanoReg()
 		cvReleaseImage(&m_pRightPlaneImages[i]);
 }
 
+
 int CIPanoReg::Init(char* pLeftFile, char* pRightFile)
 {
 	//loading gray image
@@ -117,9 +118,9 @@ int CIPanoReg::Init(char* pLeftFile, char* pRightFile)
 	pRP->EstimatePose(lpts, rpts, m_leftPanoCam, m_rightPanoCam );  
 
 
-	CalculateEssentialMatrix(m_leftPanoCam.R, m_leftPanoCam.t, m_rightPanoCam.R, m_rightPanoCam.t, true, m_EM);
-
-	
+	CalculateEssentialMatrix(m_leftPanoCam.R, m_leftPanoCam.t, m_rightPanoCam.R, m_rightPanoCam.t, true, 
+		m_R, m_T, m_EM);
+		
 	//generate perspective images
 	m_pLeftPlaneImages.clear();
 	m_leftPlaneCams.clear();
@@ -383,6 +384,7 @@ CIPanoRegTri::~CIPanoRegTri()
 		cvReleaseImage(&m_pRightPlaneImages[i]);
 }
 
+
 int CIPanoRegTri::Init(char* pLeftFile, char* pRightFile)
 {
 	//loading gray image
@@ -512,8 +514,7 @@ int CIPanoRegTri::PtReg(Point2DDouble srcPt, Point2DDouble& dstPt, int nImageInd
 	{
 		int ht = m_pLeft->height;
 		int wd = m_pLeft->width;
-
-	
+		
 
 		//############  coarse searching based on triangles ###############
 		dstPt.p[0] = 0;
@@ -573,7 +574,9 @@ int CIPanoRegTri::PtReg(Point2DDouble srcPt, Point2DDouble& dstPt, int nImageInd
 
 CIPanoRegDirect::CIPanoRegDirect()
 {
-
+	m_pLeft = NULL;
+	m_pRight = NULL;
+	
 }
 
 CIPanoRegDirect::~CIPanoRegDirect()
@@ -625,7 +628,35 @@ int CIPanoRegDirect::Init(char* pLeftFile, char* pRightFile)
 	pRP->EstimatePose(lpts, rpts, m_leftPanoCam, m_rightPanoCam );  
 
 
-	CalculateEssentialMatrix(m_leftPanoCam.R, m_leftPanoCam.t, m_rightPanoCam.R, m_rightPanoCam.t, true, m_EM);
+	//calculate the essential matrix
+	CalculateEssentialMatrix(m_leftPanoCam.R, m_leftPanoCam.t, m_rightPanoCam.R, m_rightPanoCam.t, 
+		pRP->IsExplicit(), m_R,m_T, m_EM);
+	
+	return 0;
+}
+
+int CIPanoRegDirect::Init(IplImage* pLeft, IplImage* pRight, CameraPara leftCam, CameraPara rightCam)
+{
+	if(m_pLeft!=NULL)
+		cvReleaseImage(&m_pLeft);
+	m_pLeft = cvCloneImage(pLeft);
+
+	if(m_pRight!=NULL)
+		cvReleaseImage(&m_pRight);
+	m_pRight = cvCloneImage(pRight);
+
+	m_leftPanoCam.rows  = m_pLeft->height;
+	m_leftPanoCam.cols  = m_pLeft->width;
+	m_rightPanoCam.rows = m_pRight->height;
+	m_rightPanoCam.cols = m_pRight->width;
+
+	m_leftPanoCam  = leftCam;
+	m_rightPanoCam = rightCam;
+
+
+	//calculate the essential matrix
+	CalculateEssentialMatrix(m_leftPanoCam.R, m_leftPanoCam.t, m_rightPanoCam.R, m_rightPanoCam.t, m_leftPanoCam.bIsExplicit, 
+		m_R, m_T, m_EM);
 
 
 	return 0;
@@ -647,7 +678,7 @@ int CIPanoRegDirect::PtReg(Point2DDouble srcPt, Point2DDouble& dstPt, int nImage
 		double radius = (double)(m_pLeft->width) / (2*PI);
 		double lp[3];
 		SphereTo3D_center(cx, cy, radius, lp[0], lp[1], lp[2]);
-		printf("left bundle: %lf %lf %lf \n", lp[0], lp[1], lp[2]);
+		//printf("left bundle: %lf %lf %lf \n", lp[0], lp[1], lp[2]);
 
 		//generate perspective image
 		IplImage* lPtPlane = PanoToPlane(m_pLeft, lp, 12, 12);
@@ -662,11 +693,19 @@ int CIPanoRegDirect::PtReg(Point2DDouble srcPt, Point2DDouble& dstPt, int nImage
 		leftBundleDir.p[1] = lp[1];
 		leftBundleDir.p[2] = lp[2];
 
+		double lt[3];
+		double iR[9];
+		memcpy(iR, m_R, sizeof(double)*9);
+		invers_matrix(iR, 3);
+		mult(iR, m_T, lt, 3, 3, 1);
 		Point3DDouble baselineDir;
-		baselineDir.p[0] = m_leftPanoCam.t[0] - m_rightPanoCam.t[0];
-		baselineDir.p[1] = m_leftPanoCam.t[1] - m_rightPanoCam.t[1];
-		baselineDir.p[2] = m_leftPanoCam.t[2] - m_rightPanoCam.t[2];
-		printf("baseline : %lf %lf %lf \n", baselineDir.p[0], baselineDir.p[1], baselineDir.p[2]);
+		baselineDir.p[0] = lt[0];
+		baselineDir.p[1] = lt[1];
+		baselineDir.p[2] = lt[2];
+		//baselineDir.p[0] = m_leftPanoCam.t[0] - m_rightPanoCam.t[0];
+		//baselineDir.p[1] = m_leftPanoCam.t[1] - m_rightPanoCam.t[1];
+		//baselineDir.p[2] = m_leftPanoCam.t[2] - m_rightPanoCam.t[2];
+		//printf("baseline : %lf %lf %lf \n", baselineDir.p[0], baselineDir.p[1], baselineDir.p[2]);
 
 		//calculate the epipolar normal
 		mult(m_EM, lp, n, 3, 3, 1);
@@ -680,9 +719,9 @@ int CIPanoRegDirect::PtReg(Point2DDouble srcPt, Point2DDouble& dstPt, int nImage
 
 		if(1)
 		{
-			double rPanoR[9];
-			memcpy(rPanoR, m_rightPanoCam.R, sizeof(double)*9);
-			invers_matrix(rPanoR, 3);
+			//double rPanoR[9];
+			//memcpy(rPanoR, m_R, sizeof(double)*9);
+			//invers_matrix(rPanoR, 3);
 
 			double radius = (double)(m_pRight->width) / (2*PI);
 			IplImage* pDisp = cvCloneImage(m_pRight);
@@ -697,7 +736,7 @@ int CIPanoRegDirect::PtReg(Point2DDouble srcPt, Point2DDouble& dstPt, int nImage
 				rp[2] = ptVecs[i].p[2];
 				
 				double ct[3];
-				mult(rPanoR, rp, ct, 3, 3, 1);
+				mult(iR, rp, ct, 3, 3, 1);
 				
 				Point3DDouble rightBundleDir;
 				rightBundleDir.p[0] = ct[0];
@@ -711,9 +750,6 @@ int CIPanoRegDirect::PtReg(Point2DDouble srcPt, Point2DDouble& dstPt, int nImage
 				double angle3 = angleOfVector(leftBundleDir, rightBundleDir);
 				//printf("%lf %lf %lf  %lf \n", angle1, angle2, angle3, angle1-angle2-angle3);
 
-				if( fabs(angle1-angle2-angle3)>5 )
-					continue;
-				
 				double ix,iy;
 				GrdToSphere_center(ptVecs[i].p[0], ptVecs[i].p[1], ptVecs[i].p[2], radius, ix, iy);
 				CvPoint ip;
@@ -721,6 +757,13 @@ int CIPanoRegDirect::PtReg(Point2DDouble srcPt, Point2DDouble& dstPt, int nImage
 				ip.y = ht*0.5-iy;
 				cvDrawCircle(pDisp, ip, 1, CV_RGB(255,0,0), 2);
 				
+
+				if( fabs(angle1-angle2-angle3)>5 )
+					continue;
+
+				cvDrawCircle(pDisp, ip, 1, CV_RGB(0,255,0), 2);
+
+
 				//
 				IplImage* rPtPlane = PanoToPlane(m_pRight, rp, 12, 12);
 				//cvSaveImage("c:\\temp\\left_pt_plane.jpg", lPtPlane);
@@ -738,11 +781,10 @@ int CIPanoRegDirect::PtReg(Point2DDouble srcPt, Point2DDouble& dstPt, int nImage
 					minDif = sim;
 					dstPt.p[0] = ip.x;
 					dstPt.p[1] = ip.y;
-					cvSaveImage("c:\\temp\\dstPtImg.jpg", rPtPlane);
+					//cvSaveImage("c:\\temp\\dstPtImg.jpg", rPtPlane);
 				}
 				cvReleaseImage(&rPtPlane);
-
-
+				
 
 				/*
 				GrdToSphere_center(ptVecs[i+1].p[0], ptVecs[i+1].p[1], ptVecs[i+1].p[2], radius, ix, iy);

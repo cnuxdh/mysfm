@@ -152,11 +152,12 @@ typedef struct stCameraPara
 	double K[9];
 	double R[9];
 	double t[3];
-	double xs,ys,zs; //absolute position of camera
-	double lon,lat;  //the lon/lat of position of camera
+	double xs,ys,zs;     //absolute position of camera
+	double lon,lat;      //the lon/lat of position of camera
 	double ax,ay,az;     //rotation angle around x,y,z (Eular degree)
 	int    rows,cols;    //the size of image in pixels
 	CameraType camtype;  //camera type
+	bool   bIsExplicit;  //true: RX - T, false: RX + T
 }CameraPara;
 
 

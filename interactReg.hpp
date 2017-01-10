@@ -19,6 +19,8 @@
 //corelib 
 #include "Triangles.h"
 
+//#include "pos.hpp"
+
 
 
 /* base class for image interactive registration
@@ -30,6 +32,7 @@ public:
 	virtual ~CIRegBase(){}
 
 	virtual int Init(char* pLeftFile, char* pRightFile){return 0;}
+	virtual int Init(IplImage* pLeft, IplImage* pRight, CameraPara leftCam, CameraPara rightCam){return 0;}
 	virtual int PtReg(Point2DDouble srcPt, Point2DDouble& dstPt, int nImageIndex){return 0;}
 };
 
@@ -42,6 +45,7 @@ public:
 	~CIPanoReg();
 
 	int Init(char* pLeftFile, char* pRightFile);
+	int Init(IplImage* pLeft, IplImage* pRight, CameraPara leftCam, CameraPara rightCam){return 0;}
 	int PtReg(Point2DDouble srcPt, Point2DDouble& dstPt, int nImageIndex);
 
 private:
@@ -51,6 +55,8 @@ private:
 	IplImage*  m_pRight;
 	CameraPara m_leftPanoCam, m_rightPanoCam;
 	double     m_EM[9]; //essential matrix
+	double     m_R[9];
+	double     m_T[3];
 
 	//for perspective images
 	vector<IplImage*>  m_pLeftPlaneImages;
@@ -68,6 +74,7 @@ public:
 	~CIPanoRegTri();
 
 	int Init(char* pLeftFile, char* pRightFile);
+	int Init(IplImage* pLeft, IplImage* pRight, CameraPara leftCam, CameraPara rightCam){return 0;}
 	int PtReg(Point2DDouble srcPt, Point2DDouble& dstPt, int nImageIndex);
 
 private:
@@ -77,6 +84,8 @@ private:
 	IplImage*  m_pRight;
 	CameraPara m_leftPanoCam, m_rightPanoCam;
 	double     m_EM[9]; //essential matrix
+	double     m_R[9];
+	double     m_T[3];
 
 	//feature points
 	vector<Point2DDouble> m_lpts,m_rpts;
@@ -101,6 +110,7 @@ public:
 	~CIPanoRegDirect();
 
 	int Init(char* pLeftFile, char* pRightFile);
+	int Init(IplImage* pLeft, IplImage* pRight, CameraPara leftCam, CameraPara rightCam);
 	int PtReg(Point2DDouble srcPt, Point2DDouble& dstPt, int nImageIndex);
 
 private:
@@ -110,9 +120,9 @@ private:
 	IplImage*  m_pRight;
 	CameraPara m_leftPanoCam, m_rightPanoCam;
 	double     m_EM[9]; //essential matrix
+	double     m_R[9];
+	double     m_T[3];
 };
-
-
 
 
 #endif

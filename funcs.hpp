@@ -14,6 +14,7 @@
 #endif
 
 #include "defines.hpp"
+#include "pos.hpp"
 
 
 
@@ -31,8 +32,7 @@ int	   DrawMatches(char* filename, IplImage* pLeft, IplImage* pRight,
 
 int    CalculateColorHist(IplImage* pImage, int grayStep, vector<double>& hist);
 
-
-
+DLL_EXPORT int    InitCamera(CameraPara& cam, POSInfo pos);
 
 
 #endif

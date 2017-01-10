@@ -100,7 +100,7 @@ int GrdToImg(Point3DDouble gp, Point2DDouble& ip, CameraPara cam, bool explicit_
 		double radius = double(cam.cols) / (2*PI);
 		double ix,iy;
 
-		GrdToSphere(res[0], res[1], res[2], radius, ix, iy);
+		GrdToSphere_center(res[0], res[1], res[2], radius, ix, iy);
 
 		ip.p[0] = ix;
 		ip.p[1] = iy;
@@ -109,13 +109,9 @@ int GrdToImg(Point3DDouble gp, Point2DDouble& ip, CameraPara cam, bool explicit_
 	return 0;
 }
 
-
-
-
 //convert from RX+T to R(X - (-inv(R)*T) )
 int CalculateExplicitT(double* R, double* T, double* explicitT)
 {
-
 	double iR[9];
 	memset(iR, 0, sizeof(double)*9);
 	dll_matrix_invert(3, R, iR);
@@ -907,9 +903,9 @@ void CTriangulateCV::Triangulate(vector<Point2DDouble> pts,
 
 			//from spherical panorama image point to 3D point
 			double gx,gy,gz;
-			double x = cx + wd*0.5;
-			double y = ht*0.5 - cy;
-			SphereTo3D(x,y,radius,gx,gy,gz);
+			double x = cx; //;cx + wd*0.5;
+			double y = cy; //ht*0.5 - cy;
+			SphereTo3D_center(x, y, radius, gx, gy, gz);
 			//normalized the 3D point
 			pv[i].p[0] = gx/(gz+MINIMAL_VALUE);
 			pv[i].p[1] = gy/(gz+MINIMAL_VALUE);
