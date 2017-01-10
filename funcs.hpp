@@ -35,4 +35,7 @@ int    CalculateColorHist(IplImage* pImage, int grayStep, vector<double>& hist);
 DLL_EXPORT int    InitCamera(CameraPara& cam, POSInfo pos);
 
 
+
+
+
 #endif
