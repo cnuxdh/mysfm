@@ -8,6 +8,19 @@
 #include "badata.hpp"
 
 
+#ifdef OPENCV_1X 
+#include "cv.h"
+#include "highgui.h"
+#include "cxcore.h"
+#else
+#include "opencv2/core/core.hpp"
+#include "opencv2/imgproc/imgproc_c.h"
+#include "opencv2/highgui/highgui.hpp"
+using namespace cv;
+#endif
+
+
+
 //the maximal image height for feature detection
 //#define DETECT_IMAGE_HT 420
 
@@ -30,6 +43,8 @@ public:
 	virtual int Detect(char* filePath, ImgFeature& imgFeat, int maxHt){return 0;};
 
 	virtual int Detect(char* filePath, int dstHt, int dstWd, ImgFeature& imgFeat){return 0;};
+
+	virtual int Detect(IplImage* pImage, ImgFeature& imgFeat){return 0;};
 };
 
 

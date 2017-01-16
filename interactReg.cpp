@@ -6,6 +6,8 @@
 #include "sift.hpp"
 #include "panorama.hpp"
 #include "funcs.hpp"
+#include "hog.hpp"
+
 
 #include "commondata.h"
 #include "CommonFuncs.h"
@@ -78,7 +80,7 @@ CIPanoReg::~CIPanoReg()
 int CIPanoReg::Init(char* pLeftFile, char* pRightFile)
 {
 	//loading gray image
-	m_pLeft = cvLoadImage(pLeftFile, 0);
+	m_pLeft  = cvLoadImage(pLeftFile, 0);
 	m_pRight = cvLoadImage(pRightFile, 0);
 	
 	//detect feature points
@@ -635,6 +637,8 @@ int CIPanoRegDirect::Init(char* pLeftFile, char* pRightFile)
 	return 0;
 }
 
+
+//for pos
 int CIPanoRegDirect::Init(IplImage* pLeft, IplImage* pRight, CameraPara leftCam, CameraPara rightCam)
 {
 	if(m_pLeft!=NULL)
@@ -653,10 +657,11 @@ int CIPanoRegDirect::Init(IplImage* pLeft, IplImage* pRight, CameraPara leftCam,
 	m_leftPanoCam  = leftCam;
 	m_rightPanoCam = rightCam;
 
-
 	//calculate the essential matrix
 	CalculateEssentialMatrix(m_leftPanoCam.R, m_leftPanoCam.t, m_rightPanoCam.R, m_rightPanoCam.t, m_leftPanoCam.bIsExplicit, 
 		m_R, m_T, m_EM);
+	
+	//generate depth image
 
 
 	return 0;
@@ -684,7 +689,9 @@ int CIPanoRegDirect::PtReg(Point2DDouble srcPt, Point2DDouble& dstPt, int nImage
 		IplImage* lPtPlane = PanoToPlane(m_pLeft, lp, 12, 12);
 		cvSaveImage("c:\\temp\\left_pt_plane.jpg", lPtPlane);
 		vector<double> lHist;
-		CalculateColorHist(lPtPlane, 8, lHist);
+		//CalculateColorHist(lPtPlane, 8, lHist);
+		CalculateHOG(lPtPlane, lHist);
+
 		cvReleaseImage(&lPtPlane);
 		
 
@@ -726,6 +733,9 @@ int CIPanoRegDirect::PtReg(Point2DDouble srcPt, Point2DDouble& dstPt, int nImage
 			double radius = (double)(m_pRight->width) / (2*PI);
 			IplImage* pDisp = cvCloneImage(m_pRight);
 			double minDif = 100000000;
+			double maxSim = -100000000;
+			int    nIndex = 0;
+			vector<double> vecSim;
 			for(int i=0; i<ptVecs.size(); i++)
 			{
 				//visibility decision							
@@ -745,11 +755,24 @@ int CIPanoRegDirect::PtReg(Point2DDouble srcPt, Point2DDouble& dstPt, int nImage
 				
 				//printf("%lf %lf %lf \n", )
 
-				double angle1 = angleOfVector(baselineDir, leftBundleDir);
-				double angle2 = angleOfVector(baselineDir,   rightBundleDir);
-				double angle3 = angleOfVector(leftBundleDir, rightBundleDir);
-				//printf("%lf %lf %lf  %lf \n", angle1, angle2, angle3, angle1-angle2-angle3);
+				Point3DDouble rightTop,rightBottom;
+				CalculateViewField(baselineDir, leftBundleDir, 100, 2, rightBottom, rightTop);
 
+				double angle1,angle2,angle3;
+				if(0)
+				{
+					angle1 = angleOfVector(baselineDir,   leftBundleDir);
+					angle2 = angleOfVector(baselineDir,   rightBundleDir);
+					angle3 = angleOfVector(leftBundleDir, rightBundleDir);
+				    //printf("%lf %lf %lf  %lf \n", angle1, angle2, angle3, angle1-angle2-angle3);
+				}
+				else
+				{
+					angle1 = angleOfVector(rightBottom,   rightTop);
+					angle2 = angleOfVector(rightBottom,   rightBundleDir);
+					angle3 = angleOfVector(rightTop,      rightBundleDir);
+				}
+				
 				double ix,iy;
 				GrdToSphere_center(ptVecs[i].p[0], ptVecs[i].p[1], ptVecs[i].p[2], radius, ix, iy);
 				CvPoint ip;
@@ -762,16 +785,27 @@ int CIPanoRegDirect::PtReg(Point2DDouble srcPt, Point2DDouble& dstPt, int nImage
 					continue;
 
 				cvDrawCircle(pDisp, ip, 1, CV_RGB(0,255,0), 2);
-
-
+				
 				//
 				IplImage* rPtPlane = PanoToPlane(m_pRight, rp, 12, 12);
 				//cvSaveImage("c:\\temp\\left_pt_plane.jpg", lPtPlane);
 				vector<double> rHist;
-				CalculateColorHist(rPtPlane, 8, rHist);
+				//CalculateColorHist(rPtPlane, 8, rHist);
+				CalculateHOG(rPtPlane, rHist);
+
 				
 				//calculate the similarity
-				int sim = 0;
+				double sim = Cov(lHist, rHist);
+				vecSim.push_back(sim);
+								
+				if(0)
+				{
+					char filename[256];
+					sprintf(filename, "c:\\temp\\patch_%d.jpg", vecSim.size());
+					cvSaveImage(filename, rPtPlane);
+				}
+
+				/*
 				for(int ki=0; ki<lHist.size(); ki++)
 				{
 					sim += fabs( lHist[ki]-rHist[ki] );
@@ -783,6 +817,20 @@ int CIPanoRegDirect::PtReg(Point2DDouble srcPt, Point2DDouble& dstPt, int nImage
 					dstPt.p[1] = ip.y;
 					//cvSaveImage("c:\\temp\\dstPtImg.jpg", rPtPlane);
 				}
+				*/
+				if(sim>maxSim)
+				{
+					maxSim = sim;
+					dstPt.p[0] = ip.x;
+					dstPt.p[1] = ip.y;
+					nIndex = vecSim.size();
+
+					if(1)
+					{
+						cvSaveImage("c:\\temp\\dstPtImg.jpg", rPtPlane);
+					}
+				}
+
 				cvReleaseImage(&rPtPlane);
 				
 
@@ -795,10 +843,119 @@ int CIPanoRegDirect::PtReg(Point2DDouble srcPt, Point2DDouble& dstPt, int nImage
 				cvLine(pDisp, ip1, ip2, CV_RGB(0,255,0),1);
 				*/
 			}
+
+			if(1)
+			{
+				FILE* fp = fopen("c:\\temp\\sim.txt", "w");
+				for(int k=0; k<vecSim.size(); k++)
+				{
+					fprintf(fp, "%lf \n", vecSim[k]);
+				}
+				fclose(fp);
+			}
+
+			printf("best: %d \n", nIndex);
+
 			cvSaveImage("c:\\temp\\epipolarLine.jpg", pDisp);
 			cvReleaseImage(&pDisp);
 		}
 	}
+
+	return 0;
+}
+
+
+int CIPanoRegDirect::GetEpipolarLinePts(Point2DDouble srcPt, int nImageIndex, vector<Point2DDouble>& epts)
+{
+	double n[3];
+
+	epts.clear();
+
+	if(nImageIndex==0)
+	{
+		int ht = m_pLeft->height;
+		int wd = m_pLeft->width;
+		double cx = srcPt.p[0] - wd*0.5;
+		double cy = ht*0.5 - srcPt.p[1];
+
+		//from pano 2D to sphere 3D 
+		double radius = (double)(m_pLeft->width) / (2*PI);
+		double lp[3];
+		SphereTo3D_center(cx, cy, radius, lp[0], lp[1], lp[2]);
+
+		Point3DDouble leftBundleDir;
+		leftBundleDir.p[0] = lp[0];
+		leftBundleDir.p[1] = lp[1];
+		leftBundleDir.p[2] = lp[2];
+
+		double lt[3];
+		double iR[9];
+		memcpy(iR, m_R, sizeof(double)*9);
+		invers_matrix(iR, 3);
+		mult(iR, m_T, lt, 3, 3, 1);
+		Point3DDouble baselineDir;
+		baselineDir.p[0] = lt[0];
+		baselineDir.p[1] = lt[1];
+		baselineDir.p[2] = lt[2];
+
+		//calculate the epipolar normal
+		mult(m_EM, lp, n, 3, 3, 1);
+		Point3DDouble enormal;
+		enormal.p[0] = n[0];
+		enormal.p[1] = n[1];
+		enormal.p[2] = n[2];
+
+		//generate the points
+		vector<Point3DDouble> ptVecs =  GenerateEpipolarPlaneVectors(enormal, 360);
+
+		for(int i=0; i<ptVecs.size(); i++)
+		{
+			//visibility decision							
+			//from right pano to the left pano
+			double rp[3];
+			rp[0] = ptVecs[i].p[0];
+			rp[1] = ptVecs[i].p[1];
+			rp[2] = ptVecs[i].p[2];
+
+			double ct[3];
+			mult(iR, rp, ct, 3, 3, 1);
+
+			Point3DDouble rightBundleDir;
+			rightBundleDir.p[0] = ct[0];
+			rightBundleDir.p[1] = ct[1];
+			rightBundleDir.p[2] = ct[2];				
+
+			double angle1,angle2,angle3;
+			angle1 = angleOfVector(baselineDir,   leftBundleDir);
+			angle2 = angleOfVector(baselineDir,   rightBundleDir);
+			angle3 = angleOfVector(leftBundleDir, rightBundleDir);
+			
+			if( fabs(angle1-angle2-angle3)>5 )
+				continue;
+			
+			radius = (double)(m_pRight->width) / (2*PI);
+			double ix,iy;
+			GrdToSphere_center(ptVecs[i].p[0], ptVecs[i].p[1], ptVecs[i].p[2], radius, ix, iy);
+			Point2DDouble ip;
+			ip.p[0] = ix+wd*0.5;
+			ip.p[1] = ht*0.5-iy;
+			epts.push_back(ip);
+		}
+	}
+
+	//order
+	for(int j=0; j<epts.size(); j++)
+		for(int i=j+1; i<epts.size(); i++)
+		{
+			if(epts[j].p[0]>epts[i].p[0])
+			{
+				Point2DDouble tp;
+				tp = epts[j];
+				epts[j]=epts[i];
+				epts[i]=tp;
+			}
+		}
+
 
 	return 0;
 }

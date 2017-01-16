@@ -988,6 +988,8 @@ int CSiftMatch::Match(ImgFeature& lImage, ImgFeature& rImage, PairMatchRes& pair
 		pairMatch.matchs = rightMatch;
 	}*/
 
+
+	//remove outliers based on Fundamental matrix
 	if(1)
 	{
 		vector<Point2DDouble> lpts;

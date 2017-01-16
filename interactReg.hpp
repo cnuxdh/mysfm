@@ -34,6 +34,7 @@ public:
 	virtual int Init(char* pLeftFile, char* pRightFile){return 0;}
 	virtual int Init(IplImage* pLeft, IplImage* pRight, CameraPara leftCam, CameraPara rightCam){return 0;}
 	virtual int PtReg(Point2DDouble srcPt, Point2DDouble& dstPt, int nImageIndex){return 0;}
+	virtual int GetEpipolarLinePts(Point2DDouble srcPt, int nImageIndex, vector<Point2DDouble>& epts){return 0;}
 };
 
 
@@ -47,6 +48,7 @@ public:
 	int Init(char* pLeftFile, char* pRightFile);
 	int Init(IplImage* pLeft, IplImage* pRight, CameraPara leftCam, CameraPara rightCam){return 0;}
 	int PtReg(Point2DDouble srcPt, Point2DDouble& dstPt, int nImageIndex);
+	int GetEpipolarLinePts(Point2DDouble srcPt, int nImageIndex, vector<Point2DDouble>& epts){return 0;}
 
 private:
 
@@ -76,6 +78,7 @@ public:
 	int Init(char* pLeftFile, char* pRightFile);
 	int Init(IplImage* pLeft, IplImage* pRight, CameraPara leftCam, CameraPara rightCam){return 0;}
 	int PtReg(Point2DDouble srcPt, Point2DDouble& dstPt, int nImageIndex);
+	int GetEpipolarLinePts(Point2DDouble srcPt, int nImageIndex, vector<Point2DDouble>& epts){return 0;}
 
 private:
 
@@ -112,6 +115,7 @@ public:
 	int Init(char* pLeftFile, char* pRightFile);
 	int Init(IplImage* pLeft, IplImage* pRight, CameraPara leftCam, CameraPara rightCam);
 	int PtReg(Point2DDouble srcPt, Point2DDouble& dstPt, int nImageIndex);
+	int GetEpipolarLinePts(Point2DDouble srcPt, int nImageIndex, vector<Point2DDouble>& epts);
 
 private:
 

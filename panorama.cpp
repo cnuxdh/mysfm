@@ -16,10 +16,18 @@
 //corelib
 #include "corelib/matrix.h"
 
+#include "CommonFuncs.h"
 
 
 //matrix lib
 //#include "matrix/matrix.h"
+
+
+#include "funcs.hpp"
+#include "sift.hpp"
+#include "relativepose.hpp"
+
+
 
 /*
   generate perspective image of one direction
@@ -128,8 +136,12 @@ IplImage*  PanoToPlane(IplImage* panoImage,double* direction, double vangle, dou
 	return planeImage;
 }
 
+/*
 
+outputs:
+	pR:  from spherical 3D to image 3D
 
+*/
 IplImage*  PanoToPlane(IplImage* panoImage, double  vangle, double hangle, 
 	double* direction, double focalLenRatio, 
 	double& focalLen, int& outHt, int& outWd, double* pR)
@@ -169,13 +181,13 @@ IplImage*  PanoToPlane(IplImage* panoImage, double  vangle, double hangle,
 	//calculate the projection plane size
 	double radianAngle = 1.0 / 180.0 * PI;
 	double projFocus = radius*focalLenRatio;    //radius*0.8; 
-	printf("focal length: %.4lf \n", radius);
-	printf("proj focus:   %.4lf \n", projFocus);
+	//printf("focal length: %.4lf \n", radius);
+	//printf("proj focus:   %.4lf \n", projFocus);
 
 	int projHt = projFocus*tan(vangle*radianAngle*0.5)*2;
 	int projWd = projFocus*tan(hangle*radianAngle*0.5)*2;
 	
-	printf("proj width:%d   height:%d \n", projWd, projHt);
+	//printf("proj width:%d   height:%d \n", projWd, projHt);
 
 	//image re-projection
 	int nBand = panoImage->nChannels;
@@ -205,8 +217,10 @@ IplImage*  PanoToPlane(IplImage* panoImage, double  vangle, double hangle,
 
 			//for sphere 3D to panorama image space
 			double ix, iy;
-			GrdToSphere( rg[0], rg[1], rg[2], radius, ix, iy);	
+			GrdToSphere_center( rg[0], rg[1], rg[2], radius, ix, iy);	
 			//printf("%lf %lf \n", ix, iy);
+			ix = ix + wd*0.5;
+			iy = ht*0.5 - iy;
 
 			if(ix>=wd) ix=wd-1;
 			if(iy>=ht) iy=ht-1;
@@ -266,7 +280,7 @@ int PanoToPlanes(IplImage* panoImage, double anglestep,
 		direction[2] = -cos(lat);           //z
 
 
-		printf("direction: %lf %lf %lf \n", direction[0], direction[1], direction[2]);
+		//printf("direction: %lf %lf %lf \n", direction[0], direction[1], direction[2]);
 
 		double Rp[9]; //rotation matrix for plane 
 		//generate the plane projection image and save it
@@ -275,14 +289,14 @@ int PanoToPlanes(IplImage* panoImage, double anglestep,
 		IplImage* planeImage = PanoToPlane( panoImage, vangle, hangle, direction, fratio, 
 			focalLen, outHt, outWd, Rp);
 
-		for(int kj=0; kj<3; kj++)
+		/*for(int kj=0; kj<3; kj++)
 		{
 			for(int ki=0; ki<3; ki++)
 			{
 				printf("%6.4lf ", Rp[kj*3+ki]);
 			}
 			printf("\n");
-		}
+		}*/
 
 		projImages.push_back(planeImage);
 
@@ -1463,6 +1477,198 @@ DLL_EXPORT int SphereToCilinder(char* infile, char* outfile)
 
 	cvReleaseImage(&inputImage);
 	cvReleaseImage(&outImage);
+
+	return 0;
+}
+
+
+
+
+CIntegratedPanoMatch::CIntegratedPanoMatch()
+{
+	m_IsEssentialMatrixReady = false;
+}
+
+CIntegratedPanoMatch::~CIntegratedPanoMatch()
+{
+
+}
+
+int CIntegratedPanoMatch::InitEpipolarConstraint(CameraPara left, CameraPara right )
+{	
+	//calculate the relative pose according to the POS
+	m_leftPanoCam = left;
+	m_rightPanoCam = right;
+	CalculateEssentialMatrix(m_leftPanoCam.R, m_leftPanoCam.t, 
+		m_rightPanoCam.R, m_rightPanoCam.t, 
+		m_leftPanoCam.bIsExplicit, 
+		m_R, m_T, m_EM);
+	
+	m_IsEssentialMatrixReady = true;
+	return 1;
+}
+
+int CIntegratedPanoMatch::Match(IplImage* pLeftImage, IplImage* pRightImage, vector<ImagePair>& matches)
+{
+	/*
+	//if we do not know the relative pose between two images
+	if(!m_IsEssentialMatrixReady)
+	{
+		IplImage* pLeftSmall  = ResizeImage(pLeftImage,  PANORAMA_HT_SMALL);
+		IplImage* pRightSmall = ResizeImage(pLeftImage,  PANORAMA_HT_SMALL);
+
+		//relative pose estimation directly using panorama
+		CFeatureBase* pFeatDetect = new CSIFTFloat();
+		ImgFeature lFeats;
+		pFeatDetect->Detect(pLeftSmall, lFeats);
+		ImgFeature rFeats;
+		pFeatDetect->Detect(pLeftSmall,rFeats);
+		delete pFeatDetect;
+		cvReleaseImage(&pLeftSmall);
+		cvReleaseImage(&pRightSmall);
+
+		CMatchBase* pMatch = new CPanoMatch();
+		PairMatchRes mr;
+		pMatch->Match(lFeats, rFeats, mr);
+		int matchNum = mr.matchs.size();
+		vector<Point2DDouble> lpts,rpts;
+		lpts.resize(matchNum);
+		rpts.resize(matchNum);
+		for(int i=0; i<matchNum; i++)
+		{
+			int li = mr.matchs[i].l;
+			int ri = mr.matchs[i].r;
+			//default origin of feature point is at the center of image
+			lpts[i] = lFeats.GetCenteredPt(li);
+			rpts[i] = rFeats.GetCenteredPt(ri);
+		}
+		delete pMatch;
+
+		//relative pose estimation
+		CRelativePoseBase* pRP = new CEstimatePose5PointPano();
+		m_leftPanoCam.rows  = pLeftSmall->height;
+		m_leftPanoCam.cols  = pLeftSmall->width;
+		m_rightPanoCam.rows = pRightSmall->height;
+		m_rightPanoCam.cols = pRightSmall->width;
+		pRP->EstimatePose(lpts, rpts, m_leftPanoCam, m_rightPanoCam );  
+		delete pRP;
+	}
+	*/
+		
+	//resize the image
+	IplImage* resizeLeft = NULL;
+	IplImage* resizeRight = NULL;
+	ResizeImage(pLeftImage,  PANORAMA_HT);
+	ResizeImage(pRightImage, PANORAMA_HT);
+
+
+	//split the panorama image into several perspective images 
+	double R[9] = {1,0,0,0,1,0,0,0,1};
+	double T[3] = {0,0,0};
+	vector<IplImage*>  lProjImages;
+	vector<CameraPara> lCamParas;
+	PanoToPlanes(resizeLeft,  60, 90, 90, 1, R, T, lProjImages, lCamParas);
+	vector<IplImage*>  rProjImages;
+	vector<CameraPara> rCamParas;
+	PanoToPlanes(resizeRight, 60, 90, 90, 1, R, T, rProjImages, rCamParas);
+
+
+	//detect feature points
+	CFeatureBase* pFeatDetect = new CSIFTFloat();
+	vector<ImgFeature> lImageFeats;
+	lImageFeats.resize(lProjImages.size());
+	for(int i=0; i<lProjImages.size(); i++)
+	{
+		pFeatDetect->Detect(lProjImages[i], lImageFeats[i]);
+	} 
+	vector<ImgFeature> rImageFeats;
+	lImageFeats.resize(rProjImages.size());
+	for(int i=0; i<rProjImages.size(); i++)
+	{
+		pFeatDetect->Detect(rProjImages[i], rImageFeats[i]);
+	} 
+	
+	//matching one by one between left and right perspective images
+
+	for(int j=0; j<lImageFeats.size(); j++)
+	{
+		double zaxis[3] = {0, 0, -1};
+		double Rl[9];
+		memcpy(Rl, lCamParas[j].R, sizeof(double)*9);
+		invers_matrix(Rl, 3);
+		double imageDirLeft[3];
+		mult(Rl, zaxis, imageDirLeft, 3, 3, 1);
+		Point3DDouble lp;
+		lp.p[0] = imageDirLeft[0];
+		lp.p[1] = imageDirLeft[1];
+		lp.p[2] = imageDirLeft[2];
+
+		int bestIndex = 0;
+		int minAngle = 180;
+		for(int i=0; i<rImageFeats.size(); i++)
+		{
+			double Rr[9];
+			memcpy(Rr, rCamParas[i].R, sizeof(double)*9);
+			invers_matrix(Rr, 3);
+			double imageDirRight[3];
+			mult(Rr, zaxis, imageDirRight, 3, 3, 1);
+			Point3DDouble rp;
+			rp.p[0] = imageDirRight[0];
+			rp.p[1] = imageDirRight[1];
+			rp.p[2] = imageDirRight[2];
+
+			//calculate the included angle
+			double angle = angleOfVector(lp, rp);
+					
+			if(angle<minAngle)
+			{
+				minAngle = angle;
+				bestIndex = i;
+			}
+		}
+
+		/*
+		//matching
+		CMatchBase* pMatch = new CPanoMatch();
+		PairMatchRes mr;
+		pMatch->Match(lImageFeats[j], rImageFeats[i], mr);
+		int matchNum = mr.matchs.size();
+		vector<Point2DDouble> lpts,rpts;
+		lpts.resize(matchNum);
+		rpts.resize(matchNum);
+		for(int i=0; i<matchNum; i++)
+		{
+			int li = mr.matchs[i].l;
+			int ri = mr.matchs[i].r;
+			//default origin of feature point is at the center of image
+			lpts[i] = lFeats.GetCenteredPt(li);
+			rpts[i] = rFeats.GetCenteredPt(ri);
+		}
+		delete pMatch;
+		*/
+	}
+
+	
+	
+
+	return 0;
+}
+
+
+int CIntegratedPanoMatch::Match(IplImage* pLeftImage, IplImage* pRightImage, 
+	CameraPara left, CameraPara right, vector<ImagePair>& matches)
+{
+	//construct the relative pose using POS data
+	m_leftPanoCam = left;
+	m_rightPanoCam = right;
+	CalculateEssentialMatrix(m_leftPanoCam.R, m_leftPanoCam.t, 
+		m_rightPanoCam.R, m_rightPanoCam.t, 
+		m_leftPanoCam.bIsExplicit, 
+		m_R, m_T, m_EM);
+	
+	//
+
+
 
 	return 0;
 }

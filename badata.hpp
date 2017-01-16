@@ -38,6 +38,12 @@ public:
 	//
 	void SetImageDimension(int height, int width){ ht=height; wd=width; }
 	
+	int  AddFeatPt( stPtFeature fp ){ featPts.push_back(fp); return 0; }
+
+	int  Clear(){ featPts.clear(); return 0;}
+
+	stPtFeature GetFeatPt(int i){return featPts[i];}
+
 public:
 	int id;
 	int ht,wd;

@@ -11,6 +11,13 @@ using namespace std;
 #define PI 3.1415926
 #define MINIMAL_VALUE 0.000001
 
+//for panorama resize
+#define PANORAMA_HT 1024
+#define PANORAMA_HT_SMALL 256
+
+//for sift detection
+#define DETECT_IMAGE_HT 640
+
 
 typedef enum
 {

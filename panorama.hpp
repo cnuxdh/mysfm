@@ -107,9 +107,6 @@ DLL_EXPORT int PanoToPlanes(IplImage* panoImage, double anglestep,
 	vector<CameraPara>& camParas);
 
 
-
-
-
 /* relative pose estimation for spherical panoramic images, based on 5-point algorithm, 
    written by xdh, 2015.7.8
 input:
@@ -150,6 +147,47 @@ DLL_EXPORT int GeneratePanoEpipolarImageHeading(double* R, double* T, IplImage* 
 
 
 DLL_EXPORT vector<Point3DDouble> GenerateEpipolarPlaneVectors(Point3DDouble normal,int num);
+
+
+
+
+
+/*
+class for panorama matching specialy: 
+including re-projection, feature points detection, matching, and error removal
+*/
+class CIntegratedPanoMatch
+{
+public:
+	CIntegratedPanoMatch();
+	~CIntegratedPanoMatch();
+
+	// initialize the Essential Matrix using POS information
+	int InitEpipolarConstraint(CameraPara left, CameraPara right );
+	
+	//for occasions without POS
+	int Match(IplImage* pLeftImage, IplImage* pRightImage, vector<ImagePair>& matches);
+
+	//given POS is right
+	int Match(IplImage* pLeftImage, IplImage* pRightImage, CameraPara left, CameraPara right, vector<ImagePair>& matches);
+
+private:
+
+	//essential matrix for panorama pairs
+	double m_EM[9];
+	double m_R[9];
+	double m_T[3];
+
+	//if the essential matrix has been calculated
+	bool   m_IsEssentialMatrixReady;
+
+	//
+	CameraPara m_leftPanoCam, m_rightPanoCam;
+};
+
+
+
+
 
 
 #endif

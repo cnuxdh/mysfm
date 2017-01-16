@@ -1,9 +1,67 @@
 
 #include "funcs.hpp"
 #include "pos.hpp"
+#include "badata.hpp"
+
 
 //corelib
 #include "CalcAngle.h"
+
+//resize the image whose height is less than maxHt
+IplImage* ResizeImage(IplImage* src, int maxHt)
+{
+	IplImage* dst = NULL;
+
+	if(src->height > maxHt)
+	{
+		int resizeHt = maxHt;
+		int resizeWd = (double)(maxHt) / (double)(src->height) * src->width;
+		int nChannels = src->nChannels;
+		
+		dst = cvCreateImage(cvSize(resizeWd, resizeHt), 8, nChannels);
+		cvResize(src, dst);
+	}
+	else
+	{
+		dst = cvCloneImage(src);
+	}
+
+	return dst;
+}
+
+
+/*
+inputs:
+	T:           the vector connect the left camera center and right camera center
+	leftLight:   the light of left point
+	maxDistance: the maximal depth (m)
+	minDistacne: the minimal depth (m)
+outputs:
+	rightLightBottom, rightLightTop: the view field of right camera to the input left light
+*/
+int CalculateViewField(Point3DDouble T, Point3DDouble leftLight, 
+					   double maxDistance,  double minDistance,
+					   Point3DDouble& rightLightBottom, Point3DDouble& rightLightTop )
+{
+
+	double nl = norm(leftLight);
+	leftLight.p[0] /= nl;
+	leftLight.p[1] /= nl;
+	leftLight.p[2] /= nl;
+	
+	//double minAngle = 15; //minimal degree with the baseline
+	double camDis = norm(T);
+	//double minDis = tan(minAngle/180.0*PI)*camDis;
+
+	for(int i=0; i<3; i++)
+	{
+		rightLightBottom.p[i] = minDistance*leftLight.p[i] + T.p[i];
+		rightLightTop.p[i]    = maxDistance*leftLight.p[i] + T.p[i];
+	}
+	
+	return 0;
+}
+
 
 
 int   InitCamera(CameraPara& cam, POSInfo pos)
@@ -167,6 +225,22 @@ int DrawMatches(char* filename, IplImage* pLeft, IplImage* pRight, vector<Point2
 }
 
 
+int DrawFeatPt(ImgFeature& featpts, IplImage* pImage)
+{
+	
+	int numpt = featpts.GetFeatPtSum();
+	for(int i=0; i<numpt; i++)
+	{
+		Point2DDouble pt = featpts.GetTopLeftPt(i);
+		CvPoint ip;
+		ip.x = pt.p[0];
+		ip.y = pt.p[1];
+
+		cvDrawCircle(pImage, ip, 1, CV_RGB(255,0,0), 2);
+	}
+
+	return 0;
+}
 
 
 
