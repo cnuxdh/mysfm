@@ -114,9 +114,14 @@ public:
 
 	int Init(char* pLeftFile, char* pRightFile);
 	int Init(IplImage* pLeft, IplImage* pRight, CameraPara leftCam, CameraPara rightCam);
-	int PtReg(Point2DDouble srcPt, Point2DDouble& dstPt, int nImageIndex);
-	int GetEpipolarLinePts(Point2DDouble srcPt, int nImageIndex, vector<Point2DDouble>& epts);
 
+	int GroundPointReg(Point2DDouble leftPt, Point2DDouble& rightPt);
+	int GetEpipolarLinePts(Point2DDouble srcPt, int nImageIndex, vector<Point2DDouble>& epts);
+	int MatchingPoint(Point2DDouble leftPt, Point2DDouble& rightPt);
+
+	int PtReg(Point2DDouble srcPt, Point2DDouble& dstPt, int nImageIndex);
+
+	
 private:
 
 	//for panorama images

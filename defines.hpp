@@ -54,6 +54,7 @@ typedef struct stPoint2DDouble
 {
 	double p[2];
 	double x,y;
+	int    nType;  //0-ground point, 1-other point
 } Point2DDouble;
 
 /* 3D vector of doubles */
@@ -165,6 +166,7 @@ typedef struct stCameraPara
 	int    rows,cols;    //the size of image in pixels
 	CameraType camtype;  //camera type
 	bool   bIsExplicit;  //true: RX - T, false: RX + T
+	double camRelativeHei; //the height from camera center to the ground
 }CameraPara;
 
 

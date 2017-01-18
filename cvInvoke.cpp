@@ -12,6 +12,7 @@
 //corelib
 #include"commonfile.h"
 
+#include "baselib.h"
 
 
 // function for feature detection of multiple images, for input files
@@ -213,4 +214,18 @@ int dll_DLT(vector<Point3DDouble>& grds, vector<Point2DDouble>& projs,
 	}
 
 	return res;
+}
+
+
+DLL_EXPORT double dll_CalculatePanoEpipolarError(double* em, Point3DDouble lp, Point3DDouble rp, double radius)
+{
+	double error = 0;
+
+	v3_t vl,vr;
+	vl.p[0] = lp.p[0];	vl.p[1] = lp.p[1];	vl.p[2] = lp.p[2];
+	vr.p[0] = rp.p[0];	vr.p[1] = rp.p[1];	vr.p[2] = rp.p[2];
+	
+	error = dll_fmatrix_compute_residual_pano(em, vl, vr, radius);
+
+	return error;
 }

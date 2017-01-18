@@ -31,6 +31,9 @@ DLL_EXPORT int dll_EstimatePose5Point_Pano( vector<Point3DDouble>& pl,
 									double *R, double *t, vector<double>& residual);
 
 
+DLL_EXPORT double dll_CalculatePanoEpipolarError(double* em, Point3DDouble lp, Point3DDouble rp, double radius);
+
+
 
 //interface for relative pose estimation
 DLL_EXPORT int dll_EstimatePose( vector<Point2DDouble> lPts, vector<Point2DDouble> rPts,

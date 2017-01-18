@@ -663,6 +663,192 @@ int CIPanoRegDirect::Init(IplImage* pLeft, IplImage* pRight, CameraPara leftCam,
 	
 	//generate depth image
 
+	return 0;
+}
+
+int CIPanoRegDirect::MatchingPoint(Point2DDouble srcPt, Point2DDouble& dstPt)
+{
+	int ht = m_pLeft->height;
+	int wd = m_pLeft->width;
+	double cx = srcPt.p[0] - wd*0.5;
+	double cy = ht*0.5 - srcPt.p[1];
+
+	//from pano 2D to sphere 3D 
+	double radius = (double)(m_pLeft->width) / (2*PI);
+	double lp[3];
+	SphereTo3D_center(cx, cy, radius, lp[0], lp[1], lp[2]);
+
+	//generate perspective image
+	IplImage* lPtPlane = PanoToPlane(m_pLeft, lp, 12, 12);
+	cvSaveImage("c:\\temp\\left_pt_plane.jpg", lPtPlane);
+	vector<double> lHist;
+	//CalculateColorHist(lPtPlane, 8, lHist);
+	CalculateHOG(lPtPlane, lHist);
+	cvReleaseImage(&lPtPlane);
+	
+	Point3DDouble leftBundleDir;
+	leftBundleDir.p[0] = lp[0];
+	leftBundleDir.p[1] = lp[1];
+	leftBundleDir.p[2] = lp[2];
+
+	double lt[3];
+	double iR[9];
+	memcpy(iR, m_R, sizeof(double)*9);
+	invers_matrix(iR, 3);
+	mult(iR, m_T, lt, 3, 3, 1);
+	Point3DDouble baselineDir;
+	baselineDir.p[0] = lt[0];
+	baselineDir.p[1] = lt[1];
+	baselineDir.p[2] = lt[2];
+	//baselineDir.p[0] = m_leftPanoCam.t[0] - m_rightPanoCam.t[0];
+	//baselineDir.p[1] = m_leftPanoCam.t[1] - m_rightPanoCam.t[1];
+	//baselineDir.p[2] = m_leftPanoCam.t[2] - m_rightPanoCam.t[2];
+	//printf("baseline : %lf %lf %lf \n", baselineDir.p[0], baselineDir.p[1], baselineDir.p[2]);
+
+	//calculate the epipolar normal
+	double n[3];
+	mult(m_EM, lp, n, 3, 3, 1);
+	Point3DDouble enormal;
+	enormal.p[0] = n[0];
+	enormal.p[1] = n[1];
+	enormal.p[2] = n[2];
+
+	//generate the epipolar points
+	vector<Point3DDouble> ptVecs =  GenerateEpipolarPlaneVectors(enormal, 360);
+
+
+	//double rPanoR[9];
+	//memcpy(rPanoR, m_R, sizeof(double)*9);
+	//invers_matrix(rPanoR, 3);
+
+	radius = (double)(m_pRight->width) / (2*PI);
+	IplImage* pDisp = cvCloneImage(m_pRight);
+	double minDif = 100000000;
+	double maxSim = -100000000;
+	int    nIndex = 0;
+	vector<double> vecSim;
+	for(int i=0; i<ptVecs.size(); i++)
+	{
+		//visibility decision							
+		//from right pano to the left pano
+		double rp[3];
+		rp[0] = ptVecs[i].p[0];
+		rp[1] = ptVecs[i].p[1];
+		rp[2] = ptVecs[i].p[2];
+
+		double ct[3];
+		mult(iR, rp, ct, 3, 3, 1);
+
+		Point3DDouble rightBundleDir;
+		rightBundleDir.p[0] = ct[0];
+		rightBundleDir.p[1] = ct[1];
+		rightBundleDir.p[2] = ct[2];				
+
+		//printf("%lf %lf %lf \n", )
+
+		Point3DDouble rightTop,rightBottom;
+		CalculateViewField(baselineDir, leftBundleDir, 100, 2, rightBottom, rightTop);
+
+		double angle1,angle2,angle3;
+		if(0)
+		{
+			angle1 = angleOfVector(baselineDir,   leftBundleDir);
+			angle2 = angleOfVector(baselineDir,   rightBundleDir);
+			angle3 = angleOfVector(leftBundleDir, rightBundleDir);
+			//printf("%lf %lf %lf  %lf \n", angle1, angle2, angle3, angle1-angle2-angle3);
+		}
+		else
+		{
+			angle1 = angleOfVector(rightBottom,   rightTop);
+			angle2 = angleOfVector(rightBottom,   rightBundleDir);
+			angle3 = angleOfVector(rightTop,      rightBundleDir);
+		}
+
+		double ix,iy;
+		GrdToSphere_center(ptVecs[i].p[0], ptVecs[i].p[1], ptVecs[i].p[2], radius, ix, iy);
+		CvPoint ip;
+		ip.x = ix+wd*0.5;
+		ip.y = ht*0.5-iy;
+		cvDrawCircle(pDisp, ip, 1, CV_RGB(255,0,0), 2);
+
+
+		if( fabs(angle1-angle2-angle3)>5 )
+			continue;
+
+		cvDrawCircle(pDisp, ip, 1, CV_RGB(0,255,0), 2);
+
+		//
+		IplImage* rPtPlane = PanoToPlane(m_pRight, rp, 12, 12);
+		//cvSaveImage("c:\\temp\\left_pt_plane.jpg", lPtPlane);
+		vector<double> rHist;
+		//CalculateColorHist(rPtPlane, 8, rHist);
+		CalculateHOG(rPtPlane, rHist);
+
+
+		//calculate the similarity
+		double sim = Cov(lHist, rHist);
+		vecSim.push_back(sim);
+
+		if(0)
+		{
+			char filename[256];
+			sprintf(filename, "c:\\temp\\patch_%d.jpg", vecSim.size());
+			cvSaveImage(filename, rPtPlane);
+		}
+
+		/*
+		for(int ki=0; ki<lHist.size(); ki++)
+		{
+		sim += fabs( lHist[ki]-rHist[ki] );
+		}
+		if(sim<minDif)
+		{
+		minDif = sim;
+		dstPt.p[0] = ip.x;
+		dstPt.p[1] = ip.y;
+		//cvSaveImage("c:\\temp\\dstPtImg.jpg", rPtPlane);
+		}
+		*/
+		if(sim>maxSim)
+		{
+			maxSim = sim;
+			dstPt.p[0] = ip.x;
+			dstPt.p[1] = ip.y;
+			nIndex = vecSim.size();
+
+			if(1)
+			{
+				cvSaveImage("c:\\temp\\dstPtImg.jpg", rPtPlane);
+			}
+		}
+
+		cvReleaseImage(&rPtPlane);
+
+
+		/*
+		GrdToSphere_center(ptVecs[i+1].p[0], ptVecs[i+1].p[1], ptVecs[i+1].p[2], radius, ix, iy);
+		CvPoint ip2;
+		ip2.x = ix+wd*0.5;
+		ip2.y = ht*0.5-iy;
+		//cvDrawCircle(pDisp, ip, 1, CV_RGB(255,0,0), 1);
+		cvLine(pDisp, ip1, ip2, CV_RGB(0,255,0),1);
+		*/
+	}
+
+	if(1)
+	{
+		FILE* fp = fopen("c:\\temp\\sim.txt", "w");
+		for(int k=0; k<vecSim.size(); k++)
+		{
+			fprintf(fp, "%lf \n", vecSim[k]);
+		}
+		fclose(fp);
+	}
+
+	printf("best: %d \n", nIndex);
+
+	cvSaveImage("c:\\temp\\epipolarLine.jpg", pDisp);
+	cvReleaseImage(&pDisp);
 
 	return 0;
 }
@@ -685,179 +871,15 @@ int CIPanoRegDirect::PtReg(Point2DDouble srcPt, Point2DDouble& dstPt, int nImage
 		SphereTo3D_center(cx, cy, radius, lp[0], lp[1], lp[2]);
 		//printf("left bundle: %lf %lf %lf \n", lp[0], lp[1], lp[2]);
 
-		//generate perspective image
-		IplImage* lPtPlane = PanoToPlane(m_pLeft, lp, 12, 12);
-		cvSaveImage("c:\\temp\\left_pt_plane.jpg", lPtPlane);
-		vector<double> lHist;
-		//CalculateColorHist(lPtPlane, 8, lHist);
-		CalculateHOG(lPtPlane, lHist);
 
-		cvReleaseImage(&lPtPlane);
-		
-
-		Point3DDouble leftBundleDir;
-		leftBundleDir.p[0] = lp[0];
-		leftBundleDir.p[1] = lp[1];
-		leftBundleDir.p[2] = lp[2];
-
-		double lt[3];
-		double iR[9];
-		memcpy(iR, m_R, sizeof(double)*9);
-		invers_matrix(iR, 3);
-		mult(iR, m_T, lt, 3, 3, 1);
-		Point3DDouble baselineDir;
-		baselineDir.p[0] = lt[0];
-		baselineDir.p[1] = lt[1];
-		baselineDir.p[2] = lt[2];
-		//baselineDir.p[0] = m_leftPanoCam.t[0] - m_rightPanoCam.t[0];
-		//baselineDir.p[1] = m_leftPanoCam.t[1] - m_rightPanoCam.t[1];
-		//baselineDir.p[2] = m_leftPanoCam.t[2] - m_rightPanoCam.t[2];
-		//printf("baseline : %lf %lf %lf \n", baselineDir.p[0], baselineDir.p[1], baselineDir.p[2]);
-
-		//calculate the epipolar normal
-		mult(m_EM, lp, n, 3, 3, 1);
-		Point3DDouble enormal;
-		enormal.p[0] = n[0];
-		enormal.p[1] = n[1];
-		enormal.p[2] = n[2];
-
-		//generate the points
-		vector<Point3DDouble> ptVecs =  GenerateEpipolarPlaneVectors(enormal, 360);
-
-		if(1)
+		if(srcPt.nType == 0) //for ground point
 		{
-			//double rPanoR[9];
-			//memcpy(rPanoR, m_R, sizeof(double)*9);
-			//invers_matrix(rPanoR, 3);
+			GroundPointReg(srcPt, dstPt);
+		}
+		else
+		{
+			//calculate the distance
 
-			double radius = (double)(m_pRight->width) / (2*PI);
-			IplImage* pDisp = cvCloneImage(m_pRight);
-			double minDif = 100000000;
-			double maxSim = -100000000;
-			int    nIndex = 0;
-			vector<double> vecSim;
-			for(int i=0; i<ptVecs.size(); i++)
-			{
-				//visibility decision							
-				//from right pano to the left pano
-				double rp[3];
-				rp[0] = ptVecs[i].p[0];
-				rp[1] = ptVecs[i].p[1];
-				rp[2] = ptVecs[i].p[2];
-				
-				double ct[3];
-				mult(iR, rp, ct, 3, 3, 1);
-				
-				Point3DDouble rightBundleDir;
-				rightBundleDir.p[0] = ct[0];
-				rightBundleDir.p[1] = ct[1];
-				rightBundleDir.p[2] = ct[2];				
-				
-				//printf("%lf %lf %lf \n", )
-
-				Point3DDouble rightTop,rightBottom;
-				CalculateViewField(baselineDir, leftBundleDir, 100, 2, rightBottom, rightTop);
-
-				double angle1,angle2,angle3;
-				if(0)
-				{
-					angle1 = angleOfVector(baselineDir,   leftBundleDir);
-					angle2 = angleOfVector(baselineDir,   rightBundleDir);
-					angle3 = angleOfVector(leftBundleDir, rightBundleDir);
-				    //printf("%lf %lf %lf  %lf \n", angle1, angle2, angle3, angle1-angle2-angle3);
-				}
-				else
-				{
-					angle1 = angleOfVector(rightBottom,   rightTop);
-					angle2 = angleOfVector(rightBottom,   rightBundleDir);
-					angle3 = angleOfVector(rightTop,      rightBundleDir);
-				}
-				
-				double ix,iy;
-				GrdToSphere_center(ptVecs[i].p[0], ptVecs[i].p[1], ptVecs[i].p[2], radius, ix, iy);
-				CvPoint ip;
-				ip.x = ix+wd*0.5;
-				ip.y = ht*0.5-iy;
-				cvDrawCircle(pDisp, ip, 1, CV_RGB(255,0,0), 2);
-				
-
-				if( fabs(angle1-angle2-angle3)>5 )
-					continue;
-
-				cvDrawCircle(pDisp, ip, 1, CV_RGB(0,255,0), 2);
-				
-				//
-				IplImage* rPtPlane = PanoToPlane(m_pRight, rp, 12, 12);
-				//cvSaveImage("c:\\temp\\left_pt_plane.jpg", lPtPlane);
-				vector<double> rHist;
-				//CalculateColorHist(rPtPlane, 8, rHist);
-				CalculateHOG(rPtPlane, rHist);
-
-				
-				//calculate the similarity
-				double sim = Cov(lHist, rHist);
-				vecSim.push_back(sim);
-								
-				if(0)
-				{
-					char filename[256];
-					sprintf(filename, "c:\\temp\\patch_%d.jpg", vecSim.size());
-					cvSaveImage(filename, rPtPlane);
-				}
-
-				/*
-				for(int ki=0; ki<lHist.size(); ki++)
-				{
-					sim += fabs( lHist[ki]-rHist[ki] );
-				}
-				if(sim<minDif)
-				{
-					minDif = sim;
-					dstPt.p[0] = ip.x;
-					dstPt.p[1] = ip.y;
-					//cvSaveImage("c:\\temp\\dstPtImg.jpg", rPtPlane);
-				}
-				*/
-				if(sim>maxSim)
-				{
-					maxSim = sim;
-					dstPt.p[0] = ip.x;
-					dstPt.p[1] = ip.y;
-					nIndex = vecSim.size();
-
-					if(1)
-					{
-						cvSaveImage("c:\\temp\\dstPtImg.jpg", rPtPlane);
-					}
-				}
-
-				cvReleaseImage(&rPtPlane);
-				
-
-				/*
-				GrdToSphere_center(ptVecs[i+1].p[0], ptVecs[i+1].p[1], ptVecs[i+1].p[2], radius, ix, iy);
-				CvPoint ip2;
-				ip2.x = ix+wd*0.5;
-				ip2.y = ht*0.5-iy;
-				//cvDrawCircle(pDisp, ip, 1, CV_RGB(255,0,0), 1);
-				cvLine(pDisp, ip1, ip2, CV_RGB(0,255,0),1);
-				*/
-			}
-
-			if(1)
-			{
-				FILE* fp = fopen("c:\\temp\\sim.txt", "w");
-				for(int k=0; k<vecSim.size(); k++)
-				{
-					fprintf(fp, "%lf \n", vecSim[k]);
-				}
-				fclose(fp);
-			}
-
-			printf("best: %d \n", nIndex);
-
-			cvSaveImage("c:\\temp\\epipolarLine.jpg", pDisp);
-			cvReleaseImage(&pDisp);
 		}
 	}
 
@@ -955,7 +977,63 @@ int CIPanoRegDirect::GetEpipolarLinePts(Point2DDouble srcPt, int nImageIndex, ve
 				epts[i]=tp;
 			}
 		}
+		
+	return 0;
+}
 
+/* inputs:
+		leftpt,rightpt: top-left image coordinate
+*/
+int CIPanoRegDirect::GroundPointReg(Point2DDouble leftPt, Point2DDouble& rightPt)
+{
+	int lwd = m_leftPanoCam.cols;
+	int lht = m_leftPanoCam.rows;
+	int relativeHei = m_leftPanoCam.camRelativeHei;
+
+	//calculate the angle
+	double angle = (leftPt.p[1] - lht*0.5) / (double)(lht) * PI ;
+
+	//calculate the distance
+	double distance = relativeHei / sin(angle);
+
+	//calculate the 3D coordinate of ground point
+	double sx,sy,sz;
+	double cx = leftPt.p[0] - lwd*0.5;
+	double cy = lht*0.5 - leftPt.p[1];
+	double lradius = (double)(m_leftPanoCam.cols) / (2*PI);
+	SphereTo3D_center(cx, cy, lradius, sx, sy, sz);
+	double ng = sqrt(sx*sx + sy*sy + sz*sz);
+	sx = sx / ng;
+	sy = sy / ng;
+	sz = sz / ng;
+	
+	//calculate the ground point
+	double rp[3];
+	rp[0] = sx*distance;
+	rp[1] = sy*distance;
+	rp[2] = sz*distance;
+	double lR[9];
+	memcpy(lR, m_leftPanoCam.R, sizeof(double)*9);
+	invers_matrix(lR, 3);
+	double res[3];
+	mult(lR, rp, res, 3, 3, 1);
+	double gx,gy,gz;
+	gx = m_leftPanoCam.t[0] + res[0];
+	gy = m_leftPanoCam.t[1] + res[1];
+	gz = m_leftPanoCam.t[2] + res[2];
+
+	//transform to the right camera
+	double gp[3];
+	gp[0] = gx - m_rightPanoCam.t[0];
+	gp[1] = gy - m_rightPanoCam.t[1];
+	gp[2] = gz - m_rightPanoCam.t[2];
+	mult(m_rightPanoCam.R, gp, res, 3, 3, 1);
+
+	double radius = (double)(m_rightPanoCam.cols) / (2*PI);
+	GrdToSphere_center(res[0], res[1], res[2], radius, cx, cy);
+
+	rightPt.p[0] = cx + m_rightPanoCam.cols*0.5;
+	rightPt.p[1] = m_rightPanoCam.rows*0.5 - cy;
 
 	return 0;
 }

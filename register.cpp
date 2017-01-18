@@ -696,6 +696,10 @@ int CPanoMatch::Match(ImgFeature& lImage, ImgFeature& rImage, PairMatchRes& pair
 		mid.r = pMatch[i].id2;
 		pairMatch.matchs.push_back(mid);
 	}
+
+	//
+
+
 	delete[] pMatch;
 	
 	return 1;
