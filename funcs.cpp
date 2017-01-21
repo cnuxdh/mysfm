@@ -123,6 +123,18 @@ double distanceVec(Point2DDouble p1, Point2DDouble p2)
 	return dis;
 }
 
+double distanceVec(Point3DDouble p1, Point3DDouble p2)
+{
+	double dis = 0;
+
+	double dx = p1.p[0] - p2.p[0];
+	double dy = p1.p[1] - p2.p[1];
+	double dz = p1.p[2] - p2.p[2];
+
+	dis = sqrt( dx*dx + dy*dy + dz*dz);
+
+	return dis;
+}
 double norm(Point3DDouble p)
 {
 	return sqrt( p.p[0]*p.p[0] + p.p[1]*p.p[1] + p.p[2]*p.p[2] );

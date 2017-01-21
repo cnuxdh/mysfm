@@ -106,7 +106,7 @@ int CPanoBA::BundleAdjust(int numCameras, vector<CameraPara>& cameras,
 
 
 	//2.2 triangulation
-	CTriangulateBase* pTri = new CTriangulatePano();
+	CTriangulateBase* pTri = new CTriangulateCV(); //new CTriangulatePano();
 	vector<Point3DDouble> gpts;
 	vector<double> errorarray;
 	pTri->Triangulate(lpts, rpts, cameras[leftImageId], cameras[rightImageId], gpts, errorarray);
@@ -121,15 +121,17 @@ int CPanoBA::BundleAdjust(int numCameras, vector<CameraPara>& cameras,
 		trackSeq[i].grd = gpts[i];
 		trackSeq[i].derror = errorarray[i];
 	}
+	SaveTracksToPly("c:\\temp\\pair-raw.ply", trackSeq, cameraIDOrder, cameras);
 	
 
 	RemoveOutlierPts(tracks, trackSeq, imageFeatures, cameraIDOrder, cameras);
   
-	SaveTracksToPly("c:\\temp\\pair-raw.ply", trackSeq, cameraIDOrder, cameras);
+	SaveTracksToPly("c:\\temp\\pair-raw-inliers.ply", trackSeq, cameraIDOrder, cameras);
 
 	RunBA(trackSeq, imageFeatures, cameraIDOrder, cameras);
 
 	RemoveOutlierPts(tracks, trackSeq, imageFeatures, cameraIDOrder, cameras);
+	//int num_pruned = RemoveBadPoints(trackSeq, imageFeatures, cameras);
 
 	SaveTracksToPly("c:\\temp\\pair.ply", trackSeq, cameraIDOrder, cameras);
 

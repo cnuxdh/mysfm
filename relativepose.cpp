@@ -679,6 +679,7 @@ int CEstimatePose5PointPano::EstimatePose( vector<Point2DDouble>& lPts, vector<P
 	residual.resize(pl.size());
 	EstimatePose5Point_Pano(pl, pr, radius, num_trials, threshold, R, t, residual);
 
+	/*
 	//remove the outliers
 	double epipolarThreshold = wd*0.005;
 	vector<Point2DDouble> inlierLeftPts, inlierRightPts;
@@ -692,6 +693,7 @@ int CEstimatePose5PointPano::EstimatePose( vector<Point2DDouble>& lPts, vector<P
 	}
 	lPts = inlierLeftPts;
 	rPts = inlierRightPts;
+	*/
 
 	//rotation matrix
 	for(int i=0; i<9; i++)
@@ -719,9 +721,12 @@ int CEstimatePose5PointPano::EstimatePose( vector<Point2DDouble>& lPts, vector<P
 	double ea[3];
 	rot2eular(R, ea);
 	cam1.ax = cam1.ay = cam1.az = 0;
+	cam1.bIsExplicit = m_bIsExplicit;
+
 	cam2.ax = ea[0];
 	cam2.ay = ea[1];
 	cam2.az = ea[2];
+	cam2.bIsExplicit = m_bIsExplicit;
 
 	printf("relative pose eular angle: %lf %lf %lf \n", ea[0], ea[1], ea[2]);
 	printf("relative pose translation: %lf %lf %lf \n", cam2.t[0], cam2.t[1], cam2.t[2]);

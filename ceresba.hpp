@@ -192,7 +192,7 @@ struct SFMPanoReprojectionError
 		p[2] += t[2];
 			
 		T dx,dy;
-		GrdToPanoImage(p[0], p[1], p[2], T(radius), dx, dy);
+		GrdToPanoImageCenter(p[0], p[1], p[2], T(radius), dx, dy);
 		
 		residuals[0] = dx - T(observed_x);
 		residuals[1] = dy - T(observed_y);
@@ -250,7 +250,7 @@ struct RefinePanoCameraError
 		p[2] += t[2];
 
 		T dx,dy;
-		GrdToPanoImage(p[0], p[1], p[2], T(radius), dx, dy);
+		GrdToPanoImageCenter(p[0], p[1], p[2], T(radius), dx, dy);
 			
 		residuals[0] = dx - T(observed_x);
 		residuals[1] = dy - T(observed_y);
@@ -432,7 +432,8 @@ struct RefineCameraFixedFocalLen
 };
 
 
-
+int RemoveBadPoints(vector<TrackInfo>& trackSeq, 
+	vector<ImgFeature>& imageFeatures, vector<CameraPara>& cameras );
 
 //bundle adjustment for multiple cameras
 int CeresBA( vector<TrackInfo> trackSeq, vector<ImgFeature> imageFeatures, vector<CameraPara> &cameras);

@@ -2,6 +2,7 @@
 #include "defines.hpp"
 #include "bundlerio.hpp"
 #include "badata.hpp"
+#include "funcs.hpp"
 
 
 //matrix
@@ -32,10 +33,26 @@ int SaveTracksToPly(char* filepath, vector<TrackInfo>& trackSeq,
 		double gx = trackSeq[i].grd.p[0];
 		double gy = trackSeq[i].grd.p[1];
 		double gz = trackSeq[i].grd.p[2];
-		double distance = sqrt(gx*gx+gy*gy+gz*gz);
 
-		//if(distance>30)
-		//	continue;
+		//calculate the maximal distance between the 3D point and camera center
+		double maxDis = 0;
+		for(int k=0; k<cameraIDOrder.size(); k++)
+		{
+			int id = cameraIDOrder[k];
+
+			Point3DDouble cp;
+			cp.p[0] = cameras[id].t[0];
+			cp.p[1] = cameras[id].t[1];
+			cp.p[2] = cameras[id].t[2];
+
+			double dis = distanceVec(cp,  trackSeq[i].grd);
+			if(maxDis<dis)
+				maxDis = dis;
+		}
+
+		//remove the 3D point far away from the cameras
+		if(maxDis>50)
+			continue;
 
 		if( trackSeq[i].derror<8 )
 		{

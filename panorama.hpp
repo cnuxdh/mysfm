@@ -48,6 +48,27 @@ int GrdToPanoImage(T gx, T gy, T gz, T radius, T& ix, T& iy)
 	return 0;
 }
 
+
+template<typename T>
+int GrdToPanoImageCenter(T gx, T gy, T gz, T radius, T& ix, T& iy)
+{
+
+	T sita, fai; //sita-lontitude, fai-latitude
+
+	sita = atan2( gx, gy );
+	//sita = atan2( gy, gx );
+	//if( sita<T(0.0) ) sita += T(2.0*PI);
+
+	//fai  = atan2( sqrt(gx*gx+gy*gy), gz );
+	fai  = atan2( gz, sqrt(gx*gx+gy*gy) );
+	//if( fai<T(0.0) )  fai += T(PI);
+
+	ix = radius*sita;
+	iy = radius*fai;
+
+	return 0;
+}
+
 //for cylinder projection
 //from 3d space to cylinder projection
 int GrdToCylinder(double gx, double gy, double gz, double radius, double& ix, double& iy);

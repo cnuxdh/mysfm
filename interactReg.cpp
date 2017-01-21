@@ -56,6 +56,8 @@ int GetHistData(int x, int y, IplImage* pImage, int* hist, int nGrayStep, int bl
 			pixelValue = pixelValue/nGrayStep;
 			hist[pixelValue] ++;
 		}
+
+	return 0;
 }
 
 
