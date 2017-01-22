@@ -314,7 +314,20 @@ int RemoveOutlierPts( vector<TrackInfo>& tracks, vector<TrackInfo>& trackSeq,
 			pDist);
 		dll_median_copy(dists.size(), pDist);
 		double thresh = 1.2 * NUM_STDDEV * med;  // k * stddev
-		thresh = CLAMP(thresh, MIN_PROJ_ERROR_THRESHOLD, MAX_PROJ_ERROR_THRESHOLD);  
+
+		if(cameras[camId].camtype==PerspectiveCam)
+		{
+			thresh = CLAMP(thresh, MIN_PROJ_ERROR_THRESHOLD, MAX_PROJ_ERROR_THRESHOLD); 
+		}
+		else if(cameras[camId].camtype==PanoramCam)
+		{
+			double radius = (double)(cameras[camId].cols) / (2*PI);
+			double minT = radius*0.01;
+			double maxT = radius*0.1;
+			thresh = CLAMP(thresh, minT, maxT);
+			printf("thresh: %lf \n", thresh);
+		}
+
 		delete[] pDist;
 
 		//collect the outliers
@@ -1242,9 +1255,20 @@ int FindGoodPoints(vector<Point3DDouble>& grdPts, vector<Point2DDouble>& imgPts,
 		double err = sqrt(dx*dx+dy*dy);
 		pErrors[i] = err;
 	}
-	double med = dll_kth_element_copy(grdPts.size(), dll_iround(0.95 * grdPts.size()), pErrors);
+	double med = dll_kth_element_copy(grdPts.size(), dll_iround(0.8 * grdPts.size()), pErrors);
 	double threshold = 1.2 * NUM_STDDEV * med; 
-	threshold = CLAMP(threshold, MIN_PROJ_ERROR_THRESHOLD, MAX_PROJ_ERROR_THRESHOLD);  
+
+	if(camera.camtype == PerspectiveCam)
+	{
+		threshold = CLAMP(threshold, MIN_PROJ_ERROR_THRESHOLD, MAX_PROJ_ERROR_THRESHOLD);  
+	}
+	else if(camera.camtype == PanoramCam)
+	{
+		double radius = (double)(camera.cols) / (2*PI);
+		double minT = radius*0.01;
+		double maxT = radius*0.1;
+		threshold = CLAMP(threshold, minT, maxT);
+	}
 	
 	//find the good points
 	vector<Point3DDouble> newGrdPts;
