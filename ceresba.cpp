@@ -1220,7 +1220,7 @@ int RefineAllParameters(vector<TrackInfo>& trackSeq, vector<ImgFeature>& imageFe
 	}while(nOutliers>0);
 	
 	//remove the bad points according to the angle
-	int num_pruned = RemoveBadPoints(trackSeq, imageFeatures, cameras);
+	//int num_pruned = RemoveBadPoints(trackSeq, imageFeatures, cameras);
 
 	return nTotalOutliers;
 }

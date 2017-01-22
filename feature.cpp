@@ -8,14 +8,14 @@
 void GetResizeDimension(int srcHt, int srcWd, int& dstHt, int& dstWd)
 {
 
-	if( srcHt<DETECT_IMAGE_HT )
+	if( srcHt<dstHt )
 	{
 		dstHt = srcHt;
 		dstWd = srcWd;
 	}
 	else
 	{
-		double ratio = (double)(DETECT_IMAGE_HT) / (double)(srcHt);
+		double ratio = (double)(dstHt) / (double)(srcHt);
 		dstHt = ceil(srcHt*ratio);
 		dstWd = ceil(srcWd*ratio);
 	}

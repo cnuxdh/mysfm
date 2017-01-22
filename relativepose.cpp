@@ -1310,13 +1310,13 @@ int CPanoDLTPose::EstimatePose(vector<Point3DDouble> pt3, vector<Point2DDouble> 
 		
 		double x,y;
 
-		//from center to top-left
-		x = pt2[i].p[0] + wd*0.5;
-		y = ht*0.5 - pt2[i].p[1];
+		//center point
+		x = pt2[i].p[0]; //pt2[i].p[0] + wd*0.5;
+		y = pt2[i].p[1]; //ht*0.5 - pt2[i].p[1];
 
 		//calculate the 3D ray light 
 		double gx,gy,gz;
-		SphereTo3D(x,y,radius,gx,gy,gz);
+		SphereTo3D_center(x,y,radius,gx,gy,gz);
 		p3.p[0] = gx;
 		p3.p[1] = gy;
 		p3.p[2] = gz;
