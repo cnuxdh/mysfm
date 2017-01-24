@@ -48,6 +48,18 @@ int GrdToPanoImage(T gx, T gy, T gz, T radius, T& ix, T& iy)
 	return 0;
 }
 
+template<typename T>
+int PanoImageCenterToGrd(T ix, T iy, T radius,T& gx, T& gy, T& gz)
+{
+	T lon = ix/radius; 
+	T lat = iy/radius; 
+
+	gx = radius*sin(lon)*cos(lat);
+	gy = radius*cos(lon)*cos(lat);
+	gz = radius*sin(lat);
+
+	return 0;
+}
 
 template<typename T>
 int GrdToPanoImageCenter(T gx, T gy, T gz, T radius, T& ix, T& iy)
@@ -68,6 +80,10 @@ int GrdToPanoImageCenter(T gx, T gy, T gz, T radius, T& ix, T& iy)
 
 	return 0;
 }
+
+
+
+
 
 //for cylinder projection
 //from 3d space to cylinder projection
