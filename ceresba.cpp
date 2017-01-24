@@ -88,10 +88,13 @@ int RunBA( vector<TrackInfo>& trackSeq, vector<ImgFeature>& imageFeatures,
 
 	//generate observation points
 	int nProjection = 0;
+	int validGrdPt = 0;
 	for(int i=0; i<trackSeq.size(); i++)
 	{
 		int nview = trackSeq[i].GetImageKeySum(); //trackSeq[i].views.size();
 		nProjection += nview;
+		if(nview>0)
+			validGrdPt++;
 	}
 	vector<int> vecCamIndex;    // camera index for each projection point
 	vector<int> vecTrackIndex;  // track point index for each projection point
@@ -123,7 +126,7 @@ int RunBA( vector<TrackInfo>& trackSeq, vector<ImgFeature>& imageFeatures,
 		}
 	}
 	
-	printf("3D Points: %d   projection number: %d \n", num_pts, nProjection);
+	printf("3D Points: %d  valid points: %d  projection number: %d \n", num_pts, validGrdPt, nProjection);
 	//google::InitGoogleLogging(NULL);
 	ceres::Problem problem;
 	//invoke ceres functions, each time adding one projection
@@ -274,6 +277,8 @@ int RemoveOutlierPts( vector<TrackInfo>& tracks, vector<TrackInfo>& trackSeq,
 		int camId   = cameraIDOrder[i];
 		int nFeatPt = imageFeatures[camId].GetFeatPtSum();
 
+		double radius = (double)(cameras[camId].cols) / (2*PI);
+
 		vector<double> dists;
 		for(int k=0; k<nFeatPt; k++)
 		{
@@ -292,16 +297,29 @@ int RemoveOutlierPts( vector<TrackInfo>& tracks, vector<TrackInfo>& trackSeq,
 				continue;
 
 			Point3DDouble gp = trackSeq[nCurrentTrack].GetGround();
-			
-			Point2DDouble projPt;
-			GrdToImg(gp, projPt, cameras[camId]);
-
 			Point2DDouble ip = imageFeatures[camId].GetCenteredPt(k);
 
-			double dx = projPt.p[0] - ip.p[0];
-			double dy = projPt.p[1] - ip.p[1];
+			double dist = 0;
+			//if(cameras[camId].camtype == PerspectiveCam)
+			{		
+				Point2DDouble projPt;
+				GrdToImg(gp, projPt, cameras[camId]);
+				double dx = projPt.p[0] - ip.p[0];
+				double dy = projPt.p[1] - ip.p[1];
+				dist = sqrt(dx*dx + dy*dy);
+			}
+			/*else if(cameras[camId].camtype == PanoramCam)
+			{
+				double gx,gy,gz;
+				SphereTo3D_center(ip.p[0], ip.p[1], radius, gx, gy, gz);
+				double n1 = sqrt(gp.p[0]*gp.p[0] + gp.p[1]*gp.p[1] + gp.p[2]*gp.p[2]) + 0.000001;
+				double n2 = sqrt(gx*gx + gy*gy + gz*gz) + 0.000001;
+				double dotv = gp.p[0]*gx + gp.p[1]*gy + gp.p[2]*gz;
+				double angle = acos( dotv / (n1*n2) );
+				dist = angle*radius;
+			}
+			*/
 			
-			double dist = sqrt(dx*dx + dy*dy);
 			dists.push_back(dist);
 		}
 		
@@ -310,7 +328,7 @@ int RemoveOutlierPts( vector<TrackInfo>& tracks, vector<TrackInfo>& trackSeq,
 		for(int i=0; i<dists.size(); i++)
 			pDist[i] = dists[i];
 		double med = dll_kth_element_copy(dists.size(), 
-			dll_iround(0.8 * dists.size()),
+			dll_iround(0.85 * dists.size()),
 			pDist);
 		dll_median_copy(dists.size(), pDist);
 		double thresh = 1.2 * NUM_STDDEV * med;  // k * stddev
@@ -320,12 +338,12 @@ int RemoveOutlierPts( vector<TrackInfo>& tracks, vector<TrackInfo>& trackSeq,
 			thresh = CLAMP(thresh, MIN_PROJ_ERROR_THRESHOLD, MAX_PROJ_ERROR_THRESHOLD); 
 		}
 		else if(cameras[camId].camtype==PanoramCam)
-		{
-			double radius = (double)(cameras[camId].cols) / (2*PI);
-			double minT = radius*0.01;
-			double maxT = radius*0.1;
+		{ 
+			//double radius = (double)(cameras[camId].cols) / (2*PI);
+			double minT = radius*0.1/180.0*3.14;
+			double maxT = radius*5.0/180.0*3.14;
+			printf("minT: %lf  maxT: %lf  thresh: %lf \n", minT, maxT, thresh);
 			thresh = CLAMP(thresh, minT, maxT);
-			printf("thresh: %lf \n", thresh);
 		}
 
 		delete[] pDist;
@@ -657,6 +675,19 @@ int UpdateBATracks( int newCameraIndex,
 					vector<TrackInfo>& trackSeqNew,
 					vector<CameraPara>& cameras)
 {
+
+	int projThreshold = 8; 
+
+	if( cameras[newCameraIndex].camtype == PerspectiveCam )
+	{
+		projThreshold = cameras[newCameraIndex].cols * 0.003 ; //
+	}
+	else if ( cameras[newCameraIndex].camtype == PanoramCam )
+	{
+		double radius = (double)(cameras[newCameraIndex].cols) / (2*PI);
+		projThreshold = radius*(5.0/180.0*PI); //angle: degree
+	}
+
 	int nOldTracks = trackSeqNew.size();
 
 	int nFeatPtNum = imageFeatures[newCameraIndex].featPts.size();
@@ -690,7 +721,7 @@ int UpdateBATracks( int newCameraIndex,
 				double dy = (projPt.p[1]-ip.p[1]);
 				double error = sqrt( dx*dx+dy*dy );
 				
-				if(error<8)
+				if(error<projThreshold)
 					trackSeqNew[nNewTrackIndex].AddImageKey(ik);
 			}
 		}
@@ -731,7 +762,7 @@ int UpdateBATracks( int newCameraIndex,
 	CaculateTrackSeqGrd(imageFeatures, newTracks, cameras, true);
 	for(int i=nOldTracks; i<trackSeqNew.size(); i++)
 	{
-		if( newTracks[i-nOldTracks].GetProjectionError() > 8 )
+		if( newTracks[i-nOldTracks].GetProjectionError() > projThreshold )
 		{
 			trackSeqNew[i].Clear();
 		}
@@ -1230,6 +1261,7 @@ int RefineAllParameters(vector<TrackInfo>& trackSeq, vector<ImgFeature>& imageFe
 		//2. find the wrong feature point projections and remove them
 		nOutliers = RemoveOutlierPts(tracks, trackSeq, imageFeatures, cameraIDOrder, cameras);
 		nTotalOutliers += nOutliers;
+
 	}while(nOutliers>0);
 	
 	//remove the bad points according to the angle

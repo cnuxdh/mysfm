@@ -191,21 +191,23 @@ struct SFMPanoReprojectionError
 		p[1] += t[1];
 		p[2] += t[2];
 			
-		/*
-		//T dx,dy;
-		//GrdToPanoImageCenter(p[0], p[1], p[2], T(radius), dx, dy);
-		//residuals[0] = dx - T(observed_x);
-		//residuals[1] = dy - T(observed_y);
-		*/
+		
+		T dx,dy;
+		GrdToPanoImageCenter(p[0], p[1], p[2], T(radius), dx, dy);
+		//residuals[0] = sqrt((dx - T(observed_x))*(dx - T(observed_x)) + (dy - T(observed_y))*(dy - T(observed_y)));
+		residuals[0] = dx - T(observed_x);
+		residuals[1] = dy - T(observed_y);
+		
 
+		/*
 		T ox,oy,oz;
 		PanoImageCenterToGrd(T(observed_x), T(observed_y), T(radius), ox, oy, oz);
-
 		T n1 = sqrt(p[0]*p[0] + p[1]*p[1] + p[2]*p[2])+0.000001;
 		T n2 = sqrt(ox*ox + oy*oy + oz*oz) + 0.000001;
 		T dotv = p[0]*ox + p[1]*oy + p[2]*oz;
 		T angle = acos( dotv / (n1*n2) );
 		residuals[0] = angle*T(radius);
+		*/
 
 		//printf("residual: %lf %lf \n", residuals[0], residuals[1]);
 
@@ -216,7 +218,7 @@ struct SFMPanoReprojectionError
 	// the client code.
 	static ceres::CostFunction* Create(const double observed_x, const double observed_y, const double radius) 
 	{
-			return (new ceres::AutoDiffCostFunction<SFMPanoReprojectionError, 1, 6, 3>(
+			return (new ceres::AutoDiffCostFunction<SFMPanoReprojectionError, 2, 6, 3>(
 				new SFMPanoReprojectionError(observed_x, observed_y, radius)));
 	}
 
@@ -259,22 +261,22 @@ struct RefinePanoCameraError
 		p[1] += t[1];
 		p[2] += t[2];
 
-		/*
+		
 		T dx,dy;
 		GrdToPanoImageCenter(p[0], p[1], p[2], T(radius), dx, dy);
 		residuals[0] = dx - T(observed_x);
 		residuals[1] = dy - T(observed_y);
-		*/
+		
 
+		/*
 		T ox,oy,oz;
 		PanoImageCenterToGrd(T(observed_x), T(observed_y), T(radius), ox, oy, oz);
-
 		T n1 = sqrt(p[0]*p[0] + p[1]*p[1] + p[2]*p[2])+0.000001;
 		T n2 = sqrt(ox*ox + oy*oy + oz*oz) + 0.000001;
 		T dotv = p[0]*ox + p[1]*oy + p[2]*oz;
 		T angle = acos( dotv / (n1*n2) );
 		residuals[0] = angle*T(radius);
-
+		*/
 
 		return true;
 	}
@@ -282,7 +284,7 @@ struct RefinePanoCameraError
 	// the client code.
 	static ceres::CostFunction* Create(const double observed_x,	const double observed_y, 
 		const double gx, const double gy, const double gz, const double radius) {
-			return (new ceres::AutoDiffCostFunction<RefinePanoCameraError, 1, 6>(
+			return (new ceres::AutoDiffCostFunction<RefinePanoCameraError, 2, 6>(
 				new RefinePanoCameraError(observed_x, observed_y, gx, gy, gz, radius) ) );
 	}
 

@@ -35,7 +35,7 @@ int SaveTracksToPly(char* filepath, vector<TrackInfo>& trackSeq,
 		double gz = trackSeq[i].grd.p[2];
 
 		//calculate the maximal distance between the 3D point and camera center
-		double maxDis = 0;
+		double minDis = 100000;
 		for(int k=0; k<cameraIDOrder.size(); k++)
 		{
 			int id = cameraIDOrder[k];
@@ -46,15 +46,15 @@ int SaveTracksToPly(char* filepath, vector<TrackInfo>& trackSeq,
 			cp.p[2] = cameras[id].t[2];
 
 			double dis = distanceVec(cp,  trackSeq[i].grd);
-			if(maxDis<dis)
-				maxDis = dis;
+			if(minDis>dis)
+				minDis = dis;
 		}
 
 		//remove the 3D point far away from the cameras
-		if(maxDis>50)
+		if(minDis>60)
 			continue;
 
-		if( trackSeq[i].derror<8 )
+		if( trackSeq[i].derror<32 )
 		{
 			goodGrds.push_back( trackSeq[i].grd );
 

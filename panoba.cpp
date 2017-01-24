@@ -123,15 +123,15 @@ int CPanoBA::BundleAdjust(int numCameras, vector<CameraPara>& cameras,
 	}
 	SaveTracksToPly("c:\\temp\\pair-raw.ply", trackSeq, cameraIDOrder, cameras);
 	
-
+	
 	RemoveOutlierPts(tracks, trackSeq, imageFeatures, cameraIDOrder, cameras);
-  
-	SaveTracksToPly("c:\\temp\\pair-raw-inliers.ply", trackSeq, cameraIDOrder, cameras);
-
+  	SaveTracksToPly("c:\\temp\\pair-raw-inliers.ply", trackSeq, cameraIDOrder, cameras);
 	RunBA(trackSeq, imageFeatures, cameraIDOrder, cameras);
-
 	RemoveOutlierPts(tracks, trackSeq, imageFeatures, cameraIDOrder, cameras);
 	//int num_pruned = RemoveBadPoints(trackSeq, imageFeatures, cameras);
+	
+
+	//RefineAllParameters(trackSeq, imageFeatures, cameraIDOrder, tracks, cameras);
 
 	SaveTracksToPly("c:\\temp\\pair.ply", trackSeq, cameraIDOrder, cameras);
 
@@ -164,6 +164,11 @@ int CPanoBA::BundleAdjust(int numCameras, vector<CameraPara>& cameras,
 		printf("\n BA for all cameras... \n");
 		//optimization for all cameras
 		RefineAllParameters(trackSeq, imageFeatures, cameraIDOrder, tracks, cameras);
+
+		//save temperary file
+		char file[256];
+		sprintf(file, "c:\\temp\\bundle_%d.ply", cameraIDOrder.size());
+		SaveTracksToPly(file, trackSeq, cameraIDOrder, cameras);
 	}
 
 	SaveTracksToPly("c:\\temp\\final-ba.ply", trackSeq, cameraIDOrder, cameras);
