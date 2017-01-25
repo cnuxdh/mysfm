@@ -416,7 +416,7 @@ int RemoveOutlierPts( vector<TrackInfo>& tracks, vector<TrackInfo>& trackSeq,
 int RemoveBadPoints(vector<TrackInfo>& trackSeq, 
 	vector<ImgFeature>& imageFeatures, vector<CameraPara>& cameras )
 {
-	CTriangulateBase* pTriangulate = new CTriangulateCV();
+	//CTriangulateBase* pTriangulate = new CTriangulateCV();
 	
 	int num_pruned = 0;
 
@@ -681,6 +681,7 @@ int UpdateBATracks( int newCameraIndex,
 	if( cameras[newCameraIndex].camtype == PerspectiveCam )
 	{
 		projThreshold = cameras[newCameraIndex].cols * 0.003 ; //
+		projThreshold = min(16, max(8, projThreshold));
 	}
 	else if ( cameras[newCameraIndex].camtype == PanoramCam )
 	{

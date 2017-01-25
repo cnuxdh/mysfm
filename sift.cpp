@@ -519,8 +519,7 @@ int CSIFTPano::Detect(IplImage* pImage, ImgFeature& imgFeat)
 		cvReleaseImage(&pGray);
 		pGray = cvCloneImage(pTemp);
 		cvReleaseImage(&pTemp);
-	}
-	
+	}	
 
 	//the image parameter of original panorama
 	double radius = (double)(pGray->width) / (2*PI);
@@ -530,8 +529,9 @@ int CSIFTPano::Detect(IplImage* pImage, ImgFeature& imgFeat)
 	//resize the image
 	IplImage* pResizeImage = NULL;
 	pResizeImage = ResizeImage(pGray, PANORAMA_HT);
-
+	cvReleaseImage(&pGray);
 	
+
 	//split the image
 	double R[9] = {1,0,0,0,1,0,0,0,1};
 	double T[3] = {0,0,0};

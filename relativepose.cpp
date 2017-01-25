@@ -1356,6 +1356,7 @@ int CPanoDLTPose::EstimatePose(vector<Point3DDouble> pt3, vector<Point3DDouble> 
 		projs_solve[i].p[2] = pt2[i].p[2];
 	}
 
+	double proj_estimation_threshold = 2; //cam.cols*0.002;
 	double proj_estimation_threshold_weak = 4.0*proj_estimation_threshold;
 
 	//find the 3*4 projection matrix
