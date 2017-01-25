@@ -659,6 +659,10 @@ int CPanoMatch::Match(ImgFeature& lImage, ImgFeature& rImage, vector<MatchPairIn
 		matchRes.push_back(mid);
 	}
     delete[] pMatch;
+
+	free(lPts);
+	free(rPts);
+
 	return 1;
 }
 int CPanoMatch::Match(ImgFeature& lImage, ImgFeature& rImage, PairMatchRes& pairMatch )
@@ -698,11 +702,11 @@ int CPanoMatch::Match(ImgFeature& lImage, ImgFeature& rImage, PairMatchRes& pair
 	}
 
 	//
-
+	free(lPts);
+	free(rPts);
 
 	delete[] pMatch;
 	
-	return 1;
 	return 0;
 }
 
