@@ -55,9 +55,8 @@ public:
 	CSIFTPano();
 	~CSIFTPano();
 
-	int Detect(IplImage* pImage, ImgFeature& imgFeat);
-
-	
+	int Detect(IplImage* pImage, ImgFeature& imgFeat, int maxHt);
+	int Detect(char* filePath, ImgFeature& imgFeat, int maxHt);
 };
 
 

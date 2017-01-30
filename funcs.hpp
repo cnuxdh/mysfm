@@ -35,7 +35,8 @@ double angleOfVector(Point3DDouble p1, Point3DDouble p2);
 
 
 DLL_EXPORT int	   DrawMatches(char* filename, IplImage* pLeft, IplImage* pRight, 
-							vector<Point2DDouble> lpts, vector<Point2DDouble> rpts);
+							vector<Point2DDouble> lpts, vector<Point2DDouble> rpts,
+							 int thickness=1);
 
 int    CalculateColorHist(IplImage* pImage, int grayStep, vector<double>& hist);
 

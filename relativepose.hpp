@@ -25,6 +25,9 @@ public:
 	virtual ~CRelativePoseBase(){}
 	virtual int  EstimatePose( PairMatchRes pairMatches, ImgFeature& lImageFeat, ImgFeature& rImageFeat, CameraPara& cam1, CameraPara& cam2 ){return 0;}
 	virtual int  EstimatePose( vector<Point2DDouble>& lPts, vector<Point2DDouble>& rPts, CameraPara& cam1, CameraPara& cam2 ){return 0;}
+	virtual int EstimatePose( vector<Point2DDouble>& lPts, vector<Point2DDouble>& rPts, 
+		CameraPara& cam1, CameraPara& cam2, vector<int>& inliers ){return 0;}
+
 	virtual bool IsExplicit(){return false;}
 };
 
@@ -34,7 +37,13 @@ public:
 	CEstimatePose5Point();
 	~CEstimatePose5Point();
 	int EstimatePose( PairMatchRes pairMatches, ImgFeature& lImageFeat, ImgFeature& rImageFeat, CameraPara& cam1, CameraPara& cam2 );
-	int EstimatePose( vector<Point2DDouble>& lPts, vector<Point2DDouble>& rPts, CameraPara& cam1, CameraPara& cam2 );
+	
+	int EstimatePose( vector<Point2DDouble>& lPts, vector<Point2DDouble>& rPts, 
+		CameraPara& cam1, CameraPara& cam2 );
+
+	int EstimatePose( vector<Point2DDouble>& lPts, vector<Point2DDouble>& rPts, 
+		CameraPara& cam1, CameraPara& cam2, vector<int>& inliers ){return 0;}
+	
 	bool IsExplicit(){return m_bIsExplicit;}
 private:
 	bool m_bIsExplicit;
@@ -48,6 +57,10 @@ public:
 	~CEstimatePose5PointPano();
 	int EstimatePose( PairMatchRes pairMatches, ImgFeature& lImageFeat, ImgFeature& rImageFeat, CameraPara& cam1, CameraPara& cam2 ){return 0;}
 	int EstimatePose( vector<Point2DDouble>& lPts, vector<Point2DDouble>& rPts, CameraPara& cam1, CameraPara& cam2 );
+
+	int EstimatePose( vector<Point2DDouble>& lPts, vector<Point2DDouble>& rPts, 
+		CameraPara& cam1, CameraPara& cam2, vector<int>& inliers );
+
 	bool IsExplicit(){return m_bIsExplicit;}
 private:
 	bool m_bIsExplicit;

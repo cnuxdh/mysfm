@@ -734,6 +734,105 @@ int CEstimatePose5PointPano::EstimatePose( vector<Point2DDouble>& lPts, vector<P
 	return 0;
 }
 
+int CEstimatePose5PointPano::EstimatePose( vector<Point2DDouble>& lPts, vector<Point2DDouble>& rPts, 
+	CameraPara& cam1, CameraPara& cam2, vector<int>& inliers )
+{
+	int ht = cam1.rows;
+	int wd = cam1.cols;
+	double radius = (double)(wd) / (2*PI);
+
+	vector<Point3DDouble> pl;
+	vector<Point3DDouble> pr;
+
+	//from pano 2d to 3d 
+	for(int i=0; i<lPts.size(); i++)
+	{
+		double x = lPts[i].p[0];
+		double y = lPts[i].p[1];
+		//from image center to top-left
+		//x = wd*0.5 + x;
+		//y = ht*0.5 - y;
+		double gx,gy,gz;
+		SphereTo3D_center(x, y, radius, gx, gy, gz);
+		Point3DDouble p3;
+		p3.p[0] = gx / radius;
+		p3.p[1] = gy / radius;
+		p3.p[2] = gz / radius;
+		pl.push_back(p3);
+
+
+		x = rPts[i].p[0];
+		y = rPts[i].p[1];
+		//from image center to top-left
+		//x = wd*0.5 + x;
+		//y = ht*0.5 - y;
+		SphereTo3D_center(x, y, radius, gx, gy, gz);
+		p3.p[0] = gx / radius;
+		p3.p[1] = gy / radius;
+		p3.p[2] = gz / radius;
+		pr.push_back(p3);
+	}
+	
+	int num_trials = 512;
+	double threshold = 2.5;
+	double R[9];
+	double t[3];
+
+	vector<double> residual;
+	residual.resize(pl.size());
+	EstimatePose5Point_Pano(pl, pr, radius, num_trials, threshold, R, t, residual);
+
+	//save the inliers
+	double epipolarThreshold = wd*0.005;
+	inliers.clear();
+	for(int i=0; i<lPts.size(); i++)
+	{
+		if(residual[i]<epipolarThreshold)
+		{
+			inliers.push_back(i);
+		}
+	}
+
+	//rotation matrix
+	for(int i=0; i<9; i++)
+	{
+		cam1.R[i] = 0;
+		cam2.R[i] = R[i];
+	}
+	cam1.R[0] = cam1.R[4] = cam1.R[8] = 1;
+
+
+	//from RX+T to R(X-T')
+	double Rt[9];
+	transpose(R, Rt, 3, 3);
+	double gt[3];
+	mult(Rt, t, gt, 3, 3, 1);
+	for(int i=0; i<3; i++)
+	{
+		cam1.t[i] = 0;
+		cam2.t[i] = -gt[i];
+	}
+
+	m_bIsExplicit = true;
+	
+	//save eular angle
+	double ea[3];
+	rot2eular(R, ea);
+	cam1.ax = cam1.ay = cam1.az = 0;
+	cam1.bIsExplicit = m_bIsExplicit;
+
+	cam2.ax = ea[0];
+	cam2.ay = ea[1];
+	cam2.az = ea[2];
+	cam2.bIsExplicit = m_bIsExplicit;
+
+	printf("relative pose eular angle: %lf %lf %lf \n", ea[0], ea[1], ea[2]);
+	printf("relative pose translation: %lf %lf %lf \n", cam2.t[0], cam2.t[1], cam2.t[2]);
+	
+
+	return 0;
+}
+
 //////////////////////////////////////////////////////////////////////////
 CTriangulateCV::CTriangulateCV()
 {

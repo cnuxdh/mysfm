@@ -343,14 +343,13 @@ void FeatureConvert(vector<PtFeature>& imageFeats, ImageFeatures &features)
 //convert my data format to SIFT_float format
 void FeatureConvert(PtFeature srcFeat, Key_Point& dstFeat)
 {
-	dstFeat.index      = srcFeat.id;
+	dstFeat.index        = srcFeat.id;
 	//dstFeat.key_column = srcFeat.x;
 	//dstFeat.key_row    = srcFeat.y;
 	dstFeat.initl_column = srcFeat.x;
 	dstFeat.initl_row    = srcFeat.y;
 	
 	int nFeatDim = srcFeat.feat.size();
-
 	for(int i=0; i<nFeatDim; i++)
 	{
 		dstFeat.descriptor[i] = srcFeat.feat[i];
@@ -700,11 +699,43 @@ int CPanoMatch::Match(ImgFeature& lImage, ImgFeature& rImage, PairMatchRes& pair
 		mid.r = pMatch[i].id2;
 		pairMatch.matchs.push_back(mid);
 	}
+	printf("raw match: %d \n", pairMatch.matchs.size());
 
-	//
+
+	//panorama epipolar constraint
+	if(1)
+	{
+		vector<Point2DDouble> lpts,rpts;
+		for(int i=0; i<pairMatch.matchs.size(); i++)
+		{
+			int li = pairMatch.matchs[i].l;
+			int ri = pairMatch.matchs[i].r;
+			lpts.push_back(lImage.GetCenteredPt(li));
+			rpts.push_back(rImage.GetCenteredPt(ri));		
+		}
+		CRelativePoseBase* pRP = new CEstimatePose5PointPano();
+		CameraPara cam1,cam2;
+		cam1.rows = lImage.ht;
+		cam1.cols = lImage.wd;
+		cam2.rows = rImage.ht;
+		cam2.cols = rImage.wd;
+		vector<int> inliers;
+		pRP->EstimatePose(lpts, rpts, cam1, cam2, inliers);
+		delete pRP;
+
+		//output
+		PairMatchRes inlierMatch;
+		for(int i=0; i<inliers.size(); i++)
+		{
+			int ti = inliers[i];
+			inlierMatch.matchs.push_back( pairMatch.matchs[ti] );
+		}
+		pairMatch.matchs = inlierMatch.matchs;
+	}
+
+	//release memory
 	free(lPts);
 	free(rPts);
-
 	delete[] pMatch;
 	
 	return 0;

@@ -195,7 +195,8 @@ IplImage* VerticalMosaic(IplImage* pLeft, IplImage* pRight)
 
 
 
-int DrawMatches(char* filename, IplImage* pLeft, IplImage* pRight, vector<Point2DDouble> lpts, vector<Point2DDouble> rpts)
+int DrawMatches(char* filename, IplImage* pLeft, IplImage* pRight, 
+	vector<Point2DDouble> lpts, vector<Point2DDouble> rpts, int thickness)
 {
 	IplImage* pMosaic = VerticalMosaic(pLeft, pRight);
 
@@ -226,7 +227,7 @@ int DrawMatches(char* filename, IplImage* pLeft, IplImage* pRight, vector<Point2
 
 			//cvDrawCircle(pLeft, pl, 2, CV_RGB(r,g,b),2);
 			//cvDrawCircle(rImage, pr, 2, CV_RGB(r,g,b),2);
-			cvDrawLine(pMosaic, pl, cvPoint( pr.x, pr.y+ht ), CV_RGB(r,g,b));
+			cvDrawLine(pMosaic, pl, cvPoint( pr.x, pr.y+ht ), CV_RGB(r,g,b), thickness);
 		}				
 	}	
 

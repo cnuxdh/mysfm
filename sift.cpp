@@ -508,7 +508,19 @@ CSIFTPano::~CSIFTPano()
 {
 
 }
-int CSIFTPano::Detect(IplImage* pImage, ImgFeature& imgFeat)
+
+int CSIFTPano::Detect(char* filePath, ImgFeature& imgFeat, int maxHt)
+{
+	IplImage* pImage = cvLoadImage(filePath, 0);
+
+	Detect(pImage, imgFeat, maxHt);
+
+	cvReleaseImage(&pImage);
+
+	return 0;
+}
+
+int CSIFTPano::Detect(IplImage* pImage, ImgFeature& imgFeat, int maxHt)
 {
 	//if color, convert to gray image
 	IplImage* pGray = cvCloneImage(pImage);
@@ -526,12 +538,15 @@ int CSIFTPano::Detect(IplImage* pImage, ImgFeature& imgFeat)
 	int pht = pGray->height;
 	int pwd = pGray->width;
 
+	//added by xiedonghai, 2017.1.29
+	imgFeat.ht = pht;
+	imgFeat.wd = pwd;
+
 	//resize the image
 	IplImage* pResizeImage = NULL;
-	pResizeImage = ResizeImage(pGray, PANORAMA_HT);
+	pResizeImage = ResizeImage(pGray, maxHt);
 	cvReleaseImage(&pGray);
 	
-
 	//split the image
 	double R[9] = {1,0,0,0,1,0,0,0,1};
 	double T[3] = {0,0,0};
@@ -553,8 +568,7 @@ int CSIFTPano::Detect(IplImage* pImage, ImgFeature& imgFeat)
 			DrawFeatPt(ifeat, projImages[i]);
 			cvSaveImage(file, projImages[i]);
 		}
-
-		
+				
 		double R[9];
 		memcpy(R, camParas[i].R, sizeof(double)*9);
 		invers_matrix(R, 3);
@@ -588,9 +602,13 @@ int CSIFTPano::Detect(IplImage* pImage, ImgFeature& imgFeat)
 	}
 	delete pSift;
 
+
+	//remove the same points
+
+
+
 	for(int k=0; k<projImages.size(); k++)
-		cvReleaseImage(&projImages[k]);
-	
+		cvReleaseImage(&projImages[k]);	
 	cvReleaseImage(&pResizeImage);
 
 	return 0;
