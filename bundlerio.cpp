@@ -4,6 +4,11 @@
 #include "badata.hpp"
 #include "funcs.hpp"
 
+#include "Matrix.h"
+
+#include"baselib.h"
+
+//#include "commondata.h"
 
 //matrix
 #include"vector.h"
@@ -13,11 +18,167 @@
 //#include <string>
 //using namespace std;
 
+int WritePMVSCamFile(char* file, CameraPara cam)
+{
+	//generate the projection matrix for PMVS and save it	  
 
+	double focalLen = cam.focalLen;
+	double outHt = cam.rows;
+	double outWd = cam.cols;
+
+	printf("ht: %lf wd: %lf \n", outHt, outWd);
+
+	double K[9] =
+	{ -focalLen, 0.0, 0.5 * outWd - 0.5,
+	0.0, focalLen, 0.5 * outHt - 0.5,
+	0.0, 0.0, 1.0 };
+
+	double R[9];
+	double T[3];
+	memcpy(R, cam.R, sizeof(double) * 9);
+	memcpy(T, cam.T, sizeof(double) * 3);
+
+	//for R(x-T) to RX+T
+	double it[3];
+	/*it[0] = T[0];
+	it[1] = T[1];
+	it[2] = T[2];*/	
+	mult(R, T, it, 3, 3, 1);
+	for (int m = 0; m < 3; m++)
+	{
+		it[m] = -it[m];
+	}
+	
+	//generate P
+	double Ptmp[12] =
+	{ R[0], R[1], R[2], it[0],
+	  R[3], R[4], R[5], it[1],
+	  R[6], R[7], R[8], it[2] };
+
+	double P[12];
+	dll_matrix_product(3, 3, 3, 4, K, Ptmp, P);
+	dll_matrix_scale(3, 4, P, -1.0, P);
+
+	FILE* f = fopen(file, "w");
+	fprintf(f, "CONTOUR\n");
+	fprintf(f, "%0.6f %0.6f %0.6f %0.6f\n", P[0], P[1], P[2], P[3]);
+	fprintf(f, "%0.6f %0.6f %0.6f %0.6f\n", P[4], P[5], P[6], P[7]);
+	fprintf(f, "%0.6f %0.6f %0.6f %0.6f\n", P[8], P[9], P[10], P[11]);
+	//fprintf(f, "%lf %lf %lf \n", focalLen, outHt, outWd);
+	////append the R and T for other applications
+	//fprintf(f, "%lf %lf %lf \n", T[0], T[1], T[2]);
+	//fprintf(f, "%lf %lf %lf \n", R[0], R[1], R[2]);
+	//fprintf(f, "%lf %lf %lf \n", R[3], R[4], R[5]);
+	//fprintf(f, "%lf %lf %lf \n", R[6], R[7], R[8]);
+	fclose(f);
+
+
+	return 0;
+}
+
+int SaveTracks(char* filepath, vector<TrackInfo>& tracks)
+{
+	FILE* fp = fopen(filepath, "w");
+
+	for (int i = 0; i < tracks.size(); i++)
+	{
+		int nview = tracks[i].GetImageKeySum();
+		Point3DDouble p3 = tracks[i].GetGround();
+		fprintf(fp, "%lf %lf %lf, ", p3.p[0], p3.p[1], p3.p[2]);
+		for (int k = 0; k < nview; k++)
+		{
+			ImageKey ik = tracks[i].GetImageKey(k);
+			fprintf(fp, " %d-%d ", ik.first, ik.second);
+		}
+		fprintf(fp, "\n");
+	}
+	fclose(fp);
+
+	return 0;
+}
+
+int SaveTracksToPly(char* filepath, vector<TrackInfo>& trackSeq, const vector<CameraPara>& cameras){
+
+	//save the ba results: camera position, track points
+	vector<Point3DDouble> goodGrds;
+	vector<Point3DDouble> colors;
+	printf("output the optimized track points.... \n");
+	for (int i = 0; i<trackSeq.size(); i++)
+	{
+		if (trackSeq[i].GetImageKeySum() == 0)
+			continue;
+
+		if( trackSeq[i].derror<32 )
+		{
+			goodGrds.push_back(trackSeq[i].grd);
+
+			Point3DDouble ptColor;
+			ptColor.p[0] = 255;
+			ptColor.p[1] = 0;
+			ptColor.p[2] = 0;
+			colors.push_back(ptColor);
+
+		}
+	}
+
+	//save camera positions
+	for (int i = 0; i<cameras.size(); i++)
+	{
+		int id = i;
+
+		if (!cameras[i].bIsAddedIntoNet)
+			continue;
+
+		Point3DDouble cp;
+		cp.p[0] = cameras[id].xs;
+		cp.p[1] = cameras[id].ys;
+		cp.p[2] = cameras[id].zs;
+
+		Point3DDouble camColor;
+		camColor.p[0] = 0;
+		camColor.p[1] = 255;
+		camColor.p[2] = 0;
+		colors.push_back(camColor);
+
+		goodGrds.push_back(cp);
+	}
+
+	WritePMVSPly(filepath, goodGrds, colors);
+
+	return 0;
+}
 
 int SaveTracksToPly(char* filepath, vector<TrackInfo>& trackSeq,
 					vector<int> cameraIDOrder, const vector<CameraPara>& cameras)
 {	
+
+	////calculate the average distance of image pair
+	//double sumdis = 0;
+	//int nsum = 0;
+	//for(int i=0; i<cameraIDOrder.size()-1; i++)
+	//{
+	//	int id = cameraIDOrder[i];
+	//	Point3DDouble cp1;
+	//	cp1.p[0] = cameras[id].T[0];
+	//	cp1.p[1] = cameras[id].T[1];
+	//	cp1.p[2] = cameras[id].T[2];
+	//	
+	//	id = cameraIDOrder[i+1];
+	//	Point3DDouble cp2;
+	//	cp2.p[0] = cameras[id].T[0];
+	//	cp2.p[1] = cameras[id].T[1];
+	//	cp2.p[2] = cameras[id].T[2];
+
+	//	double dis = distanceVec(cp1, cp2);
+
+	//	sumdis += dis;
+	//	nsum ++;
+	//}
+	//sumdis /= (double)(nsum);
+
+	//double disThreshold = sumdis*20;
+	//printf("distance threshold: %lf \n", disThreshold);
+
 	//save the ba results: camera position, track points
 	vector<Point3DDouble> goodGrds;
 	vector<Point3DDouble> colors;
@@ -30,31 +191,30 @@ int SaveTracksToPly(char* filepath, vector<TrackInfo>& trackSeq,
 		if( trackSeq[i].GetImageKeySum() == 0 )
 			continue;
 
-		double gx = trackSeq[i].grd.p[0];
-		double gy = trackSeq[i].grd.p[1];
-		double gz = trackSeq[i].grd.p[2];
+		//double gx = trackSeq[i].grd.p[0];
+		//double gy = trackSeq[i].grd.p[1];
+		//double gz = trackSeq[i].grd.p[2];
+		////calculate the minimal distance between the 3D point and camera center
+		//double minDis = 100000;
+		//for(int k=0; k<cameraIDOrder.size(); k++)
+		//{
+		//	int id = cameraIDOrder[k];
 
-		//calculate the maximal distance between the 3D point and camera center
-		double minDis = 100000;
-		for(int k=0; k<cameraIDOrder.size(); k++)
-		{
-			int id = cameraIDOrder[k];
+		//	Point3DDouble cp;
+		//	cp.p[0] = cameras[id].T[0];
+		//	cp.p[1] = cameras[id].T[1];
+		//	cp.p[2] = cameras[id].T[2];
 
-			Point3DDouble cp;
-			cp.p[0] = cameras[id].t[0];
-			cp.p[1] = cameras[id].t[1];
-			cp.p[2] = cameras[id].t[2];
+		//	double dis = distanceVec(cp,  trackSeq[i].grd);
+		//	if(minDis>dis)
+		//		minDis = dis;
+		//}
 
-			double dis = distanceVec(cp,  trackSeq[i].grd);
-			if(minDis>dis)
-				minDis = dis;
-		}
+		////remove the 3D point far away from the cameras
+		//if(minDis>disThreshold)
+		//	continue;
 
-		//remove the 3D point far away from the cameras
-		if(minDis>60)
-			continue;
-
-		if( trackSeq[i].derror<32 )
+		//if( trackSeq[i].derror<32 )
 		{
 			goodGrds.push_back( trackSeq[i].grd );
 
@@ -76,9 +236,9 @@ int SaveTracksToPly(char* filepath, vector<TrackInfo>& trackSeq,
 		int id = cameraIDOrder[i];
 
 		Point3DDouble cp;
-		cp.p[0] = cameras[id].t[0];
-		cp.p[1] = cameras[id].t[1];
-		cp.p[2] = cameras[id].t[2];
+		cp.p[0] = cameras[id].T[0];
+		cp.p[1] = cameras[id].T[1];
+		cp.p[2] = cameras[id].T[2];
 
 		Point3DDouble camColor;
 		camColor.p[0] = 0;
@@ -142,7 +302,7 @@ int ReadBundlerOutFile(char* filename, vector<stPOS>& camParas, vector<stTrack>&
 		
 		for(int k=0; k<nPt; k++)
 		{
-			POINT2 pt;				
+			Point2DDouble pt;				
 			fscanf(fp,"%d %d %lf %lf", &nImageIndex, &nPtIndex, &pt.x, &pt.y);
 			singleTrack.imgpt.push_back(pt);
 			singleTrack.imgid.push_back(nImageIndex);
@@ -176,7 +336,7 @@ int WriteBundlerOutFile(char* filepath, vector<CameraPara>& camParas )
 
 	for(int i=0; i<num_images; i++)
 	{
-		fprintf(f, "%0.10e %0.10e %0.10e \n",	camParas[i].focus, camParas[i].k1, camParas[i].k2);
+		fprintf(f, "%0.10e %0.10e %0.10e \n",	camParas[i].focalLen, camParas[i].k1, camParas[i].k2);
 
 		fprintf(f, "%0.10e %0.10e %0.10e\n", camParas[i].R[0], camParas[i].R[1],camParas[i].R[2]);
 		fprintf(f, "%0.10e %0.10e %0.10e\n", camParas[i].R[3], camParas[i].R[4],camParas[i].R[5]);
@@ -186,7 +346,7 @@ int WriteBundlerOutFile(char* filepath, vector<CameraPara>& camParas )
 		//matrix_product(3, 3, 3, 1, camParas[i].R, camParas[i].t, t);
 		//matrix_scale(3, 1, t, -1.0, t);
 		//fprintf(f, "%0.10e %0.10e %0.10e\n", t[0], t[1], t[2]);
-		fprintf(f, "%0.10e %0.10e %0.10e\n", camParas[i].t[0], camParas[i].t[1], camParas[i].t[2]);
+		fprintf(f, "%0.10e %0.10e %0.10e\n", camParas[i].T[0], camParas[i].T[1], camParas[i].T[2]);
 	}
 	fclose(f);
 
@@ -422,6 +582,12 @@ DLL_EXPORT int WritePMVSPly(char* filename, const vector<Point3DDouble>& gpts,
 {
 
 	FILE* fp = fopen(filename, "w");
+
+	if (fp == NULL){
+		printf("failed to open %s ! \n", filename);
+		return -1;
+	}
+
 	fprintf(fp, "ply \n");
 	fprintf(fp, "format ascii 1.0 \n");
 	fprintf(fp, "element vertex %d \n", gpts.size());

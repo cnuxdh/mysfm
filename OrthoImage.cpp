@@ -1,31 +1,24 @@
 
+#include"stdio.h"
 
 #include "OrthoImage.h"
 
 //opencv dll
-#include "cv.h"
-#include "highgui.h"
-#include "cxcore.h"
-
+#include <opencv2/core/core.hpp>
+#include <opencv2/highgui/highgui.hpp>
 
 //gdal dll
 #include "gdal_priv.h"
 #include "ogr_spatialref.h"
-
-
-//jhead static lib
-#include "jhead.h"
- 
- 
-//corelib static lib
-#include "Corelib/Matrix.h"
-#include "Corelib/FitObject.h"
-#include "Corelib/commondata.h"
-#include "Corelib/commonfile.h"
-#include "Corelib/CommonFuncs.h"
-#include "Corelib/LatLong-UTMconversion.h"
-#include "CoreLib/ImageFunc.h"
-
+  
+//corelib 
+#include "Matrix.h"
+#include "FitObject.h"
+#include "commondata.h"
+#include "commonfile.h"
+#include "CommonFuncs.h"
+#include "LatLong-UTMconversion.h"
+#include "ImageFunc.h"
 
 //cvdll
 #include "absOri.hpp"
@@ -33,7 +26,6 @@
 
 //coredll
 #include "geotiff.h"
-
 
 //mba dll
 #include "mbaExports.h"
@@ -146,6 +138,7 @@ int ReadBundlerOutFileBak(char* filename, vector<stPOS>& camParas)
 
 
 //bundler ground to image model
+//model: RX+T
 void GrdToImg1(double* R, double* T, double f, double k1, double k2, 
 			   double gx, double gy, double gz, double* ix, double* iy, int ht, int wd)
 {
@@ -216,7 +209,7 @@ void ImgtoGrd1(double* R, double* T, double f, double ix, double iy, double gz, 
    return value:
 	the ratio of input image zoomed out
 */
-#define MAX_MEMORY_32BIT 320
+#define MAX_MEMORY_32BIT 640
 double CalculateRatioFor32bitOS(int srcHt, int srcWd, int nByte)
 {
 	double ratio = 1.0;
@@ -231,6 +224,7 @@ double CalculateRatioFor32bitOS(int srcHt, int srcWd, int nByte)
 	}
 	return ratio;
 }
+
 
 void FindGroundPlane(stAbsPOS& absPosParams, vector<stPOS>& camParas, vector<stTrack>& tracks)
 {
@@ -313,6 +307,119 @@ void FindGroundPlane(stAbsPOS& absPosParams, vector<stPOS>& camParas, vector<stT
 	}
 }
 
+void FindGroundPlane(stAbsPOS& absPosParams, vector<CameraPara>& camParas, vector<TrackInfo>& tracks)
+{
+	int np = tracks.size();
+	double* px = (double*)malloc(np*sizeof(double));
+	double* py = (double*)malloc(np*sizeof(double));
+	double* pz = (double*)malloc(np*sizeof(double));
+	for (int i = 0; i<tracks.size(); i++)
+	{
+		px[i] = tracks[i].grd.p[0];
+		py[i] = tracks[i].grd.p[1];
+		pz[i] = tracks[i].grd.p[2];
+	}
+
+	//double planeR[9];
+	FitPlane1(px, py, pz, np, absPosParams.R);
+	free(px);
+	free(py);
+	free(pz);
+
+	//transform each camera parameters from current coordinate to new coordinate
+	double Rg[9];
+	memcpy(Rg, absPosParams.R, 9 * sizeof(double));
+	invers_matrix(Rg, 3);
+	double Tg[3];
+	memcpy(Tg, absPosParams.T, 3 * sizeof(double));
+
+	for (int i = 0; i<camParas.size(); i++)
+	{
+		if (!camParas[i].bIsAddedIntoNet)
+			continue;
+
+		//new R
+		double newR[9];
+		mult(camParas[i].R, Rg, newR, 3, 3, 3);
+
+		//new T
+		double newT[3];
+		mult(newR, Tg, newT, 3, 3, 1);
+		for (int k = 0; k<3; k++)
+			newT[k] = absPosParams.scale*camParas[i].T[k] - newT[k];
+
+		memcpy(camParas[i].R, newR, sizeof(double) * 9);
+		memcpy(camParas[i].T, newT, sizeof(double) * 3);
+
+		//rotation angle
+		camParas[i].pitch = atan(camParas[i].R[5] / camParas[i].R[8]) / PI * 180;
+		camParas[i].roll = asin(-camParas[i].R[2]) / PI * 180;
+		camParas[i].yaw = atan(camParas[i].R[1] / camParas[i].R[0]) / PI * 180;
+
+		//convert form RX+T to R( X - (-inv(R)*T) )
+		double t1[3];
+		double R1[9];
+		memcpy(R1, camParas[i].R, 9 * sizeof(double));
+		invers_matrix(R1, 3);
+		mult(R1, camParas[i].T, t1, 3, 3, 1);
+		camParas[i].xs = -t1[0];
+		camParas[i].ys = -t1[1];
+		camParas[i].zs = -t1[2];
+	}
+
+	//transform each point from free coordinate to absolute coordinate
+	//Xg = lamda.R.X + T
+	for (int i = 0; i<tracks.size(); i++)
+	{
+		double fP[3];
+		fP[0] = tracks[i].grd.p[0];
+		fP[1] = tracks[i].grd.p[1];
+		fP[2] = tracks[i].grd.p[2];
+
+		double tp[3];
+		mult(absPosParams.R, fP, tp, 3, 3, 1);
+
+		for (int k = 0; k<3; k++)
+			fP[k] = absPosParams.scale*tp[k] + absPosParams.T[k];
+
+		tracks[i].grd.p[0] = fP[0];
+		tracks[i].grd.p[1] = fP[1];
+		tracks[i].grd.p[2] = fP[2];
+	}
+}
+
+void CalculateGroudArea(vector<TrackInfo> tracks,
+	double& minx, double& maxx, double& miny, double& maxy, double& meanHeight)
+{
+
+	double dHeight = 0;
+	minx = 100000000;
+	maxx = -10000000;
+	miny = 100000000;
+	maxy = -10000000;
+
+	int np = tracks.size();
+
+	for (int i = 0; i<np; i++)
+	{
+		double tp[3];
+		tp[0] = tracks[i].grd.p[0];
+		tp[1] = tracks[i].grd.p[1];
+		tp[2] = tracks[i].grd.p[2];
+
+		dHeight += tp[2];
+		minx = min(minx, tp[0]);
+		maxx = max(maxx, tp[0]);
+		miny = min(miny, tp[1]);
+		maxy = max(maxy, tp[1]);
+	}
+	dHeight /= np;
+	printf("height: %lf \n", dHeight);
+	printf("range: %lf %lf %lf %lf \n", minx, maxx, miny, maxy);
+
+	meanHeight = dHeight;
+}
+
 void CalculateGroudArea(vector<stTrack> tracks, 
 						double& minx, double& maxx, double& miny, double& maxy, double& meanHeight)
 {
@@ -344,13 +451,39 @@ void CalculateGroudArea(vector<stTrack> tracks,
 	meanHeight = dHeight;	
 }
 
+//meanHeight: elevation from the sea surface
+double CalculateResolution(double meanHeight, vector<CameraPara> camParas)
+{
+	double sInterval = 0;
+	int num = 0;
+
+	for (int i = 0; i<camParas.size(); i++)
+	{
+		if (!camParas[i].bIsAddedIntoNet)
+			continue;
+
+		int ht = camParas[i].rows;
+		int wd = camParas[i].cols;
+
+		double height = fabs(meanHeight - camParas[i].zs);
+		double grdWd  = (double)(wd) / camParas[i].focalLen * height;
+		double interval = grdWd / (double)(wd);
+		//printf(" %lf ", interval);
+		sInterval += interval;
+		num++;
+	}
+	sInterval /= (double)(num);
+
+	return sInterval;
+}
+
 double CalculateResolution(int ht, int wd, double meanHeight, vector<stPOS> camParas )
 {
 	double sInterval = 0;	
 	int num = 0;
 	for(int i=0; i<camParas.size(); i++)
 	{
-		if( camParas[i].f == 0 )
+		if( !camParas[i].bHavingPOS )
 			continue;
 
 		double height = fabs(meanHeight-camParas[i].zs);
@@ -365,6 +498,25 @@ double CalculateResolution(int ht, int wd, double meanHeight, vector<stPOS> camP
 	return sInterval;
 }
 
+
+int GetZoneNumber(vector<CameraPara> camParas)
+{
+	double slon = 0;
+	int n = 0;
+	for (int i = 0; i<camParas.size(); i++)
+	{
+		if (camParas[i].bIsAddedIntoNet)
+		{
+			slon += camParas[i].lon;
+			n++;
+		}
+	}
+
+	slon /= (double)(n);
+	int zoneNumber = int((slon + 180) / 6) + 1;
+
+	return zoneNumber;
+}
 
 int GetZoneNumber(vector<stPOS> camParas)
 {
@@ -385,7 +537,7 @@ int GetZoneNumber(vector<stPOS> camParas)
 	return zoneNumber;
 }
 
-
+/*
 int VignettingCorrect(IplImage* pImage)
 {
 	int ht = pImage->height;
@@ -508,7 +660,7 @@ int VignettingCorrectFromFile(char* filename, char* outfile)
 	cvReleaseImage(&pImage);
 
 	return 0;
-}
+}*/
 
 
 /* generate one orthoimage as jpeg and header file, written by xiedonghai, 2016.1.5
@@ -649,6 +801,250 @@ int  GenerateSingleZipOrthoRGB(char*   filename,  // jpg
 	free(pOrtho3);
 }
 
+//generate the ground coordinates for each image, 2018.1.5
+int GenerateDOMGeoData(string srcFile, double meanHeight, 
+	CameraPara camPara, double outResolution, stGeoInfo& geoinfo)
+{
+	if (!camPara.bIsAddedIntoNet)
+		return -1;
+
+	char* filename = const_cast<char*>(srcFile.c_str());
+
+	stGeoInfo ginfo;
+	GetGeoInformation(filename, ginfo);
+	int ht = ginfo.ht;
+	int wd = ginfo.wd;
+	int nBand = ginfo.nband;
+
+	double bx[4], by[4];
+	bx[0] = -wd / 2;	by[0] = -ht / 2;
+	bx[1] = wd / 2;		by[1] = -ht / 2;
+	bx[2] = -wd / 2;	by[2] = ht / 2;
+	bx[3] = wd / 2;		by[3] = ht / 2;
+
+	double minx1 = 100000000;
+	double maxx1 = -10000000;
+	double miny1 = 100000000;
+	double maxy1 = -10000000;
+
+	double gz = meanHeight;
+	for (int j = 0; j<4; j++)
+	{
+		double ix = bx[j];
+		double iy = by[j];
+		double gx, gy;
+		ImgtoGrd1(camPara.R, camPara.T, camPara.focalLen, ix, iy, gz, &gx, &gy);
+
+		if (minx1>gx) minx1 = gx;
+		if (maxx1<gx) maxx1 = gx;
+		if (miny1>gy) miny1 = gy;
+		if (maxy1<gy) maxy1 = gy;
+	}
+	camPara.l = minx1;
+	camPara.r = maxx1;
+	camPara.t = miny1;
+	camPara.b = maxy1;
+	int oht = (maxy1 - miny1) / outResolution;
+	int owd = (maxx1 - minx1) / outResolution;
+
+	//save the geoinfo
+	geoinfo.ht = oht;
+	geoinfo.wd = owd;
+	geoinfo.dx = outResolution;
+	geoinfo.dy = -geoinfo.dx;
+	geoinfo.left = minx1;
+	geoinfo.top  = miny1;
+	
+	return 0;
+}
+
+
+//generate orthoimage and save into the memory, added by xiedonghai, 2018.1.4
+//meanHeight: dem elevation from the sea surface
+int GenerateRGBDOM(string srcFile,
+	double rawResolution, double outResolution, double demResolution,
+	double minx, double miny, double maxx, double maxy,
+	CameraPara camPara, double  meanHeight,
+	vector<vector<double>> demData,
+	stGeoInfo&  geoinfo, vector<vector<unsigned char>>& rgb, int& oht, int& owd
+	)
+{
+	//if (!camPara.bIsAddedIntoNet)
+	//	return -1;
+
+	char* filename = const_cast<char*>(srcFile.c_str());
+
+	int demHt = demData.size();
+	int demWd = demData[0].size();
+
+	stGeoInfo ginfo;
+	GetGeoInformation(filename, ginfo);
+	int ht = ginfo.ht;
+	int wd = ginfo.wd;
+	int nBand = ginfo.nband;
+	
+	
+	double bx[4], by[4];
+	bx[0] = -wd / 2;	by[0] = -ht / 2;
+	bx[1] = wd / 2;		by[1] = -ht / 2;
+	bx[2] = -wd / 2;	by[2] = ht / 2;
+	bx[3] = wd / 2;		by[3] = ht / 2;
+	double minx1 = 100000000;
+	double maxx1 = -10000000;
+	double miny1 = 100000000;
+	double maxy1 = -10000000;
+	double gz = meanHeight;
+
+	printf("meanHeight: %lf \n", gz);
+
+	for (int j = 0; j<4; j++)
+	{
+		double ix = bx[j];
+		double iy = by[j];
+		double gx, gy;
+		ImgtoGrd1(camPara.R, camPara.T, camPara.focalLen, ix, iy, gz, &gx, &gy);
+
+		if (minx1>gx) minx1 = gx;
+		if (maxx1<gx) maxx1 = gx;
+		if (miny1>gy) miny1 = gy;
+		if (maxy1<gy) maxy1 = gy;
+	}
+	printf("[GenerateRGBDOM] ground area: %lf %lf %lf %lf \n", minx1, maxx1, miny1, maxy1);
+	
+
+	/*
+	//determine the ortho area only based on the height, written by xdh, 2018.1.11
+	double ratio = fabs(meanHeight - camPara.zs) / camPara.focalLen;
+	double gwd = double(wd) * ratio;
+	double ght = double(ht) * ratio;
+	double minx1 = camPara.xs - gwd*0.5;
+	double maxx1 = camPara.xs + gwd*0.5;
+	double miny1 = camPara.ys - ght*0.5;
+	double maxy1 = camPara.ys + ght*0.5;
+	*/
+
+	camPara.l = minx1;
+	camPara.r = maxx1;
+	camPara.t = miny1;
+	camPara.b = maxy1;
+	oht = (maxy1 - miny1) / outResolution;
+	owd = (maxx1 - minx1) / outResolution;
+	printf("ortho image size: %d  %d \n", oht, owd);
+
+
+	//save the geoinfo
+	geoinfo.ht = oht;
+	geoinfo.wd = owd;
+	geoinfo.dx = outResolution;
+	geoinfo.dy = -geoinfo.dx;
+	geoinfo.left = minx1;
+	geoinfo.top  = maxy1; //revised by xdh, 2018.5.31
+
+
+	//image buffer for r,g,b channels
+	rgb.resize(3);
+	for (int j = 0; j < 3; j++)
+		rgb[j].resize(oht*owd);
+
+	//the ortho-images of some photos may be very large because of rotation angle, 
+	//just discard them, added by Xie Donghai, 2015.11.28
+	int maxImageSize = sqrt(double(ht*ht + wd*wd));
+	if (max(oht, owd)>maxImageSize)
+	{
+		printf("[GenerateRGBDOM]: the size of orthoimage is two big! \n");
+		return -1;
+	}
+	
+	//double tResolution = 1.0 / outResolution;
+	double tDemResolution = 1.0 / demResolution;
+
+	//generate the mapping of resampling
+	int* srcIndex = (int*)malloc(owd*oht*sizeof(int));
+	memset(srcIndex, -1, sizeof(owd*oht)*sizeof(int));
+
+	for (int j = 0; j<oht; j++)
+	{
+		for (int i = 0; i<owd; i++)
+		{
+			double gy = j*outResolution + miny1;
+			double gx = i*outResolution + minx1;
+
+			//DEM image coordinate
+			int demY = (gy - miny) * tDemResolution;
+			int demX = (gx - minx) * tDemResolution;
+			demY = max(0, min(demHt - 1, demY));
+			demX = max(0, min(demWd - 1, demX));
+
+			//3D point
+			double gP[3];
+			gP[0] = gx;
+			gP[1] = gy;
+            gP[2] = meanHeight; //demData[demY][demX];
+
+			//3D to 2D projection
+			double ix, iy;
+			GrdToImg1(camPara.R, camPara.T, camPara.focalLen,
+				camPara.k1, camPara.k2, gP[0], gP[1], gP[2], &ix, &iy, ht, wd);
+			ix = int(ix);
+			iy = int(iy);
+
+			//resample
+			if (ix>0 && ix<wd && iy>0 && iy<ht)
+			{
+				//int index1 = (oht-j-1)*owd + i;
+				int index2 = (ht - iy - 1)*wd + ix;
+
+				srcIndex[j*owd + i] = index2;
+			}
+		}
+	}
+
+	GDALAllRegister();
+	CPLSetConfigOption("GDAL_FILENAME_IS_UTF8", "NO");
+	//reading file
+	GDALDataset *poDataset = (GDALDataset*)GDALOpen(filename, GA_ReadOnly);
+	if (poDataset == NULL)
+	{
+		printf("Open file using gdal failed ! \n");
+		return -1;
+	}
+
+	double gx, gy;
+	unsigned char* pBuffer = (unsigned char*)malloc(sizeof(unsigned char)*wd*ht);
+
+	for (int k = 0; k<3; k++)
+	{
+		//reading the buffer of band
+		GDALRasterBand *poBand = poDataset->GetRasterBand(k + 1);
+		wd = poBand->GetXSize();
+		ht = poBand->GetYSize();
+
+		poBand->RasterIO(GF_Read, 0, 0, wd, ht, pBuffer, wd, ht, GDT_Byte, 0, 0);
+
+		//clear the destiny buffer
+		for (int j = 0; j<oht; j++)
+		{
+			for (int i = 0; i<owd; i++)
+			{
+				//re-sample
+				if (srcIndex[j*owd + i]>0)
+				{
+					int index1 = (oht - j - 1)*owd + i;
+					int index2 = srcIndex[j*owd + i];
+					//pDstBuffer[index1] = pBuffer[index2];
+					rgb[k][index1] = pBuffer[index2];
+				}
+			}
+		}
+	}
+	
+	free(pBuffer);
+	free(srcIndex);
+	//close the input file
+	GDALClose((GDALDatasetH)poDataset);
+
+	return 0;
+}
 
 
 /* generate one orthoimage as jpeg and header file, written by xiedonghai, 2016.1.5
@@ -1494,6 +1890,7 @@ int  GenerateMosaicImage(int ht, int wd,
 /* reading Geo Tag information from jpeg image files
    return the number of images containing geo tag
 */
+/*
 int ReadingPosFromJpegImages(char* listfile, vector<stPOS>& camParas)
 {
 	int nImageofGeotags = 0;
@@ -1546,6 +1943,8 @@ int ReadingPosFromJpegImages(char* listfile, vector<stPOS>& camParas)
 
 	return nImageofGeotags;
 }
+*/
+
 
 int ReadingPosFile(char* posFile, char* imageListFile, vector<stPOS>& camParas)
 {
@@ -1852,261 +2251,261 @@ int AbsPosEstimation(stAbsPOS& absPosParams, vector<stPOS>& camParas, vector<stT
 	return 0;
 }
 
+//
+////////////////////////////////////////////////////////////////////////////
+//int  ReadCamFile(char* camfile, vector<stPOS>& camParas)
+//{
+//	FILE* fp = fopen(camfile,"rt");
+//	if(fp==NULL)
+//	{
+//		printf("error to load camera point file ! \n");
+//		return -1;
+//	}
+//
+//	int j=0;
+//	while( !feof(fp) )
+//	{
+//		stPOS cam;
+//		int nImageIndex = 0;
+//		if(fscanf(fp, "%d", &nImageIndex)==EOF) break;
+//		cam.nImageIndex = nImageIndex;		// point on image index, image on j
+//		//m_rev[nImageIndex] = j;
+//		fscanf(fp, "%lf %lf %lf", &cam.f, &cam.k1, &cam.k2);
+//		for(int i=0; i<9; i++)	fscanf(fp, "%lf", &(cam.R[i]));
+//		for(int i=0; i<3; i++)	fscanf(fp, "%lf", &(cam.T[i]));
+//		j++;
+//		camParas.push_back(cam);
+//	}
+//	fclose(fp);
+//
+//	//sort according the image index
+//	for(int j=0; j<camParas.size(); j++)
+//		for(int i=j+1; i<camParas.size(); i++)
+//		{
+//			if(camParas[j].nImageIndex>camParas[i].nImageIndex)
+//			{
+//				stPOS tp;
+//				tp = camParas[j];
+//				camParas[j] = camParas[i];
+//				camParas[i] = tp;
+//			}
+//		}
+//
+//	return 0;
+//}
+//
+//int  ReadPtFile(char* ptfile, vector<stTrack>& tracks)
+//{
+//	int num_pts;
+//	FILE* fp = fopen(ptfile,"rt");
+//	if(fp==NULL)
+//	{
+//		printf("error to read point file ! \n");
+//		return -1;
+//	}
+//
+//	fscanf(fp, "%d\n",&num_pts);
+//
+//	for (int i=0;i<num_pts;i++)
+//	{
+//		stTrack tp;
+//		int ptnum;
+//
+//		if(fscanf(fp, "%lf %lf %lf %d", &tp.x, &tp.y, &tp.z, &ptnum )==EOF)
+//		{
+//			num_pts = i;
+//			printf("points num: %d\n", num_pts);
+//			break;
+//		}
+//
+//		if (ptnum<=0)
+//		{
+//			continue;
+//		}
+//		double t1,t2;
+//		int    ptindex;
+//		for (int j=0;j<ptnum;j++)
+//		{
+//			fscanf(fp, " %d %lf %lf", &ptindex, &t1, &t2);
+//		}
+//
+//		tracks.push_back(tp);
+//	}
+//	fclose(fp);
+//
+//
+//	return 0;
+//}
+//
 
-//////////////////////////////////////////////////////////////////////////
-int  ReadCamFile(char* camfile, vector<stPOS>& camParas)
-{
-	FILE* fp = fopen(camfile,"rt");
-	if(fp==NULL)
-	{
-		printf("error to load camera point file ! \n");
-		return -1;
-	}
-
-	int j=0;
-	while( !feof(fp) )
-	{
-		stPOS cam;
-		int nImageIndex = 0;
-		if(fscanf(fp, "%d", &nImageIndex)==EOF) break;
-		cam.nImageIndex = nImageIndex;		// point on image index, image on j
-		//m_rev[nImageIndex] = j;
-		fscanf(fp, "%lf %lf %lf", &cam.f, &cam.k1, &cam.k2);
-		for(int i=0; i<9; i++)	fscanf(fp, "%lf", &(cam.R[i]));
-		for(int i=0; i<3; i++)	fscanf(fp, "%lf", &(cam.T[i]));
-		j++;
-		camParas.push_back(cam);
-	}
-	fclose(fp);
-
-	//sort according the image index
-	for(int j=0; j<camParas.size(); j++)
-		for(int i=j+1; i<camParas.size(); i++)
-		{
-			if(camParas[j].nImageIndex>camParas[i].nImageIndex)
-			{
-				stPOS tp;
-				tp = camParas[j];
-				camParas[j] = camParas[i];
-				camParas[i] = tp;
-			}
-		}
-
-	return 0;
-}
-
-int  ReadPtFile(char* ptfile, vector<stTrack>& tracks)
-{
-	int num_pts;
-	FILE* fp = fopen(ptfile,"rt");
-	if(fp==NULL)
-	{
-		printf("error to read point file ! \n");
-		return -1;
-	}
-
-	fscanf(fp, "%d\n",&num_pts);
-
-	for (int i=0;i<num_pts;i++)
-	{
-		stTrack tp;
-		int ptnum;
-
-		if(fscanf(fp, "%lf %lf %lf %d", &tp.x, &tp.y, &tp.z, &ptnum )==EOF)
-		{
-			num_pts = i;
-			printf("points num: %d\n", num_pts);
-			break;
-		}
-
-		if (ptnum<=0)
-		{
-			continue;
-		}
-		double t1,t2;
-		int    ptindex;
-		for (int j=0;j<ptnum;j++)
-		{
-			fscanf(fp, " %d %lf %lf", &ptindex, &t1, &t2);
-		}
-
-		tracks.push_back(tp);
-	}
-	fclose(fp);
-
-
-	return 0;
-}
-
-int  MosaicOnBundleWithWYOut(char* imageListFile, char* camfile,  char* ptfile, 
-							 int nLevel, char* outFile)
-{	
-	//reading camera's parameters
-	vector<stPOS> camParas;
-    if( ReadCamFile(camfile, camParas) < 0 )
-	{
-		printf("Loading cam file failed! \n");
-		return -1;
-	}
-	
-	//reading tracks
-	vector<stTrack> tracks;
-	ReadPtFile(ptfile, tracks);
-	
-	//reading image list file path
-	double focus;
-	int    tn;
-	char   tline[256];
-	int    nImageIndex;
-	int    wd,ht;
-	double scale, td1,td2;
-	int nImage = ( GetFileRows(imageListFile)-1) / 2;
-	if(nImage<1) return -1;
-	char** filenamesAll = f2c(nImage, 256);
-	FILE* fp = fopen(imageListFile, "r");
-	if(fp==NULL)
-	{
-		printf("error reading image list file! \n");
-		return -1;
-	}
-	fgets(tline, 256, fp);
-	for(int i=0; i<nImage; i++)
-	{
-		fscanf(fp, "%d %d %d  %lf %lf %lf ", &nImageIndex, &wd, &ht, &scale, &td1, &td2);
-		fscanf(fp, "\n%[^\n]", filenamesAll[i]);
-	}
-	fclose(fp);
-
-	//generate image list
-	int nImageValid = camParas.size();
-	char** filenames = f2c(nImageValid, 256);
-	for(int i=0; i<nImageValid; i++)
-	{   
-		int nImageId = camParas[i].nImageIndex; 
-		sprintf(filenames[i], "%s", filenamesAll[nImageId]);
-		printf("%s \n", filenames[i]);
-	}
-
-	//find the ground plane 
-	//(just like absolute pose estimation and transform the exterior parameters and tracks to new coordinate )
-	stAbsPOS absPosParams;
-	absPosParams.scale = 1;
-	memset(absPosParams.T, 0, 3*sizeof(double));
-	memset(absPosParams.R, 0, 9*sizeof(double));
-	absPosParams.R[0] = absPosParams.R[4] = absPosParams.R[8] = 1;
-   	{
-		FindGroundPlane(absPosParams, camParas, tracks);
-	}
-
-	//progress write
-	FILE *f_pro = fopen("process_4.txt","wt");	
-	fprintf(f_pro,"10\n");
-	fclose(f_pro);
-	
-	//calculate the mean height of plane
-	double planeHeiMean = 0;
-	int nValidCameras = 0;
-	for(int i=0; i<camParas.size(); i++)
-	{
-		if(camParas[i].f == 0 )
-			continue;
-		planeHeiMean += camParas[i].zs;
-		nValidCameras ++;
-	}
-	planeHeiMean /= double( nValidCameras );
-	printf("plane mean height: %lf \n", planeHeiMean);
-
-	//calculate the area and height of points after absolute pose estimation
-	double minx,maxx,miny,maxy;
-	double meanHeight;
-	CalculateGroudArea(tracks, minx, maxx, miny, maxy, meanHeight);
-	double relativeHei = fabs(meanHeight - planeHeiMean);
-    
-  
-	//calculate the resolution after absolute pose estimation
-	double rawResolution;
-	rawResolution = CalculateResolution(ht, wd, meanHeight, camParas);
-	
-	
-	//get the resolution
-	double outResolution = rawResolution*(nLevel*2 + 1); 
-	int oht = (maxy-miny) / outResolution ;
-	int owd = (maxx-minx) / outResolution ;
-	//get the maximum dimension for 32bit OS
-	double ratio = CalculateRatioFor32bitOS(oht, owd, 1);
-	oht *= ratio;
-	owd *= ratio;
-	outResolution = outResolution / ratio;
-    
-	//progress write
-	f_pro = fopen("process_4.txt","wt");	
-	fprintf(f_pro,"20\n");
-	fclose(f_pro);
-
-
-	//DEM interpolation
-	float* iz = NULL;
-	int demHt, demWd;
-	ratio = CalculateRatioFor32bitOS(oht, owd, 4);
-	int demScale = (outResolution/rawResolution)*(1.0/ratio)*2;
-	int np = tracks.size();
-	double* px = (double*)malloc(np*sizeof(double));
-	double* py = (double*)malloc(np*sizeof(double));
-	double* pz = (double*)malloc(np*sizeof(double));
-	int index = 0;
-	double heiRatio = 0.25;
-	for(int i=0; i<np; i++)
-	{
-		//remove error 3d point
-		double dif = fabs(tracks[i].z - meanHeight);
-        if(dif > fabs(relativeHei*heiRatio) )
-			continue;
-
-		px[index] = tracks[i].x;
-		py[index] = tracks[i].y;
-		pz[index] = tracks[i].z;
-		index ++;
-	}
-	MBAInterpolation(px, py, pz, index, demScale, rawResolution, demHt, demWd, &iz);
-	printf("dem ht*wd: %d %d \n", demHt, demWd);
-	free(px);
-	free(py);
-	free(pz);
-
-	//progress write
-	f_pro = fopen("process_4.txt","wt");	
-	fprintf(f_pro,"30\n");
-	fclose(f_pro);
-
-
-	/*
-	stGeoInfo geoinfo;
-	memset( &geoinfo, 0, sizeof(stGeoInfo) );
-	geoinfo.left = minx;
-	geoinfo.top = miny;
-	geoinfo.dx = rawResolution*demScale;
-	geoinfo.dy = rawResolution*demScale;
-	GdalWriteFloat("d:\\dem.tif", iz, demHt, demWd, geoinfo);
-	*/
-	
-	//generating orthoimage
-	//GenerateMosaicImage(ht, wd, filenames, rawResolution, outResolution, demHt, demWd, demScale, 
-	//	iz, camParas, absPosParams, minx, maxx, miny, maxy, meanHeight, outFile);
-	
-	//progress write
-	f_pro = fopen("process_4.txt","wt");	
-	fprintf(f_pro,"100\n");
-	fclose(f_pro);
-    
-	
-    free(iz);	
-	
-	return 0;
-}
-//////////////////////////////////////////////////////////////////////////
-
-
-
+//
+//int  MosaicOnBundleWithWYOut(char* imageListFile, char* camfile,  char* ptfile, 
+//							 int nLevel, char* outFile)
+//{	
+//	//reading camera's parameters
+//	vector<stPOS> camParas;
+//    if( ReadCamFile(camfile, camParas) < 0 )
+//	{
+//		printf("Loading cam file failed! \n");
+//		return -1;
+//	}
+//	
+//	//reading tracks
+//	vector<stTrack> tracks;
+//	ReadPtFile(ptfile, tracks);
+//	
+//	//reading image list file path
+//	double focus;
+//	int    tn;
+//	char   tline[256];
+//	int    nImageIndex;
+//	int    wd,ht;
+//	double scale, td1,td2;
+//	int nImage = ( GetFileRows(imageListFile)-1) / 2;
+//	if(nImage<1) return -1;
+//	char** filenamesAll = f2c(nImage, 256);
+//	FILE* fp = fopen(imageListFile, "r");
+//	if(fp==NULL)
+//	{
+//		printf("error reading image list file! \n");
+//		return -1;
+//	}
+//	fgets(tline, 256, fp);
+//	for(int i=0; i<nImage; i++)
+//	{
+//		fscanf(fp, "%d %d %d  %lf %lf %lf ", &nImageIndex, &wd, &ht, &scale, &td1, &td2);
+//		fscanf(fp, "\n%[^\n]", filenamesAll[i]);
+//	}
+//	fclose(fp);
+//
+//	//generate image list
+//	int nImageValid = camParas.size();
+//	char** filenames = f2c(nImageValid, 256);
+//	for(int i=0; i<nImageValid; i++)
+//	{   
+//		int nImageId = camParas[i].nImageIndex; 
+//		sprintf(filenames[i], "%s", filenamesAll[nImageId]);
+//		printf("%s \n", filenames[i]);
+//	}
+//
+//	//find the ground plane 
+//	//(just like absolute pose estimation and transform the exterior parameters and tracks to new coordinate )
+//	stAbsPOS absPosParams;
+//	absPosParams.scale = 1;
+//	memset(absPosParams.T, 0, 3*sizeof(double));
+//	memset(absPosParams.R, 0, 9*sizeof(double));
+//	absPosParams.R[0] = absPosParams.R[4] = absPosParams.R[8] = 1;
+//   	{
+//		FindGroundPlane(absPosParams, camParas, tracks);
+//	}
+//
+//	//progress write
+//	FILE *f_pro = fopen("process_4.txt","wt");	
+//	fprintf(f_pro,"10\n");
+//	fclose(f_pro);
+//	
+//	//calculate the mean height of plane
+//	double planeHeiMean = 0;
+//	int nValidCameras = 0;
+//	for(int i=0; i<camParas.size(); i++)
+//	{
+//		if(camParas[i].f == 0 )
+//			continue;
+//		planeHeiMean += camParas[i].zs;
+//		nValidCameras ++;
+//	}
+//	planeHeiMean /= double( nValidCameras );
+//	printf("plane mean height: %lf \n", planeHeiMean);
+//
+//	//calculate the area and height of points after absolute pose estimation
+//	double minx,maxx,miny,maxy;
+//	double meanHeight;
+//	CalculateGroudArea(tracks, minx, maxx, miny, maxy, meanHeight);
+//	double relativeHei = fabs(meanHeight - planeHeiMean);
+//    
+//  
+//	//calculate the resolution after absolute pose estimation
+//	double rawResolution;
+//	rawResolution = CalculateResolution(ht, wd, meanHeight, camParas);
+//	
+//	
+//	//get the resolution
+//	double outResolution = rawResolution*(nLevel*2 + 1); 
+//	int oht = (maxy-miny) / outResolution ;
+//	int owd = (maxx-minx) / outResolution ;
+//	//get the maximum dimension for 32bit OS
+//	double ratio = CalculateRatioFor32bitOS(oht, owd, 1);
+//	oht *= ratio;
+//	owd *= ratio;
+//	outResolution = outResolution / ratio;
+//    
+//	//progress write
+//	f_pro = fopen("process_4.txt","wt");	
+//	fprintf(f_pro,"20\n");
+//	fclose(f_pro);
+//
+//
+//	//DEM interpolation
+//	float* iz = NULL;
+//	int demHt, demWd;
+//	ratio = CalculateRatioFor32bitOS(oht, owd, 4);
+//	int demScale = (outResolution/rawResolution)*(1.0/ratio)*2;
+//	int np = tracks.size();
+//	double* px = (double*)malloc(np*sizeof(double));
+//	double* py = (double*)malloc(np*sizeof(double));
+//	double* pz = (double*)malloc(np*sizeof(double));
+//	int index = 0;
+//	double heiRatio = 0.25;
+//	for(int i=0; i<np; i++)
+//	{
+//		//remove error 3d point
+//		double dif = fabs(tracks[i].z - meanHeight);
+//        if(dif > fabs(relativeHei*heiRatio) )
+//			continue;
+//
+//		px[index] = tracks[i].x;
+//		py[index] = tracks[i].y;
+//		pz[index] = tracks[i].z;
+//		index ++;
+//	}
+//	MBAInterpolation(px, py, pz, index, demScale, rawResolution, demHt, demWd, &iz);
+//	printf("dem ht*wd: %d %d \n", demHt, demWd);
+//	free(px);
+//	free(py);
+//	free(pz);
+//
+//	//progress write
+//	f_pro = fopen("process_4.txt","wt");	
+//	fprintf(f_pro,"30\n");
+//	fclose(f_pro);
+//
+//
+//	/*
+//	stGeoInfo geoinfo;
+//	memset( &geoinfo, 0, sizeof(stGeoInfo) );
+//	geoinfo.left = minx;
+//	geoinfo.top = miny;
+//	geoinfo.dx = rawResolution*demScale;
+//	geoinfo.dy = rawResolution*demScale;
+//	GdalWriteFloat("d:\\dem.tif", iz, demHt, demWd, geoinfo);
+//	*/
+//	
+//	//generating orthoimage
+//	//GenerateMosaicImage(ht, wd, filenames, rawResolution, outResolution, demHt, demWd, demScale, 
+//	//	iz, camParas, absPosParams, minx, maxx, miny, maxy, meanHeight, outFile);
+//	
+//	//progress write
+//	f_pro = fopen("process_4.txt","wt");	
+//	fprintf(f_pro,"100\n");
+//	fclose(f_pro);
+//    
+//	
+//    free(iz);	
+//	
+//	return 0;
+//}
+////////////////////////////////////////////////////////////////////////////
+//
 
 /* mosaic uav images according the bundler output , written by xie donghai, 2015.9.30
    inputs
@@ -2188,8 +2587,7 @@ int MosaicOnBundleWithDEM(char* imageListFile, char* bundleFile,
 	vector<stTrack> tracks;
 	ReadSmoothedPointCloud(smoothedFile, tracks);	
 	WriteProgressValueToFile(5.0);
-
-
+	
 	//getchar();
 	
 	//reading POS parameters 
@@ -2208,7 +2606,7 @@ int MosaicOnBundleWithDEM(char* imageListFile, char* bundleFile,
 		{	
 			int nPOSTag = 0;
 						
-			nPOSTag = ReadingPosFromJpegImages(imageListFile, camParas);
+			//nPOSTag = ReadingPosFromJpegImages(imageListFile, camParas);
 						
 			if( nPOSTag>3 )
 				bIsHavePos = true;
@@ -2299,13 +2697,12 @@ int MosaicOnBundleWithDEM(char* imageListFile, char* bundleFile,
 	oht *= ratio;
 	owd *= ratio;
 	outResolution = outResolution / ratio;
-	
-
 
 	//DEM interpolation
 	float* iz = NULL;
 	int demHt, demWd;
 	ratio = CalculateRatioFor32bitOS(oht, owd, 4);
+
 	int demScale = (outResolution/rawResolution)*(1.0/ratio)*2;
 	int np = tracks.size();
 	double* px = (double*)malloc(np*sizeof(double));
@@ -2325,7 +2722,8 @@ int MosaicOnBundleWithDEM(char* imageListFile, char* bundleFile,
 		pz[index] = tracks[i].z;
 		index ++;
 	}
-	MBAInterpolation(px, py, pz, index, demScale, rawResolution, demHt, demWd, &iz);
+	int level = 10;
+	MBAInterpolation(px, py, pz, index, demScale, rawResolution, level, demHt, demWd, &iz);
 	printf("dem ht*wd: %d %d \n", demHt, demWd);
 	free(px);
 	free(py);
@@ -2370,9 +2768,6 @@ int MosaicOnBundleWithDEM(char* imageListFile, char* bundleFile,
 	printf("Finished ! \n");	
 	return 0;
 }
-
-
-
 
 void FitPlane1(double* px, double* py, double* pz, int np, double* R)
 {	
@@ -2427,3 +2822,75 @@ void FitPlane1(double* px, double* py, double* pz, int np, double* R)
 	delete []tmpoty;
 	delete []tmpotz;
 }
+
+
+
+
+/*
+generate orthoimage, mosaic and fuse, written by xiedonghai, 2015.10.13
+*/
+/*
+int  GenerateOrthoImage(vector<string> filenames,
+	double  rawResolution, double  outResolution,
+	int  demHt,	int  demWd,	double  demScale,
+	float* iz,	vector<CameraPara>& camParas, stAbsPOS absPosParams,
+	double  minx, double maxx, double miny, double maxy,
+	double  meanHeight,	string outpath)
+{
+	int zoneNumber = GetZoneNumber(camParas);
+	
+	//for progress bar
+	int nValidate = 0;
+	for (int i = 0; i<camParas.size(); i++)
+	{
+		if (camParas[i].focalLen > 0)
+			nValidate++;
+	}
+	double dstep = 80.0 / double(nValidate);
+	//////////////////////////////////////////////////////////////////////////
+
+	for (int i = 0; i<camParas.size(); i++)
+	{
+		if (camParas[i].focalLen == 0)
+			continue;
+
+		char* orthofile = (char*)malloc(256);
+		GenerateProductFile(filenames[i], "product", "jpeg", &orthofile);
+		char* geofile = (char*)malloc(256);
+		GenerateProductFile(filenames[i], "product", "geo", &geofile);
+
+		//if( bIsFileExit(orthofile) && bIsFileExit(geofile) )
+		//	continue;
+
+		char* postfix = NULL;
+		GetPostfix(filenames[i], &postfix);
+
+		if (strcmp(postfix, "jpg") == 0 || strcmp(postfix, "JPG") == 0)
+		{
+			//if input format is jpg, then we compress the orthoimage as jpg and save the geodata into the *.geo file
+			GenerateSingleZipOrtho(filenames[i], rawResolution, outResolution,
+				demHt, demWd, demScale, iz, minx, miny, maxx, maxy, camParas[i], meanHeight, zoneNumber,
+				orthofile, geofile);
+		}
+		else if (strcmp(postfix, "tif") == 0 || strcmp(postfix, "TIF") == 0)
+		{
+			//if input format is tif, we save the orthoimage as tif file directly
+			GenerateProductFile(filenames[i], "product", "tif", &orthofile);
+			GenerateSingleOrthoTiff(filenames[i], rawResolution, outResolution,
+				demHt, demWd, demScale, iz, minx, miny, maxx, maxy, camParas[i], meanHeight, zoneNumber,
+				orthofile);
+		}
+		else
+		{
+
+		}
+
+		free(orthofile);
+		free(geofile);
+
+		WriteProgressValueToFile(dstep);
+	}
+
+	return 0;
+}
+*/

@@ -74,9 +74,9 @@ int   InitCamera(CameraPara& cam, POSInfo pos)
 
 	memcpy(cam.R, R, sizeof(double)*9);
 
-	cam.t[0] = pos.gx;
-	cam.t[1] = pos.gy;
-	cam.t[2] = pos.height;
+	cam.T[0] = pos.gx;
+	cam.T[1] = pos.gy;
+	cam.T[2] = pos.height;
 
 	cam.bIsExplicit = true;
 	
@@ -255,5 +255,24 @@ int DrawFeatPt(ImgFeature& featpts, IplImage* pImage)
 	return 0;
 }
 
+
+using namespace cv;
+int DrawFeatPt(ImgFeature& featpts, Mat& image)
+{
+
+	int numpt = featpts.GetFeatPtSum();
+	for (int i = 0; i<numpt; i++)
+	{
+		Point2DDouble pt = featpts.GetTopLeftPt(i);
+		Point ip;
+		ip.x = pt.p[0];
+		ip.y = pt.p[1];
+
+		//cvDrawCircle(pImage, ip, 1, CV_RGB(255, 0, 0), 2);
+		cv::circle(image, ip, 3, Scalar(0, 255, 0), 1);
+	}
+
+	return 0;
+}
 
 

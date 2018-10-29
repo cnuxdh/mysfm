@@ -38,6 +38,8 @@ DLL_EXPORT int	   DrawMatches(char* filename, IplImage* pLeft, IplImage* pRight,
 							vector<Point2DDouble> lpts, vector<Point2DDouble> rpts,
 							 int thickness=1);
 
+
+
 int    CalculateColorHist(IplImage* pImage, int grayStep, vector<double>& hist);
 
 DLL_EXPORT int    InitCamera(CameraPara& cam, POSInfo pos);
@@ -50,6 +52,7 @@ IplImage* ResizeImage(IplImage* src, int maxHt);
 
 DLL_EXPORT int DrawFeatPt(ImgFeature& featpts, IplImage* pImage);
 
+DLL_EXPORT int DrawFeatPt(ImgFeature& featpts, Mat& image);
 
 
 #endif

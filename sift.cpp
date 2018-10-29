@@ -6,11 +6,10 @@
 #include "sift.hpp"
 #include "panorama.hpp"
 #include "funcs.hpp"
-
+#include "pano2plane.h"
 
 //corelib
 #include "Matrix.h"
-
 
 //siftdll
 #include "siftfeature.h"
@@ -156,6 +155,7 @@ int CSIFTFloat::Detect(char* filePath, ImgFeature& imgFeat)
 	//image resize, to improve the speed
 	
 	int dstHt, dstWd;
+	dstHt = sht;
 	GetResizeDimension(pSrc->height, pSrc->width, dstHt, dstWd);
 	double sx = (double)(swd) / (double)(dstWd);
 	double sy = (double)(sht) / (double)(dstHt);
@@ -253,14 +253,17 @@ int CSIFTFloat::Detect(IplImage* pSrc, ImgFeature& imgFeat)
 	int sht = pSrc->height;
 	int swd = pSrc->width;
 
+	/*
 	//image resize, to improve the speed	
 	int dstHt, dstWd;
+	dstHt = sht;
 	GetResizeDimension(pSrc->height, pSrc->width, dstHt, dstWd);
 	double sx = (double)(swd) / (double)(dstWd);
 	double sy = (double)(sht) / (double)(dstHt);
 	IplImage* pImage = cvCreateImage(cvSize(dstWd, dstHt), 8, 1);
 	cvResize(pSrc, pImage);    
 	//cvReleaseImage(&pSrc);
+	*/
 
 	/*
 	float* fImage;
@@ -269,15 +272,15 @@ int CSIFTFloat::Detect(IplImage* pSrc, ImgFeature& imgFeat)
 	*/
 	
 	int i,j;
-	int ht = pImage->height;
-	int wd = pImage->width;
-	int scanwd = pImage->widthStep;
+	int ht = pSrc->height;
+	int wd = pSrc->width;
+	int scanwd = pSrc->widthStep;
 	float* fImage = (float*)malloc(ht*wd*sizeof(float));
 	float  scale = 1.0;//1.0/256.0;
 	for(j=0; j<ht; j++)
 		for(i=0; i<wd; i++)
 		{
-			fImage[j*wd+i] = float(  (unsigned char)(pImage->imageData[j*scanwd+i]) )*scale;
+			fImage[j*wd+i] = float(  (unsigned char)(pSrc->imageData[j*scanwd+i]) )*scale;
 		}
 	
 	
@@ -317,11 +320,11 @@ int CSIFTFloat::Detect(IplImage* pSrc, ImgFeature& imgFeat)
 		feat.key_intvl  = featPts[i].key_intvl;
 		feat.key_octave = featPts[i].key_octave;
 
-		feat.col = featPts[i].initl_column*sx;
-		feat.row = featPts[i].initl_row*sy;
+		feat.col = featPts[i].initl_column;
+		feat.row = featPts[i].initl_row;
 		
-		feat.x = featPts[i].initl_column*sx;
-		feat.y = featPts[i].initl_row*sy;
+		feat.x = featPts[i].initl_column;
+		feat.y = featPts[i].initl_row;
 
 		feat.cx = feat.x - swd*0.5; //normalized coordinate
 		feat.cy = sht*0.5 - feat.y; //normalized coordinate        
@@ -336,7 +339,7 @@ int CSIFTFloat::Detect(IplImage* pSrc, ImgFeature& imgFeat)
 	delete[] featPts;
 	free(fImage);
 
-	cvReleaseImage(&pImage);
+	//cvReleaseImage(&pImage);
 	
 	return 1;
 }
@@ -573,7 +576,7 @@ int CSIFTPano::Detect(IplImage* pImage, ImgFeature& imgFeat, int maxHt)
 		memcpy(R, camParas[i].R, sizeof(double)*9);
 		invers_matrix(R, 3);
 
-		double focalLen = camParas[i].focus;
+		double focalLen = camParas[i].focalLen;
 		
 		for(int k=0; k<ifeat.GetFeatPtSum(); k++)
 		{

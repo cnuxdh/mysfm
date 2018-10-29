@@ -1,14 +1,15 @@
 
 #include "blend.hpp"
 #include "mosaic.hpp"
+#include "defines.hpp"
 
 //corelib
-#include "corelib/commondata.h"
-#include "corelib/ImageFunc.h"
-#include "corelib/image.h"
-#include "Corelib/commonfile.h"
-#include "Corelib/CommonFuncs.h"
-#include "Corelib/Matrix.h"
+#include "commondata.h"
+#include "ImageFunc.h"
+#include "image.h"
+#include "commonfile.h"
+#include "CommonFuncs.h"
+#include "Matrix.h"
 
 //gdal
 #include "gdal_priv.h"
@@ -33,7 +34,7 @@
 using namespace std;
 
 
-#define MAX_MASK_SIZE 900
+
 
 
 /* generate mask for mosaic, ratio is default set to 1
@@ -2153,12 +2154,59 @@ int SeamlinesFindingVoronoiOneByOne(char** maskNames, int nFile,
 	
 	}
 
-	
-
 	return 0;
 }
 
 
+
+int SeamlinesFindingVoronoi(unsigned char** pMaskArray, int nFile, 
+	vector<int> masksHt, vector<int> masksWd, vector<MyRect> vecRect, bool& bIsStop)
+{
+	printf("Finding seam lines by voronoi... \n");
+
+	CSeamFinderBase* pSeamFinder = new CVoroniSeamFinder();
+
+	for (int i = 0; i<nFile; i++)
+	{
+		if (bIsStop) {
+			delete pSeamFinder;
+			return -1;
+		}
+
+		printf(" %d ", i);
+
+		unsigned char* pMask1 = pMaskArray[i];
+		int mht1 = masksHt[i];
+		int mwd1 = masksWd[i];
+
+		iPoint p1;
+		p1.x = vecRect[i].left;
+		p1.y = vecRect[i].top;
+
+		for (int j = i + 1; j<nFile; j++)
+		{
+			unsigned char* pMask2 = pMaskArray[j];
+			int mht2 = masksHt[j];
+			int mwd2 = masksWd[j];
+
+			iPoint p2;
+			p2.x = vecRect[j].left;
+			p2.y = vecRect[j].top;
+
+			pSeamFinder->FindPair(pMask1, mht1, mwd1, pMask2, mht2, mwd2, p1, p2);
+		}
+		if (0)
+		{
+			char maskfile[256];
+			//strcpy(maskfile, maskNames[i]);
+			strcat(maskfile, ".jpg");
+			SaveToJpg(pMask1, mht1, mwd1, maskfile);
+		}
+	}
+	delete pSeamFinder;
+
+	return 0;
+}
 
 int SeamlinesFindingVoronoi(char** maskNames, int nFile, 
 							vector<MyRect> vecRect)
@@ -2394,7 +2442,7 @@ int MultiBandBlend(char** filenames, char** maskNames, int nFile,
 										(unsigned char)(pSmooth->imageData[mj*swd + mi*3 + bandId]);
 								}
 							cvReleaseImage(&pSmooth);			
-							SaveBmp("d:\\smooth.bmp", vecSIP[ki]->pImage, ht, wd );							
+							//SaveBmp("d:\\smooth.bmp", vecSIP[ki]->pImage, ht, wd );							
 						}						
 					}
 					else
@@ -2498,6 +2546,168 @@ int MultiBandBlend(char** filenames, char** maskNames, int nFile,
 
 	return 0;
 }
+
+
+//the final version, 2018.1.5
+int WeightedLoGBlendGeneral(char** filenames, unsigned char** pMaskArray, int nFile,
+	vector<int> masksHt, vector<int> masksWd,
+	vector<stGeoInfo> geoArray,
+	vector<MyRect> vecRect,
+	double outImageResolution,
+	double maskResolution,
+	double minx, double maxx, double miny, double maxy,
+	int nPyramidLevel,
+	double* gainParas,
+	char* outFile, double& dProgress,
+	sfmCall pCallBack,
+	bool& bIsStop)
+{
+	if (bIsStop) {
+		return -1;
+	}
+
+	printf("[WeightedLoGBlendGeneral] ... \n");
+
+	if (nFile <= 1)
+		return -1;
+
+	int oht = (maxy - miny) / outImageResolution;
+	int owd = (maxx - minx) / outImageResolution;
+	printf("oht: %d  owd: %d \n", oht, owd);
+
+	//generate the whole mask
+	printf("[WeightedLoGBlendGeneral] generate the whole mask....\n");
+	int mht = (maxy - miny) / maskResolution;
+	int mwd = (maxx - minx) / maskResolution;
+	unsigned char* pWholeMask = (unsigned char*)malloc(mht*mwd);
+	if (pWholeMask == NULL)
+	{
+		printf("failed to malloc memory for whole mask .... \n");
+		return -1;
+	}
+	memset(pWholeMask, 0, mht*mwd);
+	double maskRatio = outImageResolution / maskResolution;
+	for (int i = 0; i<nFile; i++)
+	{
+		//reading mask
+		unsigned char* pMask = pMaskArray[i];
+		int ht = masksHt[i];
+		int wd = masksWd[i];
+
+		//dilate and smooth the mask
+		MyDilate(pMask, ht, wd, 3);
+
+		int l = max(0, min(owd - 1, int(vecRect[i].left)))*maskRatio;
+		int r = max(0, min(owd - 1, int(vecRect[i].right)))*maskRatio;
+		int t = max(0, min(oht - 1, int(vecRect[i].top)))*maskRatio;
+		int b = max(0, min(oht - 1, int(vecRect[i].bottom)))*maskRatio;
+
+		l = min(mwd - 1, l);
+		r = min(mwd - 1, r);
+		t = min(mht - 1, t);
+		b = min(mht - 1, b);
+		//printf("%d %d %d %d \n", l, r, t, b);
+		for (int kj = t; kj <= b; kj++)
+			for (int ki = l; ki <= r; ki++)
+			{
+				int my = max(0, min(ht - 1, (kj - t)));
+				int mx = max(0, min(wd - 1, (ki - l)));
+				if (pMask[my*wd + mx] == 0)
+					continue;
+				pWholeMask[kj*mwd + ki] = pMask[my*wd + mx];
+			}
+	}
+	
+	printf("whole mask erode ...\n");
+	MyErode(pWholeMask, mht, mwd, 3); //why i use this function
+
+#ifdef _DEBUG
+	SaveToJpg(pWholeMask, mht, mwd, "c:\\temp\\wholemask.jpg");
+#endif
+
+	printf("get geoinfo from file ...\n");
+	//get the type of image format
+	stGeoInfo geoinfo;
+	GetGeoInformation(filenames[0], geoinfo);
+	int nBand = geoinfo.nband;
+
+	printf("get pixel type from file ...\n");
+	GDALDataType ntype = GetDataType(filenames[0]);
+	int nByte = 1;
+	unsigned char* pByteBuffer = NULL;
+	unsigned short* pUShortBuffer = NULL;
+	short* pShortBuffer = NULL;
+	unsigned int* pUIntBuffer = NULL;
+	int*    pIntBuffer = NULL;
+	float*  pFloatBuffer = NULL;
+	double* pDoubleBuffer = NULL;
+
+	printf("blending....\n");
+	switch (ntype)
+	{
+	case 1: //byte
+		nByte = 1;
+		printf("unsigned char ...\n");
+		LoGBlendGeneral(filenames, pMaskArray, nFile, masksHt, masksWd, geoArray, vecRect, outImageResolution
+			, maskResolution, minx, maxx, miny, maxy, nPyramidLevel, gainParas
+			, outFile, pWholeMask, maskRatio, mht, mwd,
+			pByteBuffer, ntype, nByte, nBand, oht, owd, dProgress, pCallBack, bIsStop);
+
+		break;
+	case 2: //unsigned short
+		printf("unsigned short ...\n");
+		nByte = 2;
+		LoGBlendGeneral(filenames, pMaskArray, nFile, masksHt, masksWd, geoArray, vecRect, outImageResolution
+			, maskResolution, minx, maxx, miny, maxy, nPyramidLevel, gainParas
+			, outFile, pWholeMask, maskRatio, mht, mwd,
+			pUShortBuffer, ntype, nByte, nBand, oht, owd, dProgress, pCallBack, bIsStop);
+		break;
+	case 3: //short
+		printf("short ...\n");
+		nByte = 2;
+		LoGBlendGeneral(filenames, pMaskArray, nFile, masksHt, masksWd, geoArray, vecRect, outImageResolution
+			, maskResolution, minx, maxx, miny, maxy, nPyramidLevel, gainParas
+			, outFile, pWholeMask, maskRatio, mht, mwd,
+			pShortBuffer, ntype, nByte, nBand, oht, owd, dProgress, pCallBack, bIsStop);
+
+		break;
+	case 4: //unsigned int
+		nByte = 4;
+		LoGBlendGeneral(filenames, pMaskArray, nFile, masksHt, masksWd, geoArray, vecRect, outImageResolution
+			, maskResolution, minx, maxx, miny, maxy, nPyramidLevel, gainParas
+			, outFile, pWholeMask, maskRatio, mht, mwd,
+			pUIntBuffer, ntype, nByte, nBand, oht, owd, dProgress, pCallBack, bIsStop);
+
+		break;
+	case 5: //int 
+		nByte = 4;
+		LoGBlendGeneral(filenames, pMaskArray, nFile, masksHt, masksWd, geoArray, vecRect, outImageResolution
+			, maskResolution, minx, maxx, miny, maxy, nPyramidLevel, gainParas
+			, outFile, pWholeMask, maskRatio, mht, mwd,
+			pIntBuffer, ntype, nByte, nBand, oht, owd, dProgress, pCallBack, bIsStop);
+
+		break;
+	case 6: //float
+		nByte = 4;
+		LoGBlendGeneral(filenames, pMaskArray, nFile, masksHt, masksWd, geoArray, vecRect, outImageResolution
+			, maskResolution, minx, maxx, miny, maxy, nPyramidLevel, gainParas
+			, outFile, pWholeMask, maskRatio, mht, mwd,
+			pFloatBuffer, ntype, nByte, nBand, oht, owd, dProgress, pCallBack, bIsStop);
+
+		break;
+	case 7: //double
+		nByte = 8;
+		LoGBlendGeneral(filenames, pMaskArray, nFile, masksHt, masksWd, geoArray, vecRect, outImageResolution
+			, maskResolution, minx, maxx, miny, maxy, nPyramidLevel, gainParas
+			, outFile, pWholeMask, maskRatio, mht, mwd,
+			pDoubleBuffer, ntype, nByte, nBand, oht, owd, dProgress, pCallBack, bIsStop);
+		break;
+	}
+
+	free(pWholeMask);
+}
+
+
 
 //this version can handle image of any format
 int WeightedLoGBlendGeneral( char** filenames, char** masknames, int nFile, 
@@ -3465,6 +3675,161 @@ int DirectMosaicGeoTiff(char** filenames, int nFile, char* outFile, double outRe
 	return 0;
 }
 
+/*
+//new interface for orthoimage mosaic and fusion, 2018.1.5
+int BlendOrthoImages(vector<string> imageFiles, double outResolution,
+	string mosaicFile)
+{
+	int nFile = imageFiles.size();
+
+	vector<stGeoInfo> geoArray;
+	geoArray.resize(nFile);
+
+	double minx, maxx, miny, maxy;
+	double maxrx, maxry;
+	double rx, ry;
+	minx = 5000000000;
+	maxx = -5000000000;
+	miny = 5000000000;
+	maxy = -5000000000;
+	maxrx = 0;
+	maxry = 0;
+	int zoneNumber = geoArray[0].zoneNumber;
+	for (int i = 0; i<nFile; i++)
+	{
+		if (zoneNumber != geoArray[i].zoneNumber)
+			continue;
+		//resolution
+		rx = geoArray[i].dx;
+		ry = fabs(geoArray[i].dy);
+		maxrx = max(rx, maxrx);
+		maxry = max(ry, maxry);
+		//position
+		minx = min(minx, geoArray[i].left);
+		maxx = max(maxx, geoArray[i].left + geoArray[i].wd*rx);
+		miny = min(miny, geoArray[i].top - geoArray[i].ht*ry);
+		maxy = max(maxy, geoArray[i].top);
+	}
+	printf(" left:%lf right:%lf  top:%lf bottom:%lf \n", minx, maxx, maxy, miny);
+
+
+	//get the proper resolution
+	double resolution = outResolution;
+	int oht = (maxy - miny) / resolution;
+	int owd = (maxx - minx) / resolution;
+	double memRatio = CalculateRatioFor64bitOS(oht, owd, 1);
+	oht *= memRatio;
+	owd *= memRatio;
+	outResolution = resolution / memRatio;
+	printf("%lf %d %d \n", memRatio, oht, owd);
+	printf(" restricted resolution: %lf \n", resolution);
+	WriteProgressValueToFile(5.0);
+
+	//////////////////  2. generate the original mask image and save them into files//////////////
+	char** maskNames = f2c(nFile, 256);
+	for (int i = 0; i<nFile; i++)
+	{
+		//GenerateProductFile(filenames[i], "product", "msk", &(maskNames[i]) );
+		strcpy(maskNames[i], filenames[i]);
+		int len = strlen(maskNames[i]);
+		strcpy(maskNames[i] + len - 3, "msk");
+		printf("%s \n", maskNames[i]);
+	}
+
+	//set the resolution for the mask
+	int iht = geoArray[0].ht;
+	int iwd = geoArray[0].wd;
+	int nMaskSize = max(iht, iwd);
+	double maskResolution = fabs(geoArray[0].dx);
+	if (nMaskSize>MAX_MASK_SIZE)
+	{
+		double maskRatio = (double)(MAX_MASK_SIZE) / (double)(nMaskSize);
+		maskResolution = maskResolution / maskRatio;
+	}
+	if (maskResolution<outResolution)
+		maskResolution = outResolution;
+
+	vector<MyRect> vecRectMosaic;
+	vecRectMosaic.resize(nFile);
+	vector<MyRect> vecRectMask;
+	vecRectMask.resize(nFile);
+	printf("generating original mask... \n");
+	for (int i = 0; i<nFile; i++)
+	{
+		printf("%d \n", i);
+		unsigned char* pMask = NULL;
+		int mht, mwd;
+
+		double ratio = fabs(geoArray[i].dx) / maskResolution;
+		stGeoInfo geoInfo;
+		GetGeoInformation(filenames[i], geoInfo);
+		int ht = geoInfo.ht;
+		int wd = geoInfo.wd;
+		mht = ht*ratio;
+		mwd = wd*ratio;
+
+		ReadGeoFileByte(filenames[i], 1, ratio, &pMask, mht, mwd);
+		//convert to mask value
+		for (int k = 0; k<mht*mwd; k++)
+		{
+			if (pMask[k]>0)
+				pMask[k] = 10;
+		}
+
+		//calculate the translation of each image in mask space
+		double mosaicRatio = fabs(geoArray[i].dx) / outResolution;
+		int x = (geoArray[i].left - minx) / outResolution;
+		int y = (maxy - geoArray[i].top) / outResolution;
+		vecRectMosaic[i].top = y;
+		vecRectMosaic[i].left = x;
+		vecRectMosaic[i].bottom = y + geoArray[i].ht*mosaicRatio + 0.5;
+		vecRectMosaic[i].right = x + geoArray[i].wd*mosaicRatio + 0.5;
+
+		double maskRatio = fabs(geoArray[i].dx) / maskResolution;
+		x = (geoArray[i].left - minx) / maskResolution;
+		y = (maxy - geoArray[i].top) / maskResolution;
+		vecRectMask[i].top = y;
+		vecRectMask[i].left = x;
+		vecRectMask[i].bottom = y + geoArray[i].ht*maskRatio + 0.5;
+		vecRectMask[i].right = x + geoArray[i].wd*maskRatio + 0.5;
+
+		SaveRawImage(pMask, mht, mwd, maskNames[i]);
+		free(pMask);
+	}
+	//getchar();
+
+	//////////////////////   3. gain compensation ////////////////////////////////////
+	double* pg = (double*)malloc(nFile*sizeof(double));
+	for (int i = 0; i<nFile; i++)
+		pg[i] = 1;
+
+	//calculate the gain only for RGB true colr images
+	//char* postfix;
+	//GetPostfix(filenames[0], &postfix);
+	//if (strcmp(postfix, "jpg") == 0 || strcmp(postfix, "JPG") == 0)
+	//{
+	//	CalculateGain(maskNames, filenames, nFile, vecRectMask, pg);
+	//}
+	//free(postfix);
+
+
+	//////////////////////   4. finding seams ////////////////////////////////////
+	SeamlinesFindingVoronoi(maskNames, nFile, vecRectMask);
+	//SeamlinesFindingVoronoiOneByOne(maskNames, nFile, vecRect, oht, owd);
+
+
+	int nPyramidLevel = CalculateSeqsPyramidLevel(geoArray, outResolution);
+	WeightedLoGBlendGeneral(filenames, maskNames, nFile, geoArray, vecRectMosaic,
+			resolution, maskResolution, minx, maxx, miny, maxy, nPyramidLevel, pg, outFile);
+
+	free(pg);
+
+	printf("Finished ! \n");
+
+	return 0;
+}
+*/
+
 int BlendMosaicGeoTiff(char** filenames, int nFile, char* outFile, double outResolution)
 {
 	if(nFile<2)
@@ -3891,3 +4256,6 @@ int LoGBlend(char** filenames, int nFile, char* outFile, int nLevel )
 	
 	return 0;
 }
+
+///////////////////////////////////////////////////////////////////////////////////
+

@@ -9,18 +9,20 @@
 #include "distortion.hpp"
 #include "bundlerio.hpp"
 #include "badata.hpp"
+#include "triangulate.hpp"
+
 
 //matrix
 //#include "matrix/matrix.h"
 
 
-#ifndef WIN32
-#include <ext/hash_set>
-#include <ext/hash_map>
-#else
-#include <hash_set>
-#include <hash_map>
-#endif
+//#ifndef WIN32
+//#include <ext/hash_set>
+//#include <ext/hash_map>
+//#else
+//#include <hash_set>
+//#include <hash_map>
+//#endif
 
 #ifdef WIN32
 #define isnan _isnan
@@ -36,7 +38,7 @@
 //imagelib
 //#include "qsort.h"
 //#include "util.h"
-#include "defines.h"
+//#include "defines.h"
 
 //matrix
 //#include "matrix.h"
@@ -44,8 +46,9 @@
 //triangulate
 //#include "triangulate.h"
 
-#include "bundlerio.hpp"
 
+
+#include "bundlerio.hpp"
 #include "baselib.h"
 
 
@@ -2200,9 +2203,13 @@ double runSFMApi( int num_pts, int num_cameras, int start_camera,
 
 
 /* Return the intersection of two int vectors */
+
 std::vector<int> GetVectorIntersection(const std::vector<int> &v1,
 									   const std::vector<int> &v2)
 {
+    std::vector<int> intersection;
+
+    /*
 #ifndef WIN32
 	__gnu_cxx::hash_set<int> seen;
 #else
@@ -2222,7 +2229,8 @@ std::vector<int> GetVectorIntersection(const std::vector<int> &v1,
 			intersection.push_back(v2[i]);
 	}
 
-	seen.clear();
+	seen.clear();*/
+
 
 	return intersection;
 }
@@ -2374,11 +2382,11 @@ int DoSFM( vector<TrackInfo> trackSeq, vector<ImgFeature> imageFeatures, vector<
 	{
 		InitializeCameraParams(pCameras[i]);
 		int camId = cameraIDOrder[i];
-		pCameras[i].f = cameras[camId].focus;
+		pCameras[i].f = cameras[camId].focalLen;
 		pCameras[i].k[0] = cameras[camId].k1;
 		pCameras[i].k[1] = cameras[camId].k2;
 		memcpy(pCameras[i].R, cameras[camId].R, sizeof(double)*9);
-		memcpy(pCameras[i].t, cameras[camId].t, sizeof(double)*3);
+		memcpy(pCameras[i].t, cameras[camId].T, sizeof(double)*3);
 	}    
 
 	int    ncons = 0;
@@ -2439,11 +2447,11 @@ int DoSFM( vector<TrackInfo> trackSeq, vector<ImgFeature> imageFeatures, vector<
 	for(int i=0; i<num_cameras; i++)
 	{
 		int camId = cameraIDOrder[i];
-		cameras[camId].focus = pCameras[i].f;
+		cameras[camId].focalLen = pCameras[i].f;
 		cameras[camId].k1 = pCameras[i].k[0];
 		cameras[camId].k2 = pCameras[i].k[1];
 		memcpy(cameras[camId].R, pCameras[i].R, sizeof(double)*9);
-		memcpy(cameras[camId].t, pCameras[i].t, sizeof(double)*3);
+		memcpy(cameras[camId].T, pCameras[i].t, sizeof(double)*3);
 	}    
 	for(int i=0; i<num_pts; i++)
 	{
@@ -2487,7 +2495,7 @@ int TrackSeqImageOrder(vector<TrackInfo>& trackSeq, vector<int> cameraIDOrder)
 	return 1;
 }
 
-
+/*
 CSBA::CSBA()
 {
 	//m_estimate_focal_length = 1;
@@ -2502,13 +2510,13 @@ CSBA::~CSBA()
 }
 
 
-/*  x,y,z ------ (img1,id1),(img2,id2),....
-     pt3                   ptViews
-    
-	imageFeatures: projection point 
-	cameraIDOrder: the original camera index
-    cameras:       intrinsic and exterior parameters for cameras
-*/
+ // x,y,z ------ (img1,id1),(img2,id2),....
+ //    pt3                   ptViews
+ //   
+	//imageFeatures: projection point 
+	//cameraIDOrder: the original camera index
+ //   cameras:       intrinsic and exterior parameters for cameras
+
 int CSBA::RunSFM(vector<Point3DDouble> pt3, vector<ImageKeyVector> ptViews, 
 				 vector<ImgFeature> imageFeatures, vector<int> cameraIDOrder,
 				 vector<CameraPara> &cameras)
@@ -2568,9 +2576,9 @@ int CSBA::RunSFM(vector<Point3DDouble> pt3, vector<ImageKeyVector> ptViews,
     for(int i=0; i<num_cameras; i++)
 	{
 		InitializeCameraParams(pCameras[i]);
-		pCameras[i].f = cameras[i].focus;
+		pCameras[i].f = cameras[i].focalLen;
 		memcpy(pCameras[i].R, cameras[i].R, sizeof(double)*9);
-		memcpy(pCameras[i].t, cameras[i].t, sizeof(double)*3);
+		memcpy(pCameras[i].t, cameras[i].T, sizeof(double)*3);
 	}    
 
 	int    ncons = 0;
@@ -2637,29 +2645,7 @@ int CSBA::RunSFM(vector<Point3DDouble> pt3, vector<ImageKeyVector> ptViews,
 	return 1;
 }
 
-/*
-//ouput 3D model
-CModelFileBase* pOutput = new CPlyModel();
-//color setting
-vector<Point3DDouble> colors;
-for(int i=0; i<gpts.size(); i++)
-{
-Point3DDouble c;
-c.p[0]=255; c.p[1]=0; c.p[2]=0;
-colors.push_back(c);
-}
-//add the camera position into the 3D point set
-Point3DDouble pos;
-pos.p[0]=cameras[leftImageId].t[0];  pos.p[1] = cameras[leftImageId].t[1];  pos.p[2] = cameras[leftImageId].t[2];
-gpts.push_back(pos);
-pos.p[0]=cameras[rightImageId].t[0];  pos.p[1] = cameras[rightImageId].t[1];  pos.p[2] = cameras[rightImageId].t[2];
-gpts.push_back(pos);
-Point3DDouble c;
-c.p[0]=0; c.p[1]=255; c.p[2]=0;
-colors.push_back(c);
-colors.push_back(c);
-pOutput->Save("d:\\model.ply", gpts,colors);
-*/
+
 
 
 
@@ -2735,7 +2721,7 @@ int CSBA::BundleAdjust(int numCameras, vector<CameraPara>& cameras, vector<CImag
 	int num_images = cameras.size();
 	int *added_order = new int[num_images];
 	camera_params_t *pCamera = new camera_params_t[num_images];
-	int  max_pts = (int) tracks.size(); // 1243742; /* HACK! */
+	int  max_pts = (int) tracks.size(); 
 	v3_t *points = new v3_t[max_pts];
 	v3_t *colors = new v3_t[max_pts];
 	vector<ImageKeyVector> pt_views;
@@ -2807,9 +2793,9 @@ int CSBA::BundleAdjust(int numCameras, vector<CameraPara>& cameras, vector<CImag
 		printf("[SifterApp::BundleAdjust] max_matches = %d\n", max_matches);
 
 		if (max_matches < MIN_MAX_MATCHES)
-			break; /* No more connections */
+			break; // No more connections
 
-		/* Find all images with 90% of the matches of the maximum */
+		// Find all images with 90% of the matches of the maximum 
 		std::vector<ImagePair> image_set;
 		
 		if (false && max_matches < 48) 
@@ -2818,8 +2804,8 @@ int CSBA::BundleAdjust(int numCameras, vector<CameraPara>& cameras, vector<CImag
 		}
 		else
 		{
-			// int nMatches = MIN(100, iround(0.75 /* 0.9 */ * max_matches));
-			int nMatches = dll_iround(0.75 /* 0.9 */ * max_matches);
+			// int nMatches = MIN(100, iround(0.75  * max_matches));
+			int nMatches = dll_iround(0.75  * max_matches);
 			image_set = FindCamerasWithNMatches(nMatches,curr_num_cameras, 
 										added_order, imageData,
 										tracks,	pt_views);
@@ -2830,7 +2816,7 @@ int CSBA::BundleAdjust(int numCameras, vector<CameraPara>& cameras, vector<CImag
 		for (int i = 0; i < num_added_images; i++)
 			printf("[SifterApp::BundleAdjustFast] Adjusting camera %d\n",image_set[i].first);
 
-		/* Now, throw the new cameras into the mix */
+		//Now, throw the new cameras into the mix 
 		int image_count = 0;
 		for (int i = 0; i < num_added_images; i++) 
 		{
@@ -2844,14 +2830,14 @@ int CSBA::BundleAdjust(int numCameras, vector<CameraPara>& cameras, vector<CImag
 				round, next_idx, 
 				(parent_idx == -1 ? -1 : added_order[parent_idx]));
 
-			/* **** Set up the new camera **** */
+			// **** Set up the new camera **** 
 			bool success = false;
 			camera_params_t camera_new = 
 				BundleInitializeImage(tracks,
 				next_idx, curr_num_cameras + image_count,
 				curr_num_cameras, curr_num_pts,
 				added_order, points, 
-				NULL /*cameras + parent_idx*/, 
+				NULL , 
 				pCamera, 
 				imageData,
 				pt_views, &success);
@@ -2883,11 +2869,11 @@ int CSBA::BundleAdjust(int numCameras, vector<CameraPara>& cameras, vector<CImag
 
 		curr_num_pts = pt_count;
 
-		/* Run sfm again to update parameters */
+		//Run sfm again to update parameters 
 		runSFMApi(curr_num_pts, curr_num_cameras, 0, false, imageData,
 			pCamera, points, added_order, colors, pt_views);
 
-		/* Remove bad points and cameras */
+		//Remove bad points and cameras 
 		RemoveBadPointsAndCameras(curr_num_pts, curr_num_cameras + 1, 
 			added_order, pCamera, points, colors, 
 			imageData, pt_views);
@@ -3020,3 +3006,4 @@ int CSBA::BundleAdjust(int numCameras, vector<CameraPara>& cameras,vector<ImgFea
 
 	return 1;
 }
+*/

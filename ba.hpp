@@ -11,8 +11,8 @@
 
 
 #define  PROJECTION_ESTIMATION_THRESHOLD 4.0
-#define  MIN_PROJ_ERROR_THRESHOLD  8.0
-#define  MAX_PROJ_ERROR_THRESHOLD  16.0
+#define  MIN_PROJ_ERROR_THRESHOLD  24.0
+#define  MAX_PROJ_ERROR_THRESHOLD  48.0
 #define  MIN_MAX_MATCHES  16
 #define  MIN_POINTS 20
 #define  NUM_STDDEV 2.0 // 3.0 // 6.0
@@ -166,33 +166,38 @@ public:
 		                     vector<PairMatchRes> pairMatchs, vector<TrackInfo> tracks, char* outDir){return 0;}
 
 	virtual int BundleAdjust(int numCameras, vector<CameraPara>& cameras, vector<ImgFeature>& imageFeatures, 
-		vector<PairMatchRes>& pairMatchs, vector<TrackInfo>& tracks){return 0;}
+		vector<PairMatchRes>& pairMatchs, vector<TrackInfo>& tracks, bool& bIsStop){return 0;}
+
+	virtual void SetProgress(double* pdProgress) {}
+
+    virtual void SetCallBack(sfmCall cf) {}
+
 };
-
-class DLL_EXPORT CSBA: public CBABase
-{
-public:
-	CSBA();
-	~CSBA();
-
-	int RunSFM( vector<Point3DDouble> pt3, vector<ImageKeyVector> ptViews, 
-		vector<ImgFeature> imageFeatures,  vector<int> cameraIDOrder,
-		vector<CameraPara>& cameras);
-
-	//
-	int BundleAdjust( int numCameras, vector<CameraPara>& cameras,vector<ImgFeature> imageFeatures, 
-		              vector<PairMatchRes> pairMatchs, vector<TrackInfo> tracks, char* outDir);
-
-
-	//new interface, including more input parameters
-	int BundleAdjust(int numCameras, vector<CameraPara>& cameras, vector<CImageDataBase*> imageData, 
-				      vector<PairMatchRes> pairMatchs, vector<TrackInfo> tracks, char* outDir);
-
-
-	int BundleAdjust(int numCameras, vector<CameraPara>& cameras, vector<ImgFeature>& imageFeatures, 
-		vector<PairMatchRes>& pairMatchs, vector<TrackInfo>& tracks);
-
-private:
-};
+//
+//class DLL_EXPORT CSBA: public CBABase
+//{
+//public:
+//	CSBA();
+//	~CSBA();
+//
+//	int RunSFM( vector<Point3DDouble> pt3, vector<ImageKeyVector> ptViews, 
+//		vector<ImgFeature> imageFeatures,  vector<int> cameraIDOrder,
+//		vector<CameraPara>& cameras);
+//
+//	//
+//	int BundleAdjust( int numCameras, vector<CameraPara>& cameras,vector<ImgFeature> imageFeatures, 
+//		              vector<PairMatchRes> pairMatchs, vector<TrackInfo> tracks, char* outDir);
+//
+//
+//	//new interface, including more input parameters
+//	int BundleAdjust(int numCameras, vector<CameraPara>& cameras, vector<CImageDataBase*> imageData, 
+//				      vector<PairMatchRes> pairMatchs, vector<TrackInfo> tracks, char* outDir);
+//
+//
+//	int BundleAdjust(int numCameras, vector<CameraPara>& cameras, vector<ImgFeature>& imageFeatures, 
+//		vector<PairMatchRes>& pairMatchs, vector<TrackInfo>& tracks);
+//
+//private:
+//};
 
 #endif

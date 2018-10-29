@@ -7,12 +7,32 @@
 #include"register.hpp"
 #include"relativepose.hpp"
 #include "CalcAngle.h"
+#include "triangulate.hpp"
+#include "ORBextractor.h"
+#include "orbfeat.hpp"
 
 
 //corelib
 #include"commonfile.h"
+#include"ImageFunc.h"
+#include"commondata.h"
+
 
 #include "baselib.h"
+
+//rslib
+#include"Aerosol.h"
+#include"lut.h"
+#include"modis.h"
+
+//opencv
+#include "opencv2/core/core.hpp"
+#include "opencv2/highgui/highgui.hpp"
+#include "opencv2/calib3d/calib3d.hpp"
+#include "opencv2/imgproc/imgproc.hpp"
+
+using namespace cv;
+//using namespace ORB_SLAM2;
 
 
 // function for feature detection of multiple images, for input files
@@ -66,14 +86,16 @@ int DLL_EXPORT DetectFileFeaturePts(char* filenames, ImgFeature& imgFeatures, in
 
 
 
-//interface for memory
-int DetectFileFeaturePts(char** filenames, int nFile, vector<ImgFeature>& imgFeatures, int maxHt)
+//all features are saved in memory, and progress is also added, 2017.12.31
+int DetectFileFeaturePts(char** filenames, int nFile, vector<ImgFeature>& imgFeatures,
+	int maxHt, double& dProgress)
 {
-
 	printf("[DetectFileFeaturePts] ... \n");
 
 	CFeatureBase* pFeatDetect = new CSIFTFloat();
-	//CPointFeatureBase* pFeatureData = new CSiftFeatureDataBinary();
+	//CFeatureBase* pFeatDetect = new CORBFeat(); //for orb
+	
+	double step = 100.0 / double(nFile);
 
 	for(int i=0; i<nFile; i++)
 	{
@@ -82,6 +104,8 @@ int DetectFileFeaturePts(char** filenames, int nFile, vector<ImgFeature>& imgFea
 		ImgFeature feats;
 		pFeatDetect->Detect(filenames[i], feats, maxHt);
 		imgFeatures.push_back(feats);
+	
+		dProgress += step;
 	}
 	
 	delete pFeatDetect;
@@ -90,7 +114,8 @@ int DetectFileFeaturePts(char** filenames, int nFile, vector<ImgFeature>& imgFea
 
 
 //matching between image files
-int MatchImageFiles(vector<ImgFeature>& imgFeatures, vector<PairMatchRes>& matchRes, CameraType camtype)
+int MatchImageFiles(vector<ImgFeature>& imgFeatures, vector<PairMatchRes>& matchRes, 
+	CameraType camtype, int matchSteps)
 {
 	printf("[MatchImageFiles] ... \n");
 
@@ -102,14 +127,20 @@ int MatchImageFiles(vector<ImgFeature>& imgFeatures, vector<PairMatchRes>& match
 	if(camtype==PerspectiveCam)
 	{
 		pMatch = new CSiftMatch();  //new CKNNMatch();
+		//pMatch = new CORBPerspectiveMatch();  //for orb;
 	}
 	else if(camtype==PanoramCam)
 	{
 		pMatch = new CPanoMatch();
 	}
 
-	for(int i=0; i<nImageNum; i++)
-		for(int j=i+1; j<nImageNum; j++)
+	for (int i = 0; i < nImageNum; i++)
+	{
+		int end = min(nImageNum, i + 1 + matchSteps);
+
+
+
+		for (int j = i + 1; j < end; j++)
 		{
 
 			PairMatchRes mr;
@@ -119,10 +150,11 @@ int MatchImageFiles(vector<ImgFeature>& imgFeatures, vector<PairMatchRes>& match
 			pMatch->Match(imgFeatures[i], imgFeatures[j], mr);
 
 			//printf("%d-%d  %d %lf \n", i, j, mr.matchs.size(), mr.inlierRatio );
-			printf("%d-%d  %d  \n", i, j, mr.matchs.size() );
-			
-			matchRes.push_back(mr);			
+			printf("%d-%d  %d  \n", i, j, mr.matchs.size());
+
+			matchRes.push_back(mr);
 		}
+	}
 	
 	delete pMatch;
 
@@ -150,7 +182,7 @@ DLL_EXPORT int dll_EstimatePose( vector<Point2DDouble> lPts, vector<Point2DDoubl
 		delete pRP;
 	}
 
-	if(camtype = PanoramCam)
+	if(camtype == PanoramCam)
 	{
 		CRelativePoseBase* pRP = new CEstimatePose5PointPano(); 
 		pRP->EstimatePose(lPts, rPts, cam1, cam2);
@@ -228,4 +260,74 @@ DLL_EXPORT double dll_CalculatePanoEpipolarError(double* em, Point3DDouble lp, P
 	error = dll_fmatrix_compute_residual_pano(em, vl, vr, radius);
 
 	return error;
+}
+
+int dll_GenerateRainbowMapping(vector<int>& r, vector<int>& g, vector<int>& b)
+{
+	GenerateRainBowMapping(r, g, b);
+	
+	return 0;
+}
+
+
+
+
+int dll_GenerateORBFeature(string filepath, vector<KeyPoint>& Keys, Mat& Descriptors)
+{	
+	// Read image from file
+	Mat im;
+	im = imread(filepath, CV_LOAD_IMAGE_UNCHANGED);
+	
+	if (im.channels() == 3)
+	{
+		cvtColor(im, im, CV_RGB2GRAY);
+	}
+	//write the image 
+	//imwrite("c:\\temp\\temp.jpg", im);
+
+	//mCurrentFrame = Frame(mImGray, timestamp, 
+	//	mpIniORBextractor, mpORBVocabulary, 
+	//	mK, mDistCoef, mbf, mThDepth);
+		
+	//string strSettingPath;
+	//cv::FileStorage fSettings(strSettingPath, cv::FileStorage::READ);
+
+	int   nFeatures = 1000;   // fSettings["ORBextractor.nFeatures"];
+	float fScaleFactor = 1.2; // fSettings["ORBextractor.scaleFactor"];
+	int   nLevels = 8;        // fSettings["ORBextractor.nLevels"];
+	int   fIniThFAST = 20;    // fSettings["ORBextractor.iniThFAST"];
+	int   fMinThFAST = 7;     // fSettings["ORBextractor.minThFAST"];
+
+	ORBextractor* pIniORBextractor = new ORBextractor(2 * nFeatures,
+		fScaleFactor, nLevels, fIniThFAST, fMinThFAST);
+	
+	std::vector<cv::KeyPoint> tKeys;
+	cv::Mat tDescriptors;
+	
+	//operator() to detect feature points
+	(*pIniORBextractor)(im, cv::Mat(), tKeys, tDescriptors);
+
+	Keys = tKeys;
+	//tDescriptors.copyTo(Descriptors);
+	Descriptors = tDescriptors.clone();
+
+	
+	////draw feature points
+	//Mat colorImg = imread(filepath, CV_LOAD_IMAGE_COLOR);
+	//for (int i = 0; i < Keys.size(); i++)
+	//{
+	//	//circle(colorImg, Point(Keys[i].pt.x, Keys[i].pt.y), 1, CV_RGB(255, 0, 0), 1);
+	//	drawMarker(colorImg, Point(Keys[i].pt.x, Keys[i].pt.y), CV_RGB(255, 0, 0), MARKER_CROSS, 2);
+	//}
+	//imwrite("c:\\temp\\orb-feat.jpg", colorImg);
+	//
+	
+	//for matching
+	//vector<int> matches;
+	//OrbMatchGeneral()
+
+	delete pIniORBextractor;
+
+
+	return 0;
 }

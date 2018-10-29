@@ -2,9 +2,12 @@
 #ifndef ROTATION_HPP
 #define ROTATION_HPP
 
+#include"defines.hpp"
 
 // rotation to axis angle vector format
-void rot2aa(double *R, double *aa);
+DLL_EXPORT void  rot2aa(double *R, double *aa);
+
+DLL_EXPORT int  eular2rot(double* R, double pitch, double roll, double yaw);
 
 
 // go from a vector representing a rotation in 
@@ -37,7 +40,7 @@ void aa2rot(const T* x, T * R)
 
 
 
-//calculate the Eular angle from rotation matrix
+//calculate the Eular angle (degree) from rotation matrix
 template<typename T>
 int  rot2eular(T* R, T* ea)
 {
@@ -47,6 +50,38 @@ int  rot2eular(T* R, T* ea)
 
 	return 0;
 }
+
+/*
+//calculate rotation matrix from the Eular angle (degree) 
+template<typename T>
+int  eular2rot(T* R, T* ea)
+{
+	T pt = ea[0] / T(180.0) * PI; //pitch
+	T ro = ea[1] / T(180.0) * PI; //roll
+	T he = ea[2] / T(180.0) * PI; //yaw
+	
+	ro = -ro;
+	pt = -pt;
+	
+	rr = [cos(ro), 0, sin(ro);
+		  0, 1, 0;
+		  -sin(ro), 0, cos(ro)];
+
+	rp = [1, 0, 0;
+	      0, cos(pt), -sin(pt);
+	      0, sin(pt), cos(pt)];
+	
+    rh = [cos(he), -sin(he), 0;
+	      sin(he), cos(he), 0;
+	      0, 0, 1];
+	
+	r = rr * rp * rh;
+
+
+	return 0;
+}
+*/
+
 
 
 

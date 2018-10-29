@@ -5,19 +5,19 @@
 
 
 //matrixlib
-#include "matrix/matrix.h"
+//#include "matrix/matrix.h"
 
 
 //coredll
-#include "OrthoImage.h"
+//#include "OrthoImage.h"
 
 
 
 //corelib
-#include "corelib/commondata.h"
-#include "corelib/commonfile.h"
-#include "corelib/CommonFuncs.h"
-#include "corelib/LatLong-UTMconversion.h"
+#include "commondata.h"
+#include "commonfile.h"
+#include "CommonFuncs.h"
+#include "LatLong-UTMconversion.h"
 
 
 //generate the coordinate for plane projection according to the known Z axis
@@ -35,6 +35,10 @@ int GenerateProjectAxis(POINT3D za, POINT3D& xa, POINT3D& ya)
 	va.z = 0;
 	
 	xa = OuterProduct(vz, va);
+	//xa.x = -xa.x;
+	//xa.y = -xa.y;
+	//xa.z = -xa.z;
+
 	ya = OuterProduct(za, xa);
 	
 	return 0;
@@ -43,8 +47,7 @@ int GenerateProjectAxis(POINT3D za, POINT3D& xa, POINT3D& ya)
 
 //generate the rotation matrix between two coordinates
 int RotationAlign(vector<POINT3D> srcPts, vector<POINT3D> dstPts, double* rotationMatrix)
-{
-	
+{	
 	//calculate the R
 	double sumC[9];
 	memset(sumC, 0, sizeof(double)*9);
@@ -77,7 +80,8 @@ int RotationAlign(vector<POINT3D> srcPts, vector<POINT3D> dstPts, double* rotati
 
 
 /*
-using only three points to calculate the absolute orientation, written by Donghai,Xie, 2015.10.10
+using only three points to calculate the absolute orientation, 
+written by Donghai,Xie, 2015.10.10
 the function can be invoked in RANSAC 
 inputs:
 	freePts,grdPts: free and ground control points
@@ -159,15 +163,17 @@ int AbsOriP3( vector<POINT3D> freePts, vector<POINT3D> grdPts,
 		double gp[3]; //ground point
 		double fp[3]; //free point
 
-		fp[0] = freePts[j].x;
-		fp[1] = freePts[j].y;
-		fp[2] = freePts[j].z;
+		fp[0] = freePts[j].x*absPosParams.scale;
+		fp[1] = freePts[j].y*absPosParams.scale;
+		fp[2] = freePts[j].z*absPosParams.scale;
+
 		gp[0] = grdPts[j].x;
 		gp[1] = grdPts[j].y;
 		gp[2] = grdPts[j].z;
 
 		double mc[9];
-		dll_matrix_product(3, 1, 1, 3, gp, fp, mc);
+		//dll_matrix_product(3, 1, 1, 3, gp, fp, mc);
+		dll_matrix_product(3, 1, 1, 3, fp, gp, mc); //revised by xiedonghai, 2018.5.27
 		for(int k=0; k<9; k++)
 			sumC[k] += mc[k];    
 	}
@@ -175,8 +181,37 @@ int AbsOriP3( vector<POINT3D> freePts, vector<POINT3D> grdPts,
 	double U[9];
 	double S[3];
 	double VT[9];
+	double mS[9];
 	dll_dgesvd_driver(3, 3, sumC, U, S, VT);
-	dll_matrix_product(3, 3, 3, 3, U, VT, absPosParams.R );
+
+	double Ut[9];
+	double V[9];
+	dll_matrix_transpose(3, 3, U, Ut);
+	dll_matrix_transpose(3, 3, VT, V);
+	double m2[9];
+	dll_matrix_product(3, 3, 3, 3, V, Ut, m2 );
+
+	//adding constraints , https://en.wikipedia.org/wiki/Kabsch_algorithm
+	double det = dll_matrix_determint3(m2);
+	memset(mS, 0, 9 * sizeof(double));
+	mS[0] = 1;  mS[4] = 1; mS[8] = det;
+	double m1[9];
+	//dll_matrix_product(3, 3, 3, 3, U, mS, m1);
+	//dll_matrix_product(3, 3, 3, 3, m1, VT, absPosParams.R);
+	dll_matrix_product(3, 3, 3, 3, V, mS, m1);
+	dll_matrix_product(3, 3, 3, 3, m1, Ut, absPosParams.R);
+
+
+
+	/*
+	//printf("determinant of R: %lf \n", det);
+	if (det < 0){
+		for (int i = 0; i < 9; i++)
+			absPosParams.R[i] *= -1;
+	}
+    det = dll_matrix_determint3(absPosParams.R);
+	printf("determinant of R: %lf \n", det);
+	*/
 
 	//calculate the T
 	double gpc[3]; //center of the ground points
@@ -191,45 +226,24 @@ int AbsOriP3( vector<POINT3D> freePts, vector<POINT3D> grdPts,
 	return 0;
 }
 
-/*function from 5point lib to select index randomly
-  input:
-	n: the length of arr
-	k: number of random
-    arr: array saving the random values
-*/
-void ChooseRandIndex(int n, int k, int *arr)
+int GetZoneNumber1(vector<CameraPara> camParas)
 {
-	int i;
-
-	if (k > n) 
+	double slon = 0;
+	int n = 0;
+	for (int i = 0; i<camParas.size(); i++)
 	{
-		fprintf(stderr, "[choose] Error: k > n\n");
-		return;
-	}
-
-	for (i = 0; i < k; i++) 
-	{
-		while (1) 
+		if (camParas[i].focalLen != 0)
 		{
-			int idx = rand() % n;
-			int j, redo = 0;
-			for (j = 0; j < i; j++) 
-			{
-				if (idx == arr[j]) 
-				{
-					redo = 1;
-					break;
-				}
-			}
-			if (!redo) 
-			{
-				arr[i] = idx;
-				break;
-			}
+			slon += camParas[i].lon;
+			n++;
 		}
 	}
-}
 
+	slon /= (double)(n);
+	int zoneNumber = int((slon + 180) / 6) + 1;
+
+	return zoneNumber;
+}
 
 int GetZoneNumber1(vector<stPOS> camParas)
 {
@@ -252,11 +266,209 @@ int GetZoneNumber1(vector<stPOS> camParas)
 
 double AbsOriOrthogonal(stAbsPOS& absPosParams, vector<stPOS>& camParas, vector<stTrack>& tracks)
 {
+
+	return 0;
+}
+
+
+double AbsOriOrthogonal(stAbsPOS& absPosParams, vector<CameraPara>& camParas)
+{
+	//collect valid cameras
+	vector<int> validCameraIndex;
+	for (int i = 0; i<camParas.size(); i++)
+	{
+		if (camParas[i].focalLen != 0)
+		{
+			validCameraIndex.push_back(i);
+		}
+	}
+
+	if (validCameraIndex.size() < 3)
+	{
+		printf("[AbsOriOrthogonal]: the number of camera is less than 3 ! \n");
+		return -1;
+	}
+
+
+	// form R(X-T) to RX+T
+	for (int i = 0; i<validCameraIndex.size(); i++)
+	{
+		int ci = validCameraIndex[i];
+
+		camParas[ci].xs = camParas[ci].T[0];
+		camParas[ci].ys = camParas[ci].T[1];
+		camParas[ci].zs = camParas[ci].T[2];
+
+		//dll_matrix_invert(3, camParas[ci].R, R1);
+		double t1[3];
+		dll_matrix_product(3, 3, 3, 1, camParas[ci].R, camParas[ci].T, t1);
+
+		camParas[ci].T[0] = -t1[0];
+		camParas[ci].T[1] = -t1[1];
+		camParas[ci].T[2] = -t1[2];
+	}
+
+	//convert from lon,lat to ground coordinate
+	int zoneNumber = GetZoneNumber1(camParas);
+	printf("zonenumber: %d \n", zoneNumber);
+	for (int i = 0; i<validCameraIndex.size(); i++)
+	{
+		int ci = validCameraIndex[i];
+		/*double lat = camParas[ci].lat;
+		double lon = camParas[ci].lon;
+		double gx, gy;
+		LLtoUTM(23, lat, lon, gy, gx, zoneNumber);
+		camParas[ci].gx = gx;
+		camParas[ci].gy = gy;
+		camParas[ci].gz = camParas[ci].altitude;*/
+		printf("%lf %lf %lf \n", camParas[ci].gx, camParas[ci].gy, camParas[ci].gz);
+	}
+
+	//RANSAC absolute orientation
+	int ransac_rounds = 1000;
+	int minWrongNumber = 10000000;
+	int DistanceThrshold = 16;
+	for (int round = 0; round < ransac_rounds; round++)
+	{
+		int indices[3];
+		ChooseRandIndex(validCameraIndex.size(), 3, indices);
+
+		vector<POINT3D> freePts;
+		vector<POINT3D> grdPts;
+		freePts.resize(3);
+		grdPts.resize(3);
+		for (int i = 0; i<3; i++)
+		{
+			int ri = validCameraIndex[indices[i]];
+
+			freePts[i].x = camParas[ri].xs;
+			freePts[i].y = camParas[ri].ys;
+			freePts[i].z = camParas[ri].zs;
+
+			grdPts[i].x = camParas[ri].gx;
+			grdPts[i].y = camParas[ri].gy;
+			grdPts[i].z = camParas[ri].gz;
+		}
+
+		stAbsPOS absPara;
+		AbsOriP3(freePts, grdPts, absPara);
+
+		//calculate the errors
+		int nWrongNumber = 0;
+		for (int i = 0; i<validCameraIndex.size(); i++)
+		{
+			int ci = validCameraIndex[i];
+
+			double fP[3];
+			fP[0] = camParas[ci].xs;
+			fP[1] = camParas[ci].ys;
+			fP[2] = camParas[ci].zs;
+
+			double tp[3];
+			dll_matrix_product(3, 3, 3, 1, absPara.R, fP, tp);
+			for (int k = 0; k<3; k++)
+				fP[k] = absPara.scale*tp[k] + absPara.T[k];
+
+			double gP[3];
+			gP[0] = camParas[ci].gx;
+			gP[1] = camParas[ci].gy;
+			gP[2] = camParas[ci].gz;
+
+			double len = 0;
+			for (int k = 0; k<3; k++)
+				len += (fP[k] - gP[k])*(fP[k] - gP[k]);
+			len = sqrt(len);
+			if (len>DistanceThrshold)
+				nWrongNumber++;
+		}
+
+		if (minWrongNumber>nWrongNumber)
+		{
+			minWrongNumber = nWrongNumber;
+			absPosParams = absPara;
+		}
+	}
+	printf("minimux wrong number: %d \n", minWrongNumber);
+
+
+	//transform each camera parameters from current coordinate to new coordinate
+	double Rg[9];
+	dll_matrix_invert(3, absPosParams.R, Rg);
+	double Tg[3];
+	memcpy(Tg, absPosParams.T, 3 * sizeof(double));
+
+	double sumErr = 0;
+	vector<double> vecError;
+	vecError.resize(validCameraIndex.size());
+	for (int i = 0; i<validCameraIndex.size(); i++)
+	{
+		int ci = validCameraIndex[i];
+
+		//new R
+		double newR[9];
+		dll_matrix_product(3, 3, 3, 3, camParas[ci].R, Rg, newR);
+
+		//new T
+		double newT[3];
+		dll_matrix_product(3, 3, 3, 1, newR, Tg, newT);
+		for (int k = 0; k<3; k++)
+			newT[k] = absPosParams.scale*camParas[ci].T[k] - newT[k];
+
+		memcpy(camParas[ci].R, newR, sizeof(double)* 9);
+		memcpy(camParas[ci].T, newT, sizeof(double)* 3);
+
+		//rotation angle
+		camParas[ci].pitch = atan(camParas[ci].R[5] / camParas[ci].R[8]) / PI * 180;
+		camParas[ci].roll = asin(-camParas[ci].R[2]) / PI * 180;
+		camParas[ci].yaw = atan(camParas[ci].R[1] / camParas[ci].R[0]) / PI * 180;
+		//printf("rotation angle: %lf %lf %lf \n", camParas[ci].pitch, camParas[ci].roll, camParas[ci].yaw);
+
+		//convert form RX+T to R( X - (-inv(R)*T) )
+		double t1[3];
+		double R1[9];
+		dll_matrix_invert(3, camParas[ci].R, R1);
+		dll_matrix_product(3, 3, 3, 1, R1, camParas[ci].T, t1);
+
+		camParas[ci].xs = -t1[0];
+		camParas[ci].ys = -t1[1];
+		camParas[ci].zs = -t1[2];
+
+		//the error
+		double distance = sqrt((camParas[ci].xs - camParas[ci].gx)*(camParas[ci].xs - camParas[ci].gx) +
+			(camParas[ci].ys - camParas[ci].gy)*(camParas[ci].ys - camParas[ci].gy) +
+			(camParas[ci].zs - camParas[ci].gz)*(camParas[ci].zs - camParas[ci].gz));
+
+		vecError[i] = distance;
+		sumErr += distance;
+		printf("abs distance: %lf \n", distance);
+	}
+
+	//printf("\n");
+	sumErr /= validCameraIndex.size();
+
+	printf("Absolute orientation error.... \n");
+	for (int i = 0; i<validCameraIndex.size(); i++)
+	{
+		int ci = validCameraIndex[i];
+		printf("error: %lf  rotation angle: %lf %lf %lf \n", vecError[i],
+			camParas[ci].pitch, camParas[ci].roll, camParas[ci].yaw);
+
+		//remove the camera with large rotation angle 
+		//if( fabs(camParas[ci].pitch)>10 || fabs(camParas[ci].roll)>10 )
+		//	camParas[ci].f = 0;
+	}
+	printf("\n\n");
+
+	return sumErr;
+}
+
+double AbsOriOrthogonal(stAbsPOS& absPosParams, vector<CameraPara>& camParas, vector<TrackInfo>& tracks)
+{
 	//collect valid cameras
 	vector<int> validCameraIndex;
 	for(int i=0; i<camParas.size(); i++)
 	{
-		if(camParas[i].f != 0)
+		if(camParas[i].bIsAddedIntoNet)
 		{
 			validCameraIndex.push_back(i);
 		}
@@ -268,23 +480,30 @@ double AbsOriOrthogonal(stAbsPOS& absPosParams, vector<stPOS>& camParas, vector<
 		return -1;
 	}
 
-	//compute the position of each camera 
-	// form RX+T to R( X - (-inv(R)*T) )
+
+	// form R(X-T) to RX+T
+	printf("input for absolute orientation ..... \n");
 	for(int i=0; i<validCameraIndex.size(); i++)
 	{
 		int ci = validCameraIndex[i];		
 
-		double t1[3];
-		double R1[9];
-		
-		dll_matrix_invert(3, camParas[ci].R, R1);
-		dll_matrix_product(3, 3, 3, 1, R1, camParas[ci].T, t1);
+		camParas[ci].xs = camParas[ci].T[0];
+		camParas[ci].ys = camParas[ci].T[1];
+		camParas[ci].zs = camParas[ci].T[2];
 
-		camParas[ci].xs = -t1[0]; 
-		camParas[ci].ys = -t1[1]; 
-		camParas[ci].zs = -t1[2];
+		//dll_matrix_invert(3, camParas[ci].R, R1);
+		double t1[3];
+		dll_matrix_product(3, 3, 3, 1, camParas[ci].R, camParas[ci].T, t1);
+		camParas[ci].T[0] = -t1[0];
+		camParas[ci].T[1] = -t1[1];
+		camParas[ci].T[2] = -t1[2];
+
+		printf("%lf %lf %lf - %lf %lf %lf \n", 
+			camParas[ci].xs, camParas[ci].ys, camParas[ci].zs,
+			camParas[ci].gx, camParas[ci].gy, camParas[ci].gz);
 	}
 
+	/*
 	//convert from lon,lat to ground coordinate
 	int zoneNumber =GetZoneNumber1(camParas);
 	printf("zonenumber: %d \n", zoneNumber);
@@ -300,6 +519,7 @@ double AbsOriOrthogonal(stAbsPOS& absPosParams, vector<stPOS>& camParas, vector<
 		camParas[ci].gz = camParas[ci].altitude;
 		printf("%lf %lf %lf \n", gx, gy, camParas[ci].altitude);
 	}
+	*/
 
 	//RANSAC absolute orientation
 	int ransac_rounds  = 1000;
@@ -329,6 +549,7 @@ double AbsOriOrthogonal(stAbsPOS& absPosParams, vector<stPOS>& camParas, vector<
 
 		stAbsPOS absPara;
 		AbsOriP3(freePts, grdPts, absPara);
+		
 
 		//calculate the errors
 		int nWrongNumber     = 0; 
@@ -365,7 +586,27 @@ double AbsOriOrthogonal(stAbsPOS& absPosParams, vector<stPOS>& camParas, vector<
 			absPosParams = absPara;
 		}
 	}	
+
 	printf("minimux wrong number: %d \n", minWrongNumber);
+
+	printf("absolute orientation results: \n");
+	printf("scale: %lf \n", absPosParams.scale);
+	printf(" rotation.... \n");
+	for (int j = 0; j < 3; j++){
+		for (int i = 0; i < 3; i++){
+			printf("%lf ", absPosParams.R[j * 3 + i]);
+		}
+		printf("\n");
+	}
+	
+	
+
+	printf("\n translation.... \n");
+	for (int j = 0; j < 3; j++){
+		printf("%lf ", absPosParams.T[j]);
+	}
+	printf("\n\n");
+	
 	
 
 	//transform each camera parameters from current coordinate to new coordinate
@@ -406,6 +647,9 @@ double AbsOriOrthogonal(stAbsPOS& absPosParams, vector<stPOS>& camParas, vector<
 		dll_matrix_invert(3, camParas[ci].R, R1);
 		dll_matrix_product(3, 3, 3, 1, R1, camParas[ci].T, t1);
 
+		//camParas[ci].T[0] = -t1[0];
+		//camParas[ci].T[1] = -t1[1];
+		//camParas[ci].T[2] = -t1[2];
 		camParas[ci].xs = -t1[0]; 
 		camParas[ci].ys = -t1[1]; 
 		camParas[ci].zs = -t1[2];
@@ -417,8 +661,10 @@ double AbsOriOrthogonal(stAbsPOS& absPosParams, vector<stPOS>& camParas, vector<
 
 		vecError[i] = distance;
 		sumErr += distance;
-		//printf("%lf ");
+		
+		//printf("absolute orientation distance: %lf \n", distance);
 	}
+
 	//printf("\n");
 	sumErr /= validCameraIndex.size();
 
@@ -439,18 +685,18 @@ double AbsOriOrthogonal(stAbsPOS& absPosParams, vector<stPOS>& camParas, vector<
 	for(int i=0; i<tracks.size(); i++)
 	{
 		double fP[3];
-		fP[0] = tracks[i].x;
-		fP[1] = tracks[i].y;
-		fP[2] = tracks[i].z;
+		fP[0] = tracks[i].grd.p[0];
+		fP[1] = tracks[i].grd.p[1];
+		fP[2] = tracks[i].grd.p[2];
 
 		double tp[3];
 		dll_matrix_product(3, 3, 3, 1, absPosParams.R, fP, tp);
 		for(int k=0; k<3; k++)
 			fP[k] = absPosParams.scale*tp[k] + absPosParams.T[k];
 
-		tracks[i].x = fP[0];
-		tracks[i].y = fP[1];
-		tracks[i].z = fP[2];
+		tracks[i].grd.p[0] = fP[0];
+		tracks[i].grd.p[1] = fP[1];
+		tracks[i].grd.p[2] = fP[2];
 	}
 
 	return sumErr;

@@ -7,14 +7,9 @@
 #include "export.hpp"
 #include "defines.hpp"
 
-//#include <cmath>
-
-
 //opencv, these should be put previously, otherwise errors appear
 #include "opencv2/core/core.hpp"
 #include "opencv2/highgui/highgui.hpp"
-
-
 
 #include <vector>
 using namespace std;
@@ -81,10 +76,6 @@ int GrdToPanoImageCenter(T gx, T gy, T gz, T radius, T& ix, T& iy)
 	return 0;
 }
 
-
-
-
-
 //for cylinder projection
 //from 3d space to cylinder projection
 int GrdToCylinder(double gx, double gy, double gz, double radius, double& ix, double& iy);
@@ -100,49 +91,6 @@ DLL_EXPORT int SphereToCilinder(char* infile, char* outfile);
 
 
 
-IplImage*  PanoToPlane(IplImage* panoImage,double* direction, double vangle, double hangle);
-
-
-/* panorama to plane projection
-   srcImageFile: panoram file 
-   outImageFile: output file
-   vangle:    vertical fov angle
-   hangle:    horizonal fov angle
-   direction: the plane image normal direction
-   focalLenRatio:  focalLen / panaram radius
-   
-output:
-	 pR: rotation from the spherical coordinate to projection plane coordinate
-	 
-*/
-DLL_EXPORT int PanoToPlane(char* srcImageFile, char* outImageFile, 
-						double  vangle, double hangle, double* direction, double focalLenRatio, 
-						double& focalLen, int& outHt, int& outWd,
-						double* pR);
-
-DLL_EXPORT int PanoToPlanes(char* srcFile, double anglestep, double vangle, 
-							double hangle, double fratio, char* outpath);
-
-//panoram image is projected to several images and save the projection matrix 
-DLL_EXPORT int PanoToPlanes(int nImageIndex, char* srcFile, double anglestep,
-							double vangle, double hangle, double fratio,
-							double* R, double* T, vector<CameraPara>& camParas);
-
-
-
-DLL_EXPORT IplImage*  PanoToPlane(IplImage* panoImage, double  vangle, double hangle, 
-	double* direction, double focalLenRatio, 
-	double& focalLen, int& outHt, int& outWd, double* pR);
-
-
-
-//panoram image is projected to several images and save the images and projection matrix 
-DLL_EXPORT int PanoToPlanes(IplImage* panoImage, double anglestep,
-	double vangle, double hangle, double fratio,
-	double* R, double* T, 
-	vector<IplImage*>& projImages,
-	vector<CameraPara>& camParas);
-
 
 /* relative pose estimation for spherical panoramic images, based on 5-point algorithm, 
    written by xdh, 2015.7.8
@@ -155,44 +103,31 @@ output:
 //DLL_EXPORT int PanoramicRelativePose( vector<Point2DDouble> lPts, vector<Point2DDouble> rPts, int width, CameraPara& cam);
 
 
-
 /* simple method: calculate the rotation matrix align 3D vector a to b  
                 Ra = b
    but this method may be wrong!!!!
 */
 DLL_EXPORT int CalculateAlignRotation(double* a, double* b, double* R);
 
-
-
 /* calculate the rotation matrix align 3D vector a to b  
                 Ra = b
 */
 DLL_EXPORT int CalculateAlignRotation1(double* a, double* b, double* R);
 
-
-
 /*
 input: relative estimation results, projection model x = RX + T
 */
 DLL_EXPORT int GeneratePanoEpipolarImage(double* R, double* T, char* leftFile, char* rightFile);
-
-
 DLL_EXPORT int GeneratePanoEpipolarImageHeading(double* R, double* T, char* leftFile, char* rightFile);
-
-
 DLL_EXPORT int GeneratePanoEpipolarImageHeading(double* R, double* T, IplImage* pLeftImage, IplImage* pRightImage);
-
-
 DLL_EXPORT vector<Point3DDouble> GenerateEpipolarPlaneVectors(Point3DDouble normal,int num);
-
-
-
 
 
 /*
 class for panorama matching specialy: 
 including re-projection, feature points detection, matching, and error removal
 */
+
 class CIntegratedPanoMatch
 {
 public:
@@ -217,7 +152,6 @@ private:
 
 	//if the essential matrix has been calculated
 	bool   m_IsEssentialMatrixReady;
-
 	//
 	CameraPara m_leftPanoCam, m_rightPanoCam;
 };

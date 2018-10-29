@@ -1,13 +1,15 @@
 
 #include "math.h"
 
+#include"matrix.h"
+
 #include "rotation.hpp"
 
 //baselib dll 
 #include "baselib.h"
 
-//imagelib
-#include "defines.h"
+
+#include "defines.hpp"
 
 
 #ifndef PI
@@ -63,3 +65,64 @@ void rot2aa(double *R, double *aa)
 }
 
 
+int  eular2rot(double* R, double pitch, double roll, double yaw)
+{
+	
+	/*
+	rr = [cos(ro), 0, sin(ro);
+	0, 1, 0;
+	-sin(ro), 0, cos(ro)];
+	rp = [1, 0, 0;
+	0, cos(pt), -sin(pt);
+	0, sin(pt), cos(pt)];
+	rh = [cos(he), -sin(he), 0;
+	sin(he), cos(he), 0;
+	0, 0, 1];
+	r = rr * rp * rh;
+	*/
+
+
+	roll  = roll  / 180.0 * PI;     //y
+	pitch = pitch / 180.0 * PI;     //x
+	yaw   = yaw   / 180.0 * PI;     //z
+
+	double roty[9];
+	double rotx[9];
+	double rotz[9];
+
+	//y
+	roty[0] = cos(roll);      roty[1] = 0;    roty[2] = sin(roll);
+	roty[3] = 0;              roty[4] = 1;    roty[5] = 0;
+	roty[6] = -sin(roll);     roty[7] = 0;    roty[8] = cos(roll);
+
+	//x
+	rotx[0] = 1;     rotx[1] = 0;             rotx[2] = 0;
+	rotx[3] = 0;     rotx[4] = cos(pitch);    rotx[5] = -sin(pitch);
+	rotx[6] = 0;     rotx[7] = sin(pitch);    rotx[8] = cos(pitch);
+
+	//z
+	rotz[0] = cos(yaw);     rotz[1] = -sin(yaw);    rotz[2] = 0;
+	rotz[3] = sin(yaw);     rotz[4] =  cos(yaw);    rotz[5] = 0;
+	rotz[6] = 0;            rotz[7] =  0;           rotz[8] = 1;
+	
+	double R1[9];
+	mult(rotx, rotz, R1, 3, 3, 3);
+	mult(roty, R1, R, 3, 3, 3);
+
+	//double inRoll  = roll;
+	//double inPitch = pitch;
+	//double inYaw   = yaw;
+
+	//R[0] = cos(inRoll)*cos(inYaw) + sin(inPitch)*sin(inRoll)*sin(inYaw);
+	//R[1] = cos(inPitch)*sin(inYaw);
+	//R[2] = -sin(inRoll)*cos(inYaw) + sin(inPitch)*cos(inRoll)*sin(inYaw);
+	//R[3] = -cos(inRoll)*sin(inYaw) + sin(inPitch)*sin(inRoll)*cos(inYaw);
+	//R[4] = cos(inPitch)*cos(inYaw);
+	//R[5] = sin(inRoll)*sin(inYaw) + sin(inPitch)*cos(inRoll)*cos(inYaw);
+	//R[6] = cos(inPitch)*sin(inRoll);
+	//R[7] = -sin(inPitch); // + or - ?
+	//R[8] = cos(inRoll)*cos(inPitch);
+
+
+	return 0;
+}

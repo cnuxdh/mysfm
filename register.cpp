@@ -7,10 +7,13 @@
 
 //siftlib
 #include "siftmatch.h"
-#include "siftlib/ransac.h"
+#include "ransac.h"
 
 #include "register.hpp"
 #include "relativepose.hpp"
+#include "triangulate.hpp"
+#include "ORBextractor.h"
+
 
 #include <iostream>
 #include <fstream>
@@ -357,6 +360,239 @@ void FeatureConvert(PtFeature srcFeat, Key_Point& dstFeat)
 }
 
 
+
+//k1: src, k2: des
+static int CountInliers(const vector<Point2DDouble>& k1,
+						const vector<Point2DDouble>& k2,
+						double *M, double thresh, vector<int> &inliers)
+{
+	inliers.clear();
+	int count = 0;
+
+	for (unsigned int i = 0; i < k1.size(); i++)
+	{
+		/* Determine if the ith feature in f1, when transformed by M,
+		* is within RANSACthresh of its match in f2 (if one exists)
+		*
+		* if so, increment count and append i to inliers */
+
+		double p[3];
+
+		p[0] = k1[i].p[0];
+		p[1] = k1[i].p[1];
+		p[2] = 1.0;
+
+		double q[3];
+		dll_matrix_product(3, 3, 3, 1, M, p, q);
+
+		double qx = q[0] / q[2];
+		double qy = q[1] / q[2];
+
+		double dx = qx - k2[i].p[0];
+		double dy = qy - k2[i].p[1];
+
+		double dist = sqrt(dx * dx + dy * dy);
+
+		if (dist <= thresh)
+		{
+			count++;
+			inliers.push_back(i);
+		}
+	}
+
+	return inliers.size();
+}
+
+static int LeastSquaresFit( const vector<Point2DDouble> &k1,
+							const vector<Point2DDouble> &k2,
+							const std::vector<int> &inliers, double *M)
+{
+	v3_t *r_pts = new v3_t[inliers.size()];
+	v3_t *l_pts = new v3_t[inliers.size()];
+	double *weight = new double[inliers.size()];
+
+	/* Compute residual */
+	double error = 0.0;
+	for (int i = 0; i < (int)inliers.size(); i++)
+	{
+		int idx = inliers[i];
+
+		double r[3], l[3];
+		l[0] = k1[idx].p[0];
+		l[1] = k1[idx].p[1];
+		l[2] = 1.0;
+
+		r[0] = k2[idx].p[0];
+		r[1] = k2[idx].p[1];
+		r[2] = 1.0;
+
+		double rp[3];
+		dll_matrix_product(3, 3, 3, 1, M, l, rp);
+
+		rp[0] /= rp[2];
+		rp[1] /= rp[2];
+
+		double dx = rp[0] - r[0];
+		double dy = rp[1] - r[1];
+
+		error += dx * dx + dy * dy;
+	}
+
+	//printf("[LeastSquaresFit] Residual error (before) is %0.3e\n", error);    
+
+
+	for (int i = 0; i < (int)inliers.size(); i++)
+	{
+		int idx = inliers[i];
+
+		Vx(l_pts[i]) = k1[idx].p[0];
+		Vy(l_pts[i]) = k1[idx].p[1];
+		Vz(l_pts[i]) = 1.0;
+
+		Vx(r_pts[i]) = k2[idx].p[0];
+		Vy(r_pts[i]) = k2[idx].p[1];
+		Vz(r_pts[i]) = 1.0;
+
+		weight[i] = 1.0;
+	}
+
+	dll_align_homography((int)inliers.size(), r_pts, l_pts, M, 1);
+
+	/* Compute residual */
+	error = 0.0;
+	for (int i = 0; i < (int)inliers.size(); i++)
+	{
+		int idx = inliers[i];
+
+		double r[3], l[3];
+		l[0] = k1[idx].p[0];
+		l[1] = k1[idx].p[1];
+		l[2] = 1.0;
+
+		r[0] = k2[idx].p[0];
+		r[1] = k2[idx].p[1];
+		r[2] = 1.0;
+
+		double rp[3];
+		dll_matrix_product(3, 3, 3, 1, M, l, rp);
+
+		rp[0] /= rp[2];
+		rp[1] /= rp[2];
+
+		double dx = rp[0] - r[0];
+		double dy = rp[1] - r[1];
+
+		error += dx * dx + dy * dy;
+	}
+
+	//printf("[LeastSquaresFit] Residual error (after) is %0.3e\n", error);    
+
+	delete[] r_pts;
+	delete[] l_pts;
+	delete[] weight;
+
+	return 0;
+}
+
+//pl: source, pr: destination  
+vector<int> EstimateHMatrix(const vector<Point2DDouble>& pl,
+							const vector<Point2DDouble>& pr,
+							int num_trials,
+							double threshold,
+							double* H)
+{
+
+	int min_matches = 4;
+	
+	int *match_idxs = new int[min_matches];
+
+	int num_matches = (int)pl.size();
+	int max_inliers = 0;
+	double Mbest[9];
+
+	if (num_matches < min_matches)
+	{
+		std::vector<int> empty;
+		printf("Cannot estimate rigid transform \n");
+		return empty;
+	}
+
+	v3_t *r_pts = new v3_t[min_matches];
+	v3_t *l_pts = new v3_t[min_matches];
+	double *weight = new double[min_matches];
+
+	for (int round = 0; round < num_trials; round++)
+	{
+		for (int i = 0; i < min_matches; i++)
+		{
+			bool found;
+			int idx;
+
+			do
+			{
+				found = true;
+				idx = rand() % num_matches;
+
+				for (int j = 0; j < i; j++)
+				{
+					if (match_idxs[j] == idx)
+					{
+						found = false;
+						break;
+					}
+				}
+			} while (!found);
+
+			match_idxs[i] = idx;
+		}
+
+		/* Solve for the motion */
+
+		for (int i = 0; i < min_matches; i++)
+		{
+			int id = match_idxs[i];
+
+			Vx(l_pts[i]) = pl[id].p[0];
+			Vy(l_pts[i]) = pl[id].p[1];
+			Vz(l_pts[i]) = 1.0;
+
+			Vx(r_pts[i]) = pr[id].p[0];
+			Vy(r_pts[i]) = pr[id].p[1];
+			Vz(r_pts[i]) = 1.0;
+
+			weight[i] = 1.0;
+		}
+
+		double Mcurr[9];
+		dll_align_homography(min_matches, r_pts, l_pts, Mcurr, 1);
+
+		std::vector<int> inliers;
+		int num_inliers = CountInliers(pl, pr, Mcurr, threshold, inliers);
+
+		if (num_inliers > max_inliers)
+		{
+			max_inliers = num_inliers;
+			memcpy(Mbest, Mcurr, 9 * sizeof(double));
+		}
+	}
+
+	std::vector<int> inliers;
+	CountInliers(pl, pr, Mbest, threshold, inliers);
+
+	if (H != NULL){
+		memcpy(H, Mbest, 9 * sizeof(double));
+		LeastSquaresFit(pl, pr, inliers, H);
+	}
+	
+	delete[] match_idxs;
+	delete[] r_pts;
+	delete[] l_pts;
+	delete[] weight;
+
+	return inliers;
+}
+
+
 vector<int> EstimateFMatrix(  const vector<Point2DDouble>& pl, 
 							  const vector<Point2DDouble>& pr,
 							  int num_trials, 
@@ -495,6 +731,132 @@ vector<int> EstimateFMatrix(  const vector<Point2DDouble>& pl,
 
 	return inliers;
 }
+
+////////////////////////ORB matching for perspective projection/////////////////////////////
+CORBPerspectiveMatch::CORBPerspectiveMatch()
+{
+
+}
+CORBPerspectiveMatch::~CORBPerspectiveMatch()
+{
+
+}
+int CORBPerspectiveMatch::Match(ImgFeature& lImage, ImgFeature& rImage, PairMatchRes& pairMatch)
+{
+	float mfNNratio   = 0.9;
+	const int TH_HIGH = 100;
+	const int TH_LOW  = 50;
+	//const int HISTO_LENGTH = 30;
+
+	int nLeftPtSum  = lImage.GetFeatPtSum();
+	int nRightPtSum = rImage.GetFeatPtSum();
+
+	int nmatches = 0;
+
+	vector<int> vnMatches12(nLeftPtSum, -1); 
+	vector<int> vnMatches21(nRightPtSum, -1);
+	vector<int> vMatchedDistance(nRightPtSum, INT_MAX);
+
+	for (int i = 0; i < nLeftPtSum; i++)
+	{
+		cv::Mat d1 = lImage.mDescriptors.row(i);
+
+		int bestDist = INT_MAX;
+		int bestDist2 = INT_MAX;
+		int bestIdx2 = -1;
+
+		for (int j = 0; j < nRightPtSum; j++)
+		{
+			cv::Mat d2 = rImage.mDescriptors.row(j);
+
+			int dist = DescriptorDistance(d1, d2);
+
+			if (vMatchedDistance[j] <= dist)
+				continue;
+
+			if (dist < bestDist)
+			{
+				bestDist2 = bestDist;
+				bestDist = dist;
+				bestIdx2 = j;
+			}
+			else if (dist < bestDist2)
+			{
+				bestDist2 = dist;
+			}
+		}
+
+		if (bestDist <= TH_LOW)
+		{
+			if (bestDist < (float)bestDist2*mfNNratio)
+			{
+				if (vnMatches21[bestIdx2] >= 0)
+				{
+					vnMatches12[vnMatches21[bestIdx2]] = -1;
+					nmatches--;
+				}
+				vnMatches12[i] = bestIdx2;
+				vnMatches21[bestIdx2] = i;
+				vMatchedDistance[bestIdx2] = bestDist;
+				nmatches++;
+			}
+		}
+	}
+
+	//save matching into our designed structure
+	for (int i = 0; i < vnMatches12.size(); i++)
+	{
+		if (vnMatches12[i] > 0)
+		{
+			MatchPairIndex mp;
+			mp.l = i;
+			mp.r = vnMatches12[i];
+			pairMatch.matchs.push_back(mp);
+		}
+	}
+
+	//epipolar constrain
+	//remove outliers based on Fundamental matrix
+	if (1)
+	{
+		vector<Point2DDouble> lpts;
+		vector<Point2DDouble> rpts;
+		for (int i = 0; i<pairMatch.matchs.size(); i++)
+		{
+			int lid = pairMatch.matchs[i].l;
+			int rid = pairMatch.matchs[i].r;
+
+			Point2DDouble lp, rp;
+			lp.p[0] = lImage.featPts[lid].x;
+			lp.p[1] = lImage.featPts[lid].y;
+
+			rp.p[0] = rImage.featPts[rid].x;
+			rp.p[1] = rImage.featPts[rid].y;
+
+			lpts.push_back(lp);
+			rpts.push_back(rp);
+		}
+
+		//from "Modeling the World from Internet Photo Collections"
+		int threshold = 0.008*max(lImage.ht, lImage.wd);
+
+		vector<int> inliers = EstimateFMatrix(lpts, rpts, 2048, threshold);
+
+		vector<MatchPairIndex> inlierMatch;
+		for (int i = 0; i<inliers.size(); i++)
+		{
+			inlierMatch.push_back(pairMatch.matchs[inliers[i]]);
+		}
+
+		pairMatch.matchs = inlierMatch;
+		pairMatch.inlierRatio = (double)(inlierMatch.size()) / double(lpts.size());
+	}
+	
+	return 0;
+}
+////////////////////////////////////////////////////////////////////////////
+
+
 
 
 CRationMatch::CRationMatch()
@@ -664,6 +1026,7 @@ int CPanoMatch::Match(ImgFeature& lImage, ImgFeature& rImage, vector<MatchPairIn
 
 	return 1;
 }
+
 int CPanoMatch::Match(ImgFeature& lImage, ImgFeature& rImage, PairMatchRes& pairMatch )
 {
 	if(lImage.featPts.size()<8 || rImage.featPts.size()<8)
@@ -1039,11 +1402,11 @@ int CSiftMatch::Match(ImgFeature& lImage, ImgFeature& rImage, PairMatchRes& pair
 			int rid = pairMatch.matchs[i].r;
 
 			Point2DDouble lp,rp;
-			lp.p[0] = lImage.featPts[lid].x;
-			lp.p[1] = lImage.featPts[lid].y;
+			lp.p[0] = lImage.featPts[lid].cx;
+			lp.p[1] = lImage.featPts[lid].cy;
 			
-			rp.p[0] = rImage.featPts[rid].x;
-			rp.p[1] = rImage.featPts[rid].y;
+			rp.p[0] = rImage.featPts[rid].cx;
+			rp.p[1] = rImage.featPts[rid].cy;
 
 			lpts.push_back(lp);
 			rpts.push_back(rp);
@@ -1064,24 +1427,47 @@ int CSiftMatch::Match(ImgFeature& lImage, ImgFeature& rImage, PairMatchRes& pair
 		}
 
 		//from "Modeling the World from Internet Photo Collections"
-		int threshold = 0.008*max( lImage.ht, lImage.wd );
+		int threshold = 0.016*max( lImage.ht, lImage.wd );
 
-		vector<int> inliers = EstimateFMatrix(lpts, rpts, 2048, threshold);
+		vector<int> inliers  = EstimateFMatrix(lpts, rpts, 512, threshold);
+		vector<int> inliersH = EstimateHMatrix(lpts, rpts, 512, threshold);
 
+		//calculate the mean translation in image space
 		vector<MatchPairIndex> inlierMatch;
+		vector<double> vecDx;
+		vector<double> vecDy;
 		for(int i=0; i<inliers.size(); i++)
 		{
 			inlierMatch.push_back( pairMatch.matchs[ inliers[i] ] );
-		}
 
+			double lx = lpts[inliers[i]].p[0];
+			double ly = lpts[inliers[i]].p[1];
+			double rx = rpts[inliers[i]].p[0];
+			double ry = rpts[inliers[i]].p[1];
+
+			double dx = fabs(lx - rx);
+			double dy = fabs(ly - ry);
+			vecDx.push_back(dx);
+			vecDy.push_back(dy);
+		}
+		sort(vecDx.begin(), vecDx.end());
+		sort(vecDy.begin(), vecDy.end());
+		int half = vecDx.size()*0.5;
+		double mx = vecDx[half];
+		double my = vecDy[half];
+
+		pairMatch.mTraslation = sqrt(mx*mx + my*my);
 		pairMatch.matchs = inlierMatch;
 		pairMatch.inlierRatio = (double)(inlierMatch.size()) / double(lpts.size()); 
-	}
+		pairMatch.inlierRatioHomography = (double)(inliersH.size()) / double(lpts.size());
+        pairMatch.mRH = (double)(inliersH.size()) / 
+            ((double)(inliersH.size()) + (double)(inliers.size()));
+    }
 	
 	free(lKey);
 	free(rKey);
 
-	printf("Matching Point Number: %d \n", pairMatch.matchs.size());
+	//printf("Matching Point Number: %d \n", pairMatch.matchs.size());
 
 #ifdef _WIN32
 	//unsigned long t2 = timeGetTime();
@@ -1358,25 +1744,27 @@ CFastGenerateTrack::~CFastGenerateTrack()
 
 }
 
+
+
 int CFastGenerateTrack::GenerateTracks(vector<ImgFeature>& imgFeatures, vector<PairMatchRes>& pairMatchs, vector<TrackInfo>& tracks )
 {
 	int nImage = imgFeatures.size();
 
 	//clear the "extra" value
-	for(int i=0; i<nImage; i++)
-	{
-		int nFeat = imgFeatures[i].featPts.size();
-		for(int j=0; j<nFeat; j++)
-		{
-			imgFeatures[i].featPts[j].extra = -1; //must be initialize as -1
-		}
-	}
+	//for(int i=0; i<nImage; i++)
+	//{
+	//	int nFeat = imgFeatures[i].featPts.size();
+	//	for(int j=0; j<nFeat; j++)
+	//	{
+	//		imgFeatures[i].featPts[j].extra = -1; //must be initialize as -1
+	//	}
+	//}
 	
 	int nMatchPair = pairMatchs.size();
 
-	tracks.clear();
+	//tracks.clear();
 
-	int nTrackIndex = 0;
+	int nTrackIndex = tracks.size();
 	for(int i=0; i<nMatchPair; i++)
 	{
 		int nLeftImage  = pairMatchs[i].lId; //left image index
@@ -1396,7 +1784,7 @@ int CFastGenerateTrack::GenerateTracks(vector<ImgFeature>& imgFeatures, vector<P
 
 			TrackInfo tp;
 			tp.extra = -1;
-
+			
 			ImageKey ik;
 			
 			//create a new track point
@@ -1496,6 +1884,132 @@ int CFastGenerateTrack::GenerateTracks(vector<ImgFeature>& imgFeatures, vector<P
 	return 0;
 }
 
+int CFastGenerateTrack::GenerateTracks(vector<CVideoKeyFrame>& imgFeatures, vector<PairMatchRes>& pairMatchs, vector<TrackInfo>& tracks)
+{
+	int nImage = imgFeatures.size();
+	int nMatchPair = pairMatchs.size();
+
+	//tracks.clear();
+
+	int nTrackIndex = tracks.size();
+	for (int i = 0; i<nMatchPair; i++)
+	{
+		int nLeftImage  = pairMatchs[i].lId; //left image index
+		int nRightImage = pairMatchs[i].rId; //right image index
+		int nMatchNum   = pairMatchs[i].matchs.size();
+
+		//printf("match pair: %d - %d \n", nLeftImage, nRightImage);
+
+		//process each match point pair
+		for (int j = 0; j<nMatchNum; j++)
+		{
+			int nLeftFeatIndex = pairMatchs[i].matchs[j].l;
+			int nRightFeatIndex = pairMatchs[i].matchs[j].r;
+
+			int lTrackIndex = imgFeatures[nLeftImage].mFeature.featPts[nLeftFeatIndex].extra;
+			int rTrackIndex = imgFeatures[nRightImage].mFeature.featPts[nRightFeatIndex].extra;
+
+			TrackInfo tp;
+			tp.extra = -1;
+
+			ImageKey ik;
+
+			//create a new track point
+			if (lTrackIndex == -1 && rTrackIndex == -1)
+			{
+				ik.first = nLeftImage;
+				ik.second = nLeftFeatIndex;
+				tp.views.push_back(ik);
+
+				ik.first = nRightImage;
+				ik.second = nRightFeatIndex;
+				tp.views.push_back(ik);
+
+				tp.id = nTrackIndex;
+
+				//bridge the image point and track
+				imgFeatures[nLeftImage].mFeature.featPts[nLeftFeatIndex].extra = nTrackIndex;
+				imgFeatures[nRightImage].mFeature.featPts[nRightFeatIndex].extra = nTrackIndex;
+
+				tracks.push_back(tp);
+
+				nTrackIndex++;
+			}
+			///////////////////////////////////////////////////////////////////////
+
+			//adding the match point into existing track point
+			if (lTrackIndex != -1 && rTrackIndex == -1)
+			{
+				ik.first = nRightImage;
+				ik.second = nRightFeatIndex;
+				tp.views.push_back(ik);
+
+				//adding the right image point into the track
+				tracks[lTrackIndex].views.push_back(ik);
+				imgFeatures[nRightImage].mFeature.featPts[nRightFeatIndex].extra = lTrackIndex;
+			}
+			if (lTrackIndex == -1 && rTrackIndex != -1)
+			{
+				ik.first = nLeftImage;
+				ik.second = nLeftFeatIndex;
+				tp.views.push_back(ik);
+
+				//adding the left image point into the track
+				tracks[rTrackIndex].views.push_back(ik);
+				imgFeatures[nLeftImage].mFeature.featPts[nLeftFeatIndex].extra = rTrackIndex;
+			}
+			////////////////////////////////////////////////////////////////////////////
+		}
+	}
+
+	//remove the track with multiple projections in the same image
+	//vector<TrackInfo> newTracks;
+	for (int i = 0; i<tracks.size(); i++)
+	{
+		vector<int> vecNumberFreq;
+		vecNumberFreq.resize(nImage, 0);
+		bool bIsRemove = false;
+
+		for (int j = 0; j<tracks[i].views.size(); j++)
+		{
+			int nImageIndex = tracks[i].views[j].first;
+			vecNumberFreq[nImageIndex]++;
+
+			if (vecNumberFreq[nImageIndex]>1)
+			{
+				bIsRemove = true;
+				break;
+			}
+		}
+		//if(!bIsRemove)
+		//	newTracks.push_back(tracks[i]);
+
+		if (bIsRemove)
+		{
+			for (int k = 0; k<vecNumberFreq.size(); k++)
+				vecNumberFreq[k] = 0;
+
+			ImageKeyVector newView;
+			for (int j = 0; j<tracks[i].views.size(); j++)
+			{
+				int nImageIndex = tracks[i].views[j].first;
+				vecNumberFreq[nImageIndex]++;
+
+				ImageKey ik = tracks[i].views[j];
+
+				if (vecNumberFreq[nImageIndex] == 1)
+				{
+					newView.push_back(ik);
+				}
+			}
+			tracks[i].views = newView;
+		}
+	}
+
+	//tracks = newTracks;
+
+	return 0;
+}
 
 int CFastGenerateTrack::GenerateTracks( vector<PairMatchRes>& pairMatchs, vector<TrackInfo>& tracks )
 {
@@ -1902,6 +2416,75 @@ int LoadMatchFile( char* filename, vector<PairMatchRes>& pairMatchs)
 		pairMatchs.push_back(pair);
 	}
 	fclose(f);
+
+	return 0;
+}
+
+
+int PairMatchRes::SaveMatchFile(string filepath){
+
+	char *cfile = (char*)filepath.c_str();
+
+	FILE* fp = fopen(cfile, "wb");
+	if (fp == NULL)
+		return 0;
+
+	fwrite(&lId, sizeof(int), 1, fp);
+	fwrite(&rId, sizeof(int), 1, fp);
+	fwrite(&inlierRatio, sizeof(double), 1, fp);
+	fwrite(&inlierRatioHomography, sizeof(double), 1, fp);
+	fwrite(&mTraslation, sizeof(double), 1, fp);
+
+
+	int nmatch = matchs.size();
+	printf("[SaveMatchFile]: match number: %d  \n", nmatch);
+	int* pmatch = new int[nmatch*2];
+	for (int i = 0; i < nmatch; i++){
+		pmatch[i * 2] = matchs[i].l;
+		pmatch[i * 2 + 1] = matchs[i].r;
+	}
+	fwrite(&nmatch, sizeof(int), 1, fp);
+	fwrite(pmatch, sizeof(int), nmatch*2, fp);
+
+	fclose(fp);
+
+	delete pmatch;
+
+	return 0;
+}
+
+int PairMatchRes::ReadMatchFile(string filepath){
+
+	char *cfile = (char*)filepath.c_str();
+
+	FILE* fp = fopen(cfile, "rb");
+	if (fp == NULL)
+		return -1;
+
+	fread(&lId, sizeof(int), 1, fp);
+	fread(&rId, sizeof(int), 1, fp);
+	fread(&inlierRatio, sizeof(double), 1, fp);
+	fread(&inlierRatioHomography, sizeof(double), 1, fp);
+	fread(&mTraslation, sizeof(double), 1, fp);
+
+    mRH = inlierRatioHomography / (inlierRatioHomography + inlierRatio);
+
+	int nmatch;
+	fread(&nmatch, sizeof(int), 1, fp);
+
+	
+	int* pmatch = new int[nmatch * 2];
+	fread(pmatch, sizeof(int), nmatch * 2, fp);
+
+	matchs.resize(nmatch);
+	for (int i = 0; i < nmatch; i++){
+		matchs[i].l = pmatch[i * 2];
+		matchs[i].r = pmatch[i * 2 + 1];
+	}
+    
+	fclose(fp);
+
+	delete pmatch;
 
 	return 0;
 }

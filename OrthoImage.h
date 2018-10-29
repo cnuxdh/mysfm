@@ -14,11 +14,10 @@ using namespace std;
 //cvlib
 //#include "bundlerio.hpp"
 #include "defines.hpp"
-
+#include "badata.hpp"
 
 //gdal
 #include "gdal_priv.h"
-
 
 
 //same as ReadBundlerOutFile(...)
@@ -29,12 +28,22 @@ void GrdToImg1(double* R, double* T, double f, double k1, double k2,
 
 void ImgtoGrd1(double* R, double* T, double f, double ix, double iy, double gz, double* gx, double* gy);
 double CalculateRatioFor32bitOS(int srcHt, int srcWd, int nByte);
+
 void FindGroundPlane(stAbsPOS& absPosParams, vector<stPOS>& camParas, vector<stTrack>& tracks);
+void FindGroundPlane(stAbsPOS& absPosParams, vector<CameraPara>& camParas, vector<TrackInfo>& tracks);
+
 void CalculateGroudArea(vector<stTrack> tracks, 
 						double& minx, double& maxx, double& miny, double& maxy, double& meanHeight);
+void CalculateGroudArea(vector<TrackInfo> tracks,
+	double& minx, double& maxx, double& miny, double& maxy, double& meanHeight);
 
 double CalculateResolution(int ht, int wd, double meanHeight, vector<stPOS> camParas );
+double CalculateResolution(double meanHeight, vector<CameraPara> camParas);
+
+
 int    DLL_EXPORT GetZoneNumber(vector<stPOS> camParas);
+int    DLL_EXPORT GetZoneNumber(vector<CameraPara> camParas);
+
 int    GenerateMosaicImage(int ht, int wd, 
 						 char**  filenames,
 						 double  rawResolution,
@@ -47,7 +56,7 @@ int    GenerateMosaicImage(int ht, int wd,
 						 double  minx, double maxx, double miny, double maxy,
 						 double  meanHeight,
 						 char* outFile);
-int ReadingPosFromJpegImages(char* listfile, vector<stPOS>& camParas);
+//int ReadingPosFromJpegImages(char* listfile, vector<stPOS>& camParas);
 int ReadingPosFile(char* posFile, char* imageListFile, vector<stPOS>& camParas);
 int AbsPosEstimation(stAbsPOS& absPosParams, vector<stPOS>& camParas, vector<stTrack>& tracks);
 
@@ -65,6 +74,20 @@ int  DLL_EXPORT  MosaicOnBundleWithWYOut(char* imageListFile, char* camfile,  ch
 
 
 DLL_EXPORT int VignettingCorrectFromFile(char* filename, char* outfile);
+
+
+//generate the ground coordinates for each image, 2018.1.5
+int GenerateDOMGeoData(string srcFile, double meanHeight,
+	CameraPara camPara, double outResolution, stGeoInfo& geoinfo);
+
+//new interface using memory data, added by xiedonghai, 2018.1.4
+int GenerateRGBDOM(string srcFile,
+	double rawResolution, double outResolution, double demResolution,
+	double minx, double miny, double maxx, double maxy,
+	CameraPara camPara, double  meanHeight,
+	vector<vector<double>> demData,
+	stGeoInfo&  geoinfo, vector<vector<unsigned char>>& rgb, int& oht, int& owd
+	);
 
 
 template<typename T>
@@ -249,6 +272,11 @@ int OrthoResampleGeneral(T* pSrc,
 
 	return 0;
 }
+
+
+
+
+
 
 
 

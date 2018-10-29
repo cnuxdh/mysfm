@@ -16,7 +16,7 @@
 class DLL_EXPORT CImageDataBase
 {
 public:
-	CImageDataBase(){}
+	CImageDataBase(){}	
 	virtual ~CImageDataBase(){}
 
 	virtual int Load(char* filename){return 0;}
@@ -30,6 +30,8 @@ public:
 	virtual FeatPoint GetKeyPoint(int index) //return the point information 
 	{
 		FeatPoint pt;
+		pt.cx = 0;
+		pt.cy = 0;
 		return pt;
 	}
 	virtual void SetFeatExtra(int index, int extra){}
@@ -109,6 +111,12 @@ private:
 	double       m_initFocus;
 	int          m_isInitFocus;
 };
+
+
+
+
+
+
 
 
 #endif

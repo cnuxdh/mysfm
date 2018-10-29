@@ -1450,7 +1450,7 @@ int OptialcFlowMotion(IplImage* pFirst, IplImage* pSecond, double& tx, double& t
 }
 
 
-
+/*
 //calculate sparse optical motion, written using c style 
 int KLTOptialcFlow(IplImage* pFirst, IplImage* pSecond, vector<MyPointF> motionVector)
 {
@@ -1514,6 +1514,7 @@ int KLTOptialcFlow(IplImage* pFirst, IplImage* pSecond, vector<MyPointF> motionV
 
 	return 1;
 }
+*/
 
 
 /*  convert IplImage to gray image

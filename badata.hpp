@@ -15,6 +15,15 @@
 #include "defines.hpp"
 #include "export.hpp"
 
+
+//opencv
+#include <opencv2/core/core.hpp>
+#include <opencv2/highgui/highgui.hpp>
+#include <opencv2/features2d/features2d.hpp>
+#include <opencv2/imgproc/imgproc.hpp>
+using namespace cv;
+
+
  class DLL_EXPORT ImgFeature
 {
 public:
@@ -40,25 +49,38 @@ public:
 	
 	int  AddFeatPt( stPtFeature fp ){ featPts.push_back(fp); return 0; }
 
-	int  Clear(){ featPts.clear(); return 0;}
+	void  Clear()
+	{    
+		featPts.clear(); 
+		mDescriptors.empty();
+	}
 
 	stPtFeature GetFeatPt(int i){return featPts[i];}
+
+	//save the feature into file, added by xdh, 2018.5.7
+	int SaveImgFeaturePts(string filepath);
+	int ReadImgFeaturePts(string filepath);
+
 
 public:
 	int id;
 	int ht,wd;
-	vector<stPtFeature> featPts;
+	vector<stPtFeature> featPts;  //
+	//vector<KeyPoint> mKeys;       //for orb 
+	Mat mDescriptors;               //for orb
+
+	
 };
 
 
-
+//a track includes all projections to the images, and the 3d point,...
 class DLL_EXPORT TrackInfo
 {
 public:
 	TrackInfo();
 	~TrackInfo();
 	
-	int GetRemapTrackId(){ return extra; }
+	int GetRemapTrackId(){ return extra; } //the id to the track in other track sequence
 	int GetValidValue(){ return valid;}
 
 	void SetGround(Point3DDouble pt){ grd = pt; }
@@ -74,14 +96,23 @@ public:
 
 	void   Clear(){views.clear();}
 
+	int    GetViews(){ return views.size(); }
+
+	void   SetAsCtrlPt(){ ctrl = 1; }
+	int    IsCtrl(){ return ctrl; }
+
 public:
 	int id;
-	int extra;              //save extra information (such as the index of image feature point)
+	int extra;              //save extra information (such as the index of  track)
 	int valid;              //1:valid , 0:invalid 
+	int ctrl;               //1:control point, 0: free points
 	double derror;    
 	Point3DDouble  grd;
 	ImageKeyVector views;
 };
+
+
+int GetGoodTracks(vector<TrackInfo> srcTracks, vector<TrackInfo>& goodTracks);
 
 
 #endif

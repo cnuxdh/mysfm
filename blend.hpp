@@ -3,11 +3,43 @@
 #define BLEND_HEAD
 
 
-#include "corelib/commondata.h"
-
+#include "commondata.h"
+#include "defines.hpp"
 #include "geotiff.h"
 
+#define MAX_MASK_SIZE 900
 
+int WeightedLoGBlendGeneral(char** filenames, unsigned char** pMaskArray, int nFile,
+	vector<int> masksHt, vector<int> masksWd,
+	vector<stGeoInfo> geoArray,
+	vector<MyRect> vecRect,
+	double outImageResolution,
+	double maskResolution,
+	double minx, double maxx, double miny, double maxy,
+	int nPyramidLevel,
+	double* gainParas,
+	char* outFile, double& dProgress, sfmCall pCallBack, bool& bIsStop);
+
+int SeamlinesFindingVoronoi(unsigned char** pMaskArray, int nFile,
+	vector<int> masksHt, vector<int> masksWd, vector<MyRect> vecRect, bool& bIsStop);
+
+double CalculateRatioFor64bitOS(int srcHt, int srcWd, int nByte);
+
+int SeamlinesFindingVoronoi(char** maskNames, int nFile,
+	vector<MyRect> vecRect);
+
+int CalculateSeqsPyramidLevel(vector<stGeoInfo> geoArray, double outresolution);
+
+//this version can handle image of any format
+int WeightedLoGBlendGeneral(char** filenames, char** masknames, int nFile,
+	vector<stGeoInfo> geoArray,
+	vector<MyRect> vecRect,
+	double outImageResolution,
+	double maskResolution,
+	double minx, double maxx, double miny, double maxy,
+	int nPyramidLevel,
+	double* gainParas,
+	char* outFile);
 
 /* blend based on Laplacian images of Pyramid
 */
@@ -31,6 +63,10 @@ _declspec(dllexport) int SaveToJpg(unsigned char* pBuffer, int ht, int wd, char*
 
 int GenerateImageMask(char* filename, double rawResolution, double outResolution,
 					  unsigned char** pMask, int& mht, int& mwd, int fillValue=255);
+
+
+
+
 
 
 template<typename T>
@@ -103,7 +139,7 @@ int WritePyramidImage( PYRAMID_IMAGE_GENERAL<T>& pyraImage)
 	for(int i=0; i<pyraImage.nL; i++)
 	{
 		char file[256];
-		sprintf(file, "d:\\pyramid_%d.jpg", i);
+		sprintf(file, "c:\\temp\\pyramid_%d.jpg", i);
 		
 		int minv = 1000000;
 		int maxv = -100000;
@@ -129,7 +165,7 @@ int WritePyramidImage( PYRAMID_IMAGE_GENERAL<T>& pyraImage)
 		//char file[256];
 		if(pyraImage.pMask != NULL)
 		{
-			sprintf(file, "d:\\mask_%d.jpg", i);
+			sprintf(file, "c:\\temp\\mask_%d.jpg", i);
 			SaveToJpg(pyraImage.pMask[i], pyraImage.pHt[i], pyraImage.pWd[i], file);
 		}
 	}
@@ -430,9 +466,7 @@ int LoGBlendGeneral(char** filenames, char** masknames, int nFile,
 			printf("generate gaussian pyramid and smoothed mask! \n");
 			PYRAMID_IMAGE_GENERAL<T> pyramidImage; 
 			ConstructPyramidWithMask(pSrc, pResizeMask, rht, rwd, pyramidImage, nPyramidLevel);
-			
-
-			
+						
 			free(pSrc);
 			free(pMask);
 			free(pResizeMask);
@@ -574,5 +608,286 @@ int LoGBlendGeneral(char** filenames, char** masknames, int nFile,
 	return 0;
 }
 
+template<typename T>
+int LoGBlendGeneral(char** filenames, unsigned char** pMaskArray, int nFile,
+	vector<int> masksHt, vector<int> masksWd,
+	vector<stGeoInfo> geoArray,
+	vector<MyRect> vecRect,
+	double outImageResolution,
+	double maskResolution,
+	double minx, double maxx, double miny, double maxy,
+	int nPyramidLevel,
+	double* gainParas,
+	char* outFile,
+	unsigned char* pWholeMask, double maskRatio, int mht, int mwd,
+	T* pBuffer, GDALDataType ntype, int nByte,
+	int nBand,
+	int oht, int owd, double& dProgress,
+	sfmCall pCallBack, bool& bIsStop)
+{
+	GDALAllRegister();
+	CPLSetConfigOption("GDAL_FILENAME_IS_UTF8", "NO");
+	GDALDriver *poDriver = NULL;
+	GDALDataset *poDataset = NULL;
+	GDALRasterBand *poBand = NULL;
+	char **papszOptions = NULL;
+	int zoneNumber = geoArray[0].zoneNumber; //geoinfo.zoneNumber;
+
+	OGRSpatialReference oSRS;
+	oSRS.SetUTM(zoneNumber);
+	oSRS.SetWellKnownGeogCS("WGS84");
+	char    *pszWKT = NULL;
+	oSRS.exportToWkt(&pszWKT);
+
+	poDriver = GetGDALDriverManager()->GetDriverByName("GTiff");
+	if (poDriver == NULL)
+	{
+		printf("Gdal Open file failed ! \n");
+		return 0;
+	}
+	printf("gdal creating file... \n");
+	printf("%d %d \n", owd, oht);
+
+	poDataset = poDriver->Create(outFile, owd, oht, nBand, ntype, papszOptions);
+	if (poDataset == NULL)
+	{
+		printf("Failed to create file using gdal ! \n");
+		return -1;
+	}
+
+	double  geoTransform[6];
+	memset(geoTransform, 0, sizeof(double) * 6);
+	geoTransform[0] = minx;
+	geoTransform[3] = maxy;
+	geoTransform[1] = outImageResolution;
+	geoTransform[5] = -outImageResolution;
+	poDataset->SetGeoTransform(geoTransform);
+
+	//if(0)
+	poDataset->SetProjection(pszWKT);
+
+	double dTime = 55;
+	double dStep = dTime / (nBand*nFile);
+	int    pi = 0;
+
+	double step = 100.0 / double(nBand*nFile);
+
+	dProgress = 0;
+
+	//generate Laplacian pyramid image one by one
+	for (int bandId = 0; bandId<nBand; bandId++)
+	{
+
+		//prepare for the mosaic image
+		PYRAMID_IMAGE_GENERAL<short> mosaicLaplacianPI;
+		MallocPyramidGeneral(oht, owd, mosaicLaplacianPI, nPyramidLevel);
+
+		PYRAMID_IMAGE_GENERAL<short> mosaicLaplacianWeight;
+		MallocPyramidGeneral(oht, owd, mosaicLaplacianWeight, nPyramidLevel);
+
+		double dstMean, dstStd;
+		for (int i = 0; i<nFile; i++)
+		{
+			if (bIsStop) {
+				FreePyramidImageGeneral(mosaicLaplacianPI);
+				FreePyramidImageGeneral(mosaicLaplacianWeight);
+				GDALClose((GDALDatasetH)poDataset);
+				return -1;
+			}
+
+			dProgress += step;
+
+			pCallBack(NULL, dProgress, "Mosaic and Fusion ...");
+
+			printf("band: %d  %s \n", bandId, filenames[i]);
+
+			//reading file
+			GDALDataset *pSrcDataSet = (GDALDataset*)GDALOpen(filenames[i], GA_ReadOnly);
+			if (pSrcDataSet == NULL)
+			{
+				printf("Open file using gdal failed ! \n");
+				return 0;
+			}
+			GDALRasterBand *pSrcBand = pSrcDataSet->GetRasterBand(bandId + 1);
+			int wd = pSrcBand->GetXSize();
+			int ht = pSrcBand->GetYSize();
+			double ratio = fabs(geoArray[i].dx) / outImageResolution;
+			int rht = ratio * geoArray[i].ht;
+			int rwd = ratio * geoArray[i].wd;
+			printf("%d %d \n", rht, rwd);
+			T* pSrc = (T*)malloc(nByte*rwd*rht);
+			pSrcBand->RasterIO(GF_Read, 0, 0, wd, ht, pSrc, rwd, rht, ntype, 0, 0);
+			GDALClose((GDALDatasetH)pSrcDataSet);
+			printf("close image. \n");
+
+			for (int kj = 0; kj<rht*rwd; kj++)
+			{
+				pSrc[kj] = pSrc[kj] * gainParas[i];
+			}
+
+			printf("[LoGBlendGeneral] reading mask... \n");
+			//reading mask
+			unsigned char* pMask = pMaskArray[i];
+			int mht1 = masksHt[i];
+			int mwd1 = masksWd[i];
+			//ReadRawImage(&pMask, mht1, mwd1, masknames[i]);
+			//assert(mht==ht && mwd==wd);
+
+			//resize the mask
+			printf("resizing the mask...\n");
+			unsigned char* pResizeMask = (unsigned char*)malloc(rht*rwd);
+			ResizeImage(pMask, mht1, mwd1, pResizeMask, rht, rwd);
+
+			//generate gaussian pyramid and smoothed mask
+			printf("generate gaussian pyramid and smoothed mask! \n");
+			PYRAMID_IMAGE_GENERAL<T> pyramidImage;
+			ConstructPyramidWithMask(pSrc, pResizeMask, rht, rwd, pyramidImage, nPyramidLevel);
+
+			free(pSrc);
+			//free(pMask);
+			free(pResizeMask);
+
+#ifdef _DEBUG
+			WritePyramidImage(pyramidImage);
+#endif
+
+			//generate laplacian pyramid of each image
+			printf("generate laplacian pyramid of each image! \n");
+			PYRAMID_IMAGE_GENERAL<short> laplacianPI;
+			ConstructLaplacianPyramid(pyramidImage, laplacianPI);
+
+#ifdef _DEBUG
+			WritePyramidImage(laplacianPI);
+#endif
+			printf("fill the laplacian pyramid based on mask ... \n");
+			double imageRatio = 1;
+			for (int li = 0; li<laplacianPI.nL; li++)
+			{
+				int lht = mosaicLaplacianPI.pHt[li];
+				int lwd = mosaicLaplacianPI.pWd[li];
+
+				int iht = laplacianPI.pHt[li];
+				int iwd = laplacianPI.pWd[li];
+
+				for (int kj = 0; kj<iht; kj++)
+					for (int ki = 0; ki<iwd; ki++)
+					{
+						int ay = min(lht - 1, kj + int(vecRect[i].top*imageRatio));
+						int ax = min(lwd - 1, ki + int(vecRect[i].left*imageRatio));
+
+						int index = ay*lwd + ax;
+
+						mosaicLaplacianPI.pLevelImage[li][index] +=
+							laplacianPI.pLevelImage[li][kj*iwd + ki] * pyramidImage.pMask[li][kj*iwd + ki];
+
+
+						mosaicLaplacianWeight.pLevelImage[li][index] +=
+							pyramidImage.pMask[li][kj*iwd + ki];
+					}
+				imageRatio *= 0.5;
+#ifdef _DEBUG
+				WritePyramidImage(mosaicLaplacianPI);
+#endif
+			}
+
+			printf("free pyramid data ... \n");
+			FreePyramidImageGeneral(pyramidImage);
+			FreePyramidImageGeneral(laplacianPI);
+#ifdef _DEBUG
+			WritePyramidImage(mosaicLaplacianPI);
+#endif
+		}
+
+#ifdef _DEBUG
+		WritePyramidImage(mosaicLaplacianPI);
+#endif
+
+		//calculate the weighted 
+		printf("mosaic weighted ...\n");
+		for (int li = 0; li<mosaicLaplacianPI.nL; li++)
+		{
+			int lht = mosaicLaplacianPI.pHt[li];
+			int lwd = mosaicLaplacianPI.pWd[li];
+
+			for (int kj = 0; kj<lht*lwd; kj++)
+			{
+				if (mosaicLaplacianWeight.pLevelImage[li][kj] == 0)
+					continue;
+				mosaicLaplacianPI.pLevelImage[li][kj] /= mosaicLaplacianWeight.pLevelImage[li][kj];
+			}
+		}
+
+		if(0)
+			WritePyramidImage(mosaicLaplacianPI);
+
+		//erode the last level image
+		int nL = mosaicLaplacianPI.nL;
+		//MyErode(mosaicLaplacianPI.pLevelImage[nL-1], mosaicLaplacianPI.pHt[nL-1], mosaicLaplacianPI.pWd[nL-1], 2);
+
+		
+		//smooth the last level image, but may brighten the constructed image
+		SmoothImage(mosaicLaplacianPI.pLevelImage[nL-1],
+		mosaicLaplacianPI.pHt[nL-1], mosaicLaplacianPI.pWd[nL-1],
+		2, 2);
+		
+
+#ifdef _DEBUG
+		WritePyramidImage(mosaicLaplacianPI);
+#endif
+		//reconstruction
+		printf("ReconstrucFromLaplacian...\n");
+		short* mosaicImage = NULL;
+		int rht, rwd;
+		ReconstrucFromLaplacian(mosaicLaplacianPI, &mosaicImage, &rht, &rwd);
+
+		//double imageToMaskRatio = outImageResolution/maskResolution;
+		T* pMosaicImage = (T*)malloc(rht*rwd*nByte);
+		memset(pMosaicImage, 0, rht*rwd*nByte);
+
+		for (int j = 0; j<rht; j++)
+		{
+			int my = min(mht - 1, int(j*maskRatio + 0.5));
+			for (int i = 0; i<rwd; i++)
+			{
+				int index = j*rwd + i;
+				int mx = min(mwd - 1, int(i*maskRatio + 0.5));
+
+				//for common RGB color image
+				if (ntype == GDT_Byte)
+				{
+					if (mosaicImage[index]<0)
+						mosaicImage[index] = 0;
+					if (mosaicImage[index]>255)
+						mosaicImage[index] = 255;
+				}
+
+				if (pWholeMask[my*mwd + mx]>0)
+				{
+					pMosaicImage[index] = mosaicImage[index];
+				}
+			}
+		}
+
+#ifdef _DEBUG
+		char outfile[256];
+		sprintf(outfile, "c:\\temp\\blend_%d.jpg", bandId);
+		SaveToJpgGeneral(pMosaicImage, rht, rwd, outfile);
+#endif
+
+		printf("save band buffer... \n");
+		poBand = poDataset->GetRasterBand(bandId + 1);
+		poBand->RasterIO(GF_Write, 0, 0, owd, oht, pMosaicImage, owd, oht, ntype, 0, 0);
+
+		//free memory
+		free(pMosaicImage);
+		free(mosaicImage);
+		FreePyramidImageGeneral(mosaicLaplacianPI);
+		FreePyramidImageGeneral(mosaicLaplacianWeight);
+	}
+
+	GDALClose((GDALDatasetH)poDataset);
+
+	return 0;
+}
 
 #endif

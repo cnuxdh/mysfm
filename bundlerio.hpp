@@ -17,8 +17,16 @@
 using namespace std;
 
 
+DLL_EXPORT int WritePMVSCamFile(char* file, CameraPara cam);
+
+int SaveTracks(char* filepath, vector<TrackInfo>& tracks);
+
 int SaveTracksToPly(char* filepath, vector<TrackInfo>& trackSeq,
 	vector<int> cameraIDOrder, const vector<CameraPara>& cameras);
+
+int SaveTracksToPly(char* filepath, vector<TrackInfo>& trackSeq, const vector<CameraPara>& cameras);
+
+
 
 
 DLL_EXPORT int ReadBundlerOutFile(char* filename, vector<stPOS>& camParas, vector<stTrack>& tracks );

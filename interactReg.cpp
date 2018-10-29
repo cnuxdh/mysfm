@@ -7,15 +7,14 @@
 #include "panorama.hpp"
 #include "funcs.hpp"
 #include "hog.hpp"
+#include "pano2plane.h"
 
 
 #include "commondata.h"
 #include "CommonFuncs.h"
 #include "matrix.h"
 
-#include "delaunay.h"
-
-
+//#include "delaunay.h"
 
 
 int DrawCross1(CvPoint p, int len, IplImage* pImage)
@@ -122,17 +121,17 @@ int CIPanoReg::Init(char* pLeftFile, char* pRightFile)
 	pRP->EstimatePose(lpts, rpts, m_leftPanoCam, m_rightPanoCam );  
 
 
-	CalculateEssentialMatrix(m_leftPanoCam.R, m_leftPanoCam.t, m_rightPanoCam.R, m_rightPanoCam.t, true, 
+	CalculateEssentialMatrix(m_leftPanoCam.R, m_leftPanoCam.T, m_rightPanoCam.R, m_rightPanoCam.T, true, 
 		m_R, m_T, m_EM);
 		
 	//generate perspective images
 	m_pLeftPlaneImages.clear();
 	m_leftPlaneCams.clear();
-	PanoToPlanes(m_pLeft, 60, 90, 90,  1, m_leftPanoCam.R, m_leftPanoCam.t, m_pLeftPlaneImages, m_leftPlaneCams);
+	PanoToPlanes(m_pLeft, 60, 90, 90,  1, m_leftPanoCam.R, m_leftPanoCam.T, m_pLeftPlaneImages, m_leftPlaneCams);
 	
 	m_pRightPlaneImages.clear();
 	m_rightPlaneCams.clear();
-	PanoToPlanes(m_pRight, 60, 90, 90, 1, m_rightPanoCam.R, m_rightPanoCam.t, m_pRightPlaneImages, m_rightPlaneCams);
+	PanoToPlanes(m_pRight, 60, 90, 90, 1, m_rightPanoCam.R, m_rightPanoCam.T, m_pRightPlaneImages, m_rightPlaneCams);
 
 	//for debug
 	if(0)
@@ -210,7 +209,7 @@ int CIPanoReg::PtReg(Point2DDouble srcPt, Point2DDouble& dstPt, int nImageIndex)
 		//calculate the point coordinate of perspective image 
 		double ipt[3];
 		mult( m_leftPlaneCams[nTargetImage].R, leftPt, ipt, 3, 3, 1 );
-		double focalLen = m_leftPlaneCams[nTargetImage].focus;
+		double focalLen = m_leftPlaneCams[nTargetImage].focalLen;
 		int sx = ipt[0] / ipt[2] * (-focalLen);
 		int sy = ipt[1] / ipt[2] * (-focalLen);
 		int ht = m_pLeftPlaneImages[nTargetImage]->height;
@@ -259,9 +258,9 @@ int CIPanoReg::PtReg(Point2DDouble srcPt, Point2DDouble& dstPt, int nImageIndex)
 			/*
 			//judge the visibility
 			Point3DDouble baselineDir;
-			baselineDir.p[0] = m_leftPanoCam.t[0] - m_rightPanoCam.t[0];
-			baselineDir.p[1] = m_leftPanoCam.t[1] - m_rightPanoCam.t[1];
-			baselineDir.p[2] = m_leftPanoCam.t[2] - m_rightPanoCam.t[2];
+			baselineDir.p[0] = m_leftPanoCam.T[0] - m_rightPanoCam.T[0];
+			baselineDir.p[1] = m_leftPanoCam.T[1] - m_rightPanoCam.T[1];
+			baselineDir.p[2] = m_leftPanoCam.T[2] - m_rightPanoCam.T[2];
 
 			Point3DDouble leftBundleDir;
 			leftBundleDir.p[0] = gx;
@@ -294,7 +293,7 @@ int CIPanoReg::PtReg(Point2DDouble srcPt, Point2DDouble& dstPt, int nImageIndex)
 				continue;
 			*/
 
-			double focalLen = m_rightPlaneCams[k].focus;
+			double focalLen = m_rightPlaneCams[k].focalLen;
 			
 			double lA =   pR[0]*pn[0] + pR[3]*pn[1] + pR[6]*pn[2];
 			double lB =   pR[1]*pn[0] + pR[4]*pn[1] + pR[7]*pn[2];
@@ -442,7 +441,7 @@ int CIPanoRegTri::Init(char* pLeftFile, char* pRightFile)
 	pRP->EstimatePose(lpts, rpts, m_leftPanoCam, m_rightPanoCam );  
 	printf("inlier points: %d \n", lpts.size());
 	
-	//GeneratePanoEpipolarImageHeading(m_rightPanoCam.R, m_rightPanoCam.t, m_pLeft, m_pRight);
+	//GeneratePanoEpipolarImageHeading(m_rightPanoCam.R, m_rightPanoCam.T, m_pLeft, m_pRight);
 	
 	vector<Point2DDouble> lpts_tl,rpts_tl;
 	for(int i=0; i<lpts.size(); i++)
@@ -461,7 +460,7 @@ int CIPanoRegTri::Init(char* pLeftFile, char* pRightFile)
 
 	/*
 	//calculate the Essential matrix
-	CalculateEssentialMatrix(m_leftPanoCam.R, m_leftPanoCam.t, m_rightPanoCam.R, m_rightPanoCam.t, true, m_EM);
+	CalculateEssentialMatrix(m_leftPanoCam.R, m_leftPanoCam.T, m_rightPanoCam.R, m_rightPanoCam.T, true, m_EM);
 	
 	//generate triangles
 	m_pTin = new CTINClass("aaa");
@@ -486,11 +485,11 @@ int CIPanoRegTri::Init(char* pLeftFile, char* pRightFile)
 	//generate perspective images
 	m_pLeftPlaneImages.clear();
 	m_leftPlaneCams.clear();
-	PanoToPlanes(m_pLeft, 60, 90, 90,  1, m_leftPanoCam.R, m_leftPanoCam.t, m_pLeftPlaneImages, m_leftPlaneCams);
+	PanoToPlanes(m_pLeft, 60, 90, 90,  1, m_leftPanoCam.R, m_leftPanoCam.T, m_pLeftPlaneImages, m_leftPlaneCams);
 
 	m_pRightPlaneImages.clear();
 	m_rightPlaneCams.clear();
-	PanoToPlanes(m_pRight, 60, 90, 90, 1, m_rightPanoCam.R, m_rightPanoCam.t, m_pRightPlaneImages, m_rightPlaneCams);
+	PanoToPlanes(m_pRight, 60, 90, 90, 1, m_rightPanoCam.R, m_rightPanoCam.T, m_pRightPlaneImages, m_rightPlaneCams);
 
 	//for debug
 	if(0)
@@ -525,7 +524,7 @@ int CIPanoRegTri::PtReg(Point2DDouble srcPt, Point2DDouble& dstPt, int nImageInd
 		dstPt.p[1] = 0;
 		//find the triangle containing the srcpt
 		int pIndex[3];
-		int res = SelectTriangle(srcPt.p[0], srcPt.p[1], m_pTin, pIndex);
+		int res = 0; //SelectTriangle(srcPt.p[0], srcPt.p[1], m_pTin, pIndex);
 
 		if(res>0)
 		{
@@ -633,7 +632,7 @@ int CIPanoRegDirect::Init(char* pLeftFile, char* pRightFile)
 
 
 	//calculate the essential matrix
-	CalculateEssentialMatrix(m_leftPanoCam.R, m_leftPanoCam.t, m_rightPanoCam.R, m_rightPanoCam.t, 
+	CalculateEssentialMatrix(m_leftPanoCam.R, m_leftPanoCam.T, m_rightPanoCam.R, m_rightPanoCam.T, 
 		pRP->IsExplicit(), m_R,m_T, m_EM);
 	
 	return 0;
@@ -660,7 +659,7 @@ int CIPanoRegDirect::Init(IplImage* pLeft, IplImage* pRight, CameraPara leftCam,
 	m_rightPanoCam = rightCam;
 
 	//calculate the essential matrix
-	CalculateEssentialMatrix(m_leftPanoCam.R, m_leftPanoCam.t, m_rightPanoCam.R, m_rightPanoCam.t, m_leftPanoCam.bIsExplicit, 
+	CalculateEssentialMatrix(m_leftPanoCam.R, m_leftPanoCam.T, m_rightPanoCam.R, m_rightPanoCam.T, m_leftPanoCam.bIsExplicit, 
 		m_R, m_T, m_EM);
 	
 	//generate depth image
@@ -702,9 +701,9 @@ int CIPanoRegDirect::MatchingPoint(Point2DDouble srcPt, Point2DDouble& dstPt)
 	baselineDir.p[0] = lt[0];
 	baselineDir.p[1] = lt[1];
 	baselineDir.p[2] = lt[2];
-	//baselineDir.p[0] = m_leftPanoCam.t[0] - m_rightPanoCam.t[0];
-	//baselineDir.p[1] = m_leftPanoCam.t[1] - m_rightPanoCam.t[1];
-	//baselineDir.p[2] = m_leftPanoCam.t[2] - m_rightPanoCam.t[2];
+	//baselineDir.p[0] = m_leftPanoCam.T[0] - m_rightPanoCam.T[0];
+	//baselineDir.p[1] = m_leftPanoCam.T[1] - m_rightPanoCam.T[1];
+	//baselineDir.p[2] = m_leftPanoCam.T[2] - m_rightPanoCam.T[2];
 	//printf("baseline : %lf %lf %lf \n", baselineDir.p[0], baselineDir.p[1], baselineDir.p[2]);
 
 	//calculate the epipolar normal
@@ -1020,15 +1019,15 @@ int CIPanoRegDirect::GroundPointReg(Point2DDouble leftPt, Point2DDouble& rightPt
 	double res[3];
 	mult(lR, rp, res, 3, 3, 1);
 	double gx,gy,gz;
-	gx = m_leftPanoCam.t[0] + res[0];
-	gy = m_leftPanoCam.t[1] + res[1];
-	gz = m_leftPanoCam.t[2] + res[2];
+	gx = m_leftPanoCam.T[0] + res[0];
+	gy = m_leftPanoCam.T[1] + res[1];
+	gz = m_leftPanoCam.T[2] + res[2];
 
 	//transform to the right camera
 	double gp[3];
-	gp[0] = gx - m_rightPanoCam.t[0];
-	gp[1] = gy - m_rightPanoCam.t[1];
-	gp[2] = gz - m_rightPanoCam.t[2];
+	gp[0] = gx - m_rightPanoCam.T[0];
+	gp[1] = gy - m_rightPanoCam.T[1];
+	gp[2] = gz - m_rightPanoCam.T[2];
 	mult(m_rightPanoCam.R, gp, res, 3, 3, 1);
 
 	double radius = (double)(m_rightPanoCam.cols) / (2*PI);

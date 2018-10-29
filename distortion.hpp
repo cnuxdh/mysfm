@@ -27,4 +27,17 @@ void InvertDistortion(int n_in, int n_out, double r0, double r1,
 
 v2_t UndistortNormalizedPoint(v2_t p, camera_params_t c);
 
+
+template<typename T>
+int Undistort(T sx, T sy, T& dx, T& dy, T k1, T k2)
+{
+	T radius = sx * sx + sy * sy;
+
+	dx = sx * (1.0 + radius * (k1 + radius * k2));
+	dy = sy * (1.0 + radius * (k1 + radius * k2));
+
+	return 0;
+}
+
+
 #endif /* __distortion_h__ */

@@ -5,23 +5,30 @@
 #include <vector>
 using namespace std;
 
-
-
 #include "dataBase.hpp"
 #include "defines.hpp"
+
+//
+//#include <opencv2/core/core.hpp>
+//#include <opencv2/highgui/highgui.hpp>
+//#include <opencv2/features2d/features2d.hpp>
+//#include <opencv2/imgproc/imgproc.hpp>
+//using namespace cv;
 
 
 
 int DLL_EXPORT DetectFileFeaturePts(char** filenames, int nFile, char* outpath);
 
-int DLL_EXPORT DetectFileFeaturePts(char** filenames, int nFile, vector<ImgFeature>& imgFeatures, int maxHt);
+//multiple images
+int DLL_EXPORT DetectFileFeaturePts(char** filenames, int nFile, 
+	vector<ImgFeature>& imgFeatures, int maxHt, double& dProgress);
 
 //for single image
 int DLL_EXPORT DetectFileFeaturePts(char* filenames, ImgFeature& imgFeatures, int maxHt);
 
 
 int DLL_EXPORT MatchImageFiles(vector<ImgFeature>& imgFeatures, vector<PairMatchRes>& matchRes,
-	CameraType camtype=PerspectiveCam);
+	CameraType camtype, int matchSteps);
 
 
 DLL_EXPORT int dll_EstimatePose5Point_Pano( vector<Point3DDouble>& pl, 
@@ -65,6 +72,20 @@ DLL_EXPORT int dll_EstimatePose5Point_Pano( vector<Point3DDouble>& p1,
 	double radius,
 	int num_trials, double threshold, 
 	double *R, double *t, vector<double>& residual);
+
+
+DLL_EXPORT int dll_GenerateRainbowMapping(vector<int>& r, vector<int>& g, vector<int>& b);
+
+
+
+//DLL_EXPORT int dll_DetectFeatPts(char** filenames, int nfile,
+//					vector<CImageDataBase*>& vecImageDataPointer, double& dProgress);
+
+//ORB feature detection
+DLL_EXPORT int dll_GenerateORBFeature(string filepath, vector<KeyPoint>& Keys, Mat& Descriptors);
+
+
+
 
 #endif
 

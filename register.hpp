@@ -7,6 +7,8 @@
 #include "feature.hpp"
 #include "defines.hpp"
 #include "imagedata.hpp"
+#include "videoMosaic.hpp"
+
 
 
 
@@ -78,6 +80,14 @@ public:
 };
 
 
+//class for orb perspective matching, added by xdh, 2018.1.2
+class DLL_EXPORT CORBPerspectiveMatch : public CMatchBase
+{
+public:
+	CORBPerspectiveMatch();
+	~CORBPerspectiveMatch();
+	int Match(ImgFeature& lImage, ImgFeature& rImage, PairMatchRes& pairMatch);
+};
 
 
 
@@ -113,6 +123,9 @@ public:
 	int GenerateTracks( vector<PairMatchRes>& pairMatchs, vector<TrackInfo>& tracks );
 	int GenerateTracks( vector<ImgFeature>& imgFeatures, vector<PairMatchRes>& pairMatchs, vector<TrackInfo>& tracks );
 	int GenerateTracks( vector<PairMatchRes>& pairMatchs, vector<CImageDataBase*> imageData, vector<TrackInfo>& tracks );
+
+	int GenerateTracks(vector<CVideoKeyFrame>& imgFeatures, vector<PairMatchRes>& pairMatchs, vector<TrackInfo>& tracks);
+
 };
 
 
@@ -175,11 +188,20 @@ vector<int> EstimateTransform(const vector<stPtFeature> &k1,
 
 
 
-DLL_EXPORT vector<int> EstimateFMatrix(  const vector<Point2DDouble>& pl, 
-											const vector<Point2DDouble>& pr,
-											int num_trials, 
-											double threshold,
-											double* F=NULL);
+//estimate the fundamental matrix
+DLL_EXPORT vector<int> EstimateFMatrix( const vector<Point2DDouble>& pl, 
+										const vector<Point2DDouble>& pr,
+										int num_trials, 
+										double threshold,
+										double* F=NULL);
+
+//estimate the homography matrix
+DLL_EXPORT vector<int> EstimateHMatrix( const vector<Point2DDouble>& pl,
+										const vector<Point2DDouble>& pr,
+										int num_trials,
+										double threshold,
+										double* H = NULL);
+
 
 
 

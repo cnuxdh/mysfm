@@ -27,6 +27,7 @@ public:
 	
 	virtual int ReadPOSData(char* filename){return 0;}
 	virtual int GetPOS(int index, POSInfo& pos){return 0;}
+	virtual int GetPOSNum(){ return 0; }
 };
 
 
@@ -39,14 +40,14 @@ public:
   
 	int ReadPOSData(char* filename);
 	int GetPOS(int index, POSInfo& pos);
+	int GetPOSNum();
 
 private:
 	vector<POSInfo> m_posArray;
 };
 
-
 //read the pos data installed in the car
-class DLL_EXPORT CReadCarPos: public CReadPosBase
+class DLL_EXPORT CReadCarPos : public CReadPosBase
 {
 public:
 	CReadCarPos();
@@ -54,6 +55,23 @@ public:
 
 	int ReadPOSData(char* filename);
 	int GetPOS(int index, POSInfo& pos);
+	int GetPOSNum();
+
+private:
+	vector<POSInfo> m_posArray;
+};
+
+
+//read the pos data installed in the car
+class DLL_EXPORT CReadCarPosOrbit: public CReadPosBase
+{
+public:
+	CReadCarPosOrbit();
+	~CReadCarPosOrbit();
+
+	int ReadPOSData(char* filename);
+	int GetPOS(int index, POSInfo& pos);
+	int GetPOSNum();
 
 private:
 	vector<POSInfo> m_posArray;

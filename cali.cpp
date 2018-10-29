@@ -46,11 +46,11 @@ void InitializeCameraParams(CameraPara camPara, camera_params_t &camera)
 	}
 	camera.known_intrinsics = 0;
     
-	camera.f    = camPara.focus;
+	camera.f    = camPara.focalLen;
 	camera.k[0] = camPara.k1;
 	camera.k[1] = camPara.k2;
 	memcpy(camera.R, camPara.R, sizeof(double)*9);
-	memcpy(camera.t, camPara.t, sizeof(double)*3);
+	memcpy(camera.t, camPara.T, sizeof(double)*3);
 }
 
 
