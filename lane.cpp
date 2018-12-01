@@ -130,7 +130,7 @@ int CVDetectLane(string filepath)
     fillholes(gray);
     fillholes(gray);
     //equalizeHist(gray, gray);
-    imwrite(outpath + title + "_fill.jpg", gray);
+    //imwrite(outpath + title + "_fill.jpg", gray);
     int rows = gray.rows;
     int cols = gray.cols;
 
@@ -163,7 +163,7 @@ int CVDetectLane(string filepath)
             }
         }
     }
-    imwrite(outpath + title + "_binary.jpg", binaryImage);
+    //imwrite(outpath + title + "_binary.jpg", binaryImage);
 
     //3. remove the noise
     medianBlur(binaryImage, binaryImage, 3);
@@ -172,7 +172,7 @@ int CVDetectLane(string filepath)
         Size(2 * dilate_size + 1, 2 * dilate_size + 1),
         Point(dilate_size, dilate_size));
     dilate(binaryImage, binaryImage, dilate_element);
-    imwrite(outpath + title + "_fore.jpg", binaryImage);
+    //imwrite(outpath + title + "_fore.jpg", binaryImage);
 
     //4. contours
     Mat drawing = Mat::zeros(gray.size(), CV_8UC3);

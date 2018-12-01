@@ -1392,7 +1392,7 @@ int CSiftMatch::Match(ImgFeature& lImage, ImgFeature& rImage, PairMatchRes& pair
 
 
 	//remove outliers based on Fundamental matrix
-	if(1)
+	if(0)
 	{
 		vector<Point2DDouble> lpts;
 		vector<Point2DDouble> rpts;
@@ -1427,7 +1427,7 @@ int CSiftMatch::Match(ImgFeature& lImage, ImgFeature& rImage, PairMatchRes& pair
 		}
 
 		//from "Modeling the World from Internet Photo Collections"
-		int threshold = 0.016*max( lImage.ht, lImage.wd );
+		int threshold = 0.024*max( lImage.ht, lImage.wd );
 
 		vector<int> inliers  = EstimateFMatrix(lpts, rpts, 512, threshold);
 		vector<int> inliersH = EstimateHMatrix(lpts, rpts, 512, threshold);

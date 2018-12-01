@@ -1,4 +1,13 @@
 
+//#ifdef WIN32
+//#include"windows.h"
+//#include "atlimage.h"
+//#endif
+
+#include <opencv2/imgproc/imgproc.hpp>
+#include <opencv2/highgui/highgui.hpp>
+#include <opencv2/stitching/stitcher.hpp>
+
 #include<fstream>
 
 #include"sfm.hpp"
@@ -30,6 +39,9 @@
 //gdal
 #include"geotiff.h"
 
+#include"gdal_priv.h"
+#include"ogr_spatialref.h"
+
 
 ////mba dll
 #include"mbaExports.h"
@@ -38,9 +50,9 @@
 
 //#include<pthread.h>
 
-
-
+using namespace cv;
 using namespace std;
+
 
 CSFMSystem::CSFMSystem()
 {
@@ -799,6 +811,202 @@ int CSFMSystem::GenerateOrthoImages()
 	}	
 
 	return 0;
+}
+
+int CSFMSystem::WeightFusion(double outResolution, string mosaicFile)
+{
+    //mosaic and fusion	
+    double minx, maxx, miny, maxy;
+    double maxrx, maxry;
+    double rx, ry;
+    minx = 5000000000;	maxx = -5000000000;
+    miny = 5000000000;	maxy = -5000000000;
+    maxrx = 0;
+    maxry = 0;
+    //int zoneNumber = mValidDOMGeoData[0].zoneNumber;
+    for (int i = 0; i<mValidDOMGeoData.size(); i++)
+    {
+        //if (zoneNumber != geoArray[i].zoneNumber)
+        //	continue;		
+        //resolution
+        rx = mValidDOMGeoData[i].dx;
+        ry = fabs(mValidDOMGeoData[i].dy);
+        maxrx = max(rx, maxrx);
+        maxry = max(ry, maxry);
+        //position
+        minx = min(minx, mValidDOMGeoData[i].left);
+        maxx = max(maxx, mValidDOMGeoData[i].left + mValidDOMGeoData[i].wd*rx);
+        miny = min(miny, mValidDOMGeoData[i].top - mValidDOMGeoData[i].ht*ry);
+        maxy = max(maxy, mValidDOMGeoData[i].top);
+    }
+    printf(" left:%lf right:%lf  top:%lf bottom:%lf \n", minx, maxx, maxy, miny);
+
+    //double outResolution = 0.1;
+    double resolution = outResolution;
+    int oht = (maxy - miny) / resolution;
+    int owd = (maxx - minx) / resolution;
+    printf("%d %d \n", oht, owd);
+    Mat oimage(oht, owd, CV_16SC3, Scalar(0, 0, 0));
+
+    std::vector<cv::Mat> out_pyr_laplace;
+    int nlevel = 4;
+    cv::detail::createLaplacePyr(oimage, nlevel, out_pyr_laplace);
+    printf("size of pyramid: %d \n", out_pyr_laplace.size());
+
+    std::vector<cv::Mat> out_pyr_weights(nlevel + 1);
+    out_pyr_weights[0].create(oht, owd, CV_32FC1);
+    out_pyr_weights[0] = Scalar(0);
+    for (int i = 0; i < nlevel; ++i)
+        cv::pyrDown(out_pyr_weights[i], out_pyr_weights[i + 1]);
+
+    for (int fi = 0; fi < mValidDOMFiles.size(); fi++)
+    {
+        //convert the image type
+        Mat image = imread(mValidDOMFiles[fi]);
+        Mat srcimage;
+        image.convertTo(srcimage, CV_16SC3);
+        
+        //create laplacian images
+        std::vector<cv::Mat> pyr_laplace;
+        cv::detail::createLaplacePyr(srcimage, nlevel, pyr_laplace);
+        printf("size of pyramid: %d \n", pyr_laplace.size());
+
+        //create weight image
+        Mat weightImage;
+        int w = image.cols;
+        int h = image.rows;
+        weightImage.create(h, w, CV_32FC1);
+        float *p = (float*)weightImage.data;
+        float x_center = w / 2;
+        float y_center = h / 2;
+        float dis_max = sqrt(x_center*x_center + y_center * y_center);
+        int weightType = 0; // svar.GetInt("Map2D.WeightType", 0);
+        
+        for (int i = 0; i < h; i++)
+        {
+            uchar* pbuffer = image.ptr<uchar>(i);
+            for (int j = 0; j < w; j++)
+            {
+                int r = pbuffer[j * 3];
+                int g = pbuffer[j * 3 + 1];
+                int b = pbuffer[j * 3 + 2];
+                if ((r + g + b) == 0)
+                {
+                    *p = 0;
+                }
+                else
+                {
+                    float dis = (i - y_center)*(i - y_center) + (j - x_center)*(j - x_center);
+                    dis = 1 - sqrt(dis) / dis_max;
+                    if (0 == weightType)
+                        *p = dis;
+                    else *p = dis * dis;
+                    if (*p <= 1e-5) *p = 1e-5;
+                }
+                p++;
+            }
+        }
+
+        //create weight pyramid
+        std::vector<cv::Mat> pyr_weights(nlevel + 1);
+        pyr_weights[0] = weightImage;
+        for (int i = 0; i < nlevel; ++i)
+            cv::pyrDown(pyr_weights[i], pyr_weights[i + 1]);
+
+        //fill the pyramid
+        int l = (mValidDOMGeoData[fi].left - minx) / outResolution;
+        int t = (maxy - mValidDOMGeoData[fi].top) / outResolution;
+        for (int i = 0; i <= nlevel; i++)
+        {
+            int pht = pyr_laplace[i].rows;
+            int pwd = pyr_laplace[i].cols;
+            printf("%d %d \n", pht, pwd);
+            for (int m = 0; m < pht; m++)
+            {
+                //weight data
+                int mt = m + t;
+                if (mt >= oht) mt = oht - 1;
+                short* outp = out_pyr_laplace[i].ptr<short>(mt);
+                short* inp = pyr_laplace[i].ptr<short>(m);
+
+                //image data
+                float* outw = out_pyr_weights[i].ptr<float>(mt);
+                float* inw = pyr_weights[i].ptr<float>(m);
+
+                for (int n = 0; n < pwd; n++)
+                {
+                    //ignore the background
+                    //int sg = inp[n * 3] + inp[n * 3 + 1] + inp[n * 3 + 2];
+                    //if (sg == 0)  continue;
+                    if (inw[n] == 0)
+                        continue;
+
+                    //update the image and weight
+                    int nl = n + l;
+                    if (nl >= owd) nl = owd - 1;
+                    if (inw[n] > outw[nl])
+                    {
+                        outw[nl] = inw[n];
+                        outp[(nl) * 3] = inp[n * 3];
+                        outp[(nl) * 3 + 1] = inp[n * 3 + 1];
+                        outp[(nl) * 3 + 2] = inp[n * 3 + 2];
+                    }
+                }
+            }
+            //zoom
+            l = 0.5*l;
+            t = 0.5*t;
+        }
+    }
+
+    cv::detail::restoreImageFromLaplacePyr(out_pyr_laplace);
+    Mat result = out_pyr_laplace[0].clone();
+    if (result.type() == CV_16SC3)
+        result.convertTo(result, CV_8UC3);
+    result.setTo(cv::Scalar::all(0), out_pyr_weights[0] == 0);
+
+    
+    //save as tiff file    
+    int zoneNumber = mValidDOMGeoData[0].zoneNumber; //geoinfo.zoneNumber;
+    OGRSpatialReference oSRS;
+    oSRS.SetUTM(zoneNumber);
+    oSRS.SetWellKnownGeogCS("WGS84");
+    char    *pszWKT = NULL;
+    oSRS.exportToWkt(&pszWKT);
+    stGeoInfo geoinfo;
+    geoinfo.left = minx;
+    geoinfo.top =  maxy;
+    geoinfo.dx = resolution;
+    geoinfo.dy = -resolution;
+    geoinfo.projectRef = pszWKT;
+    
+    int rht = result.rows;
+    int rwd = result.cols;
+    unsigned char* pr = new unsigned char[rht*rwd];
+    unsigned char* pg = new unsigned char[rht*rwd];
+    unsigned char* pb = new unsigned char[rht*rwd];
+    int index = 0;
+    for (int m = 0; m < rht; m++)
+    {
+        uchar *p = result.ptr<uchar>(m);
+        for (int n = 0; n < rwd; n++)
+        {
+            pr[index] = p[n * 3];
+            pg[index] = p[n * 3 + 1];
+            pb[index] = p[n * 3 + 2];
+            index++;
+        }
+    }
+
+
+
+
+
+    delete[] pr;
+    delete[] pg;
+    delete[] pb;
+
+    return 0;
 }
 
 int CSFMSystem::Fusion(double outResolution, string mosaicFile)

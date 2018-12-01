@@ -60,6 +60,7 @@ public:
 	int DEMInterpolation();
 	int GenerateOrthoImages();
 	int Fusion(double outResolution, string mosaicFile);
+    int WeightFusion(double outResolution, string mosaicFile);
 
 	//batch processing
 	int Run();
